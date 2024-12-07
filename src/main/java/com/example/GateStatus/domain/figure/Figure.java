@@ -31,4 +31,6 @@ public class Figure extends BaseTimeEntity {
     @OneToMany(mappedBy = "figure")
     private List<Issue> issues;
 
+    private int viewCount;
+    private int likeCount;
 }
