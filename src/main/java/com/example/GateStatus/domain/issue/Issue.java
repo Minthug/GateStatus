@@ -3,10 +3,15 @@ package com.example.GateStatus.domain.issue;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.global.BaseTimeEntity;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 
 @Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Issue extends BaseTimeEntity {
 
     @Id
@@ -27,4 +32,8 @@ public class Issue extends BaseTimeEntity {
     private int viewCount;
     private boolean isHot;
 
+    public Issue(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
 }
