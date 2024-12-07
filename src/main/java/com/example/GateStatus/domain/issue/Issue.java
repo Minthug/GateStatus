@@ -1,12 +1,9 @@
 package com.example.GateStatus.domain.issue;
 
 import com.example.GateStatus.domain.figure.Figure;
-import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.global.BaseTimeEntity;
 import jakarta.persistence.*;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity

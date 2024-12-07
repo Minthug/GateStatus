@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.figure;
 
+import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.issue.Issue;
 import com.example.GateStatus.global.BaseTimeEntity;
 import jakarta.persistence.*;
@@ -22,15 +23,25 @@ public class Figure extends BaseTimeEntity {
     private Long id;
 
     private String name;
-
-    private String thumbnailUrl;
+    private String englishName;
+    private String birth; // 출생일
+    private String place; // 활동지
+    private String profileUrl;
 
     @Enumerated(EnumType.STRING)
     private FigureType figureType;
 
-    @OneToMany(mappedBy = "figure")
-    private List<Issue> issues;
+    @ElementCollection
+    private List<String> education;
 
-    private int viewCount;
-    private int likeCount;
+    @ElementCollection
+    private List<Career> careers;
+
+    @ElementCollection
+    private List<String> sites;
+
+    @ElementCollection
+    private List<String> activities;
+
+    private String updateSource;
 }
