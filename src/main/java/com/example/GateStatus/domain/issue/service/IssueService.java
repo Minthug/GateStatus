@@ -22,7 +22,7 @@ public class IssueService {
 
         return registered.getId();
     }
-
-    @Transactional
-    public FindIssueResponse
+//
+//    @Transactional
+//    public FindIssueResponse
 }
