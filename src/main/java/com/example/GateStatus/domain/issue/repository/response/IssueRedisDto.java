@@ -9,7 +9,6 @@ import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.List;
 
 public record IssueRedisDto(Long issueId, String title, String content,
                             @JsonSerialize(using = LocalDateTimeSerializer.class)
@@ -31,7 +30,7 @@ public record IssueRedisDto(Long issueId, String title, String content,
                 response.issueId(),
                 response.title(),
                 response.content(),
-                createdAt
+                createdAt,
         );
     }
 }
