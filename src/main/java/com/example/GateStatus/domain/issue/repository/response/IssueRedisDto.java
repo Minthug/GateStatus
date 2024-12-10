@@ -30,7 +30,7 @@ public record IssueRedisDto(Long issueId, String title, String content,
                 response.issueId(),
                 response.title(),
                 response.content(),
-                createdAt,
+                createdAt
         );
     }
 }
