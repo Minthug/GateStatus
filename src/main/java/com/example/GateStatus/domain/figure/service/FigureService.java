@@ -9,6 +9,8 @@ import com.example.GateStatus.domain.figure.service.response.FindFigureDetailRes
 import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +48,21 @@ public class FigureService {
     public FindFigureDetailResponse findFigure(FindFigureCommand command) {
         Figure findFigure = findFigureById(command.figureId());
         return FindFigureDetailResponse.from(findFigure);
+    }
+
+    @Transactional
+    public Page<FindFigureDetailResponse> findAllFigures(PageRequest pageRequest, String type, String keyword) {
+        Page<Figure> figures;
+        if (type != null && keyword != null) {
+            figures = switch (type.toLowerCase()) {
+                case "name" -> figureRepository.findByNameContaining(keyword, pageRequest);
+                case "plcae" -> figureRepository.findByPlaceContaining(keyword, pageRequest);
+                default -> figureRepository.findAll(pageRequest);
+            };
+        } else {
+          figures = figureRepository.findAll(pageRequest);
+        }
+        return figures.map(FindFigureDetailResponse::from);
     }
 
     private Figure findFigureById(Long figureId) {

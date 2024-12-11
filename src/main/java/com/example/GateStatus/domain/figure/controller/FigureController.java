@@ -6,6 +6,8 @@ import com.example.GateStatus.domain.figure.service.request.RegisterFigureComman
 import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
 import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,4 +30,12 @@ public class FigureController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping
+    public ResponseEntity<Page<FindFigureDetailResponse>> findAllFigures(@RequestParam(defaultValue = "0") int page,
+                                                                         @RequestParam(defaultValue = "0") int size,
+                                                                         @RequestParam(required = false) String type,
+                                                                         @RequestParam(required = false) String keyword) {
+        PageRequest pageRequest = PageRequest.of(page, size);
+        return ResponseEntity.ok(figureService.findAllFigures(pageRequest, type, keyword));
+    }
 }
