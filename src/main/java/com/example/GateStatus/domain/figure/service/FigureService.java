@@ -1,18 +1,24 @@
 package com.example.GateStatus.domain.figure.service;
 
 import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.exception.NotFoundFigureException;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.request.FindFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.RegisterFigureCommand;
+import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
 import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
 import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
+import com.example.GateStatus.domain.figure.service.response.UpdateFigureResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -68,6 +74,32 @@ public class FigureService {
     private Figure findFigureById(Long figureId) {
         return figureRepository.findById(figureId)
                 .orElseThrow(() -> new NotFoundFigureException("Figure not found"));
+    }
+
+    public List<FindFigureDetailResponse> findFiguresByType(FigureType figureType) {
+        return figureRepository.findByFigureType(figureType)
+                .stream()
+                .map(FindFigureDetailResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public UpdateFigureResponse updateFigure(Long figureId, UpdateFigureCommand command) {
+        Figure figure = findFigureById(figureId);
+        figure.update(
+                figure.getName(),
+                figure.getEnglishName(),
+                figure.getBirth(),
+                figure.getPlace(),
+                figure.getProfileUrl(),
+                figure.getFigureType(),
+                figure.getEducation(),
+                figure.getCareers(),
+                figure.getSites(),
+                figure.getActivities(),
+                figure.getUpdateSource()
+        );
+        return UpdateFigureResponse.from(figure);
     }
 
     @Transactional

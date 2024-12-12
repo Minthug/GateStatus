@@ -44,4 +44,29 @@ public class Figure extends BaseTimeEntity {
     private List<String> activities;
 
     private String updateSource;
+
+    public void update(
+            String name,
+            String englishName,
+            String birth,
+            String place,
+            String profileUrl,
+            FigureType figureType,
+            List<String> education,
+            List<Career> careers,
+            List<String> sites,
+            List<String> activities,
+            String updateSource) {
+        this.name = name;
+        this.englishName = englishName;
+        this.birth = birth;
+        this.place = place;
+        this.profileUrl = profileUrl;
+        this.figureType = figureType;
+        this.education = education;
+        this.careers = careers;
+        this.sites = sites;
+        this.activities = activities;
+        this.updateSource = updateSource;
+    }
 }
