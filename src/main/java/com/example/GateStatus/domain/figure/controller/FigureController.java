@@ -61,5 +61,4 @@ public class FigureController {
         figureService.deleteFigure(figureId);
         return ResponseEntity.noContent().build();
     }
-
 }
