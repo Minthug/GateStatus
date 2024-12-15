@@ -55,6 +55,7 @@ public class Figure extends BaseTimeEntity {
             String place,
             String profileUrl,
             FigureType figureType,
+            FigureParty figureParty,
             List<String> education,
             List<Career> careers,
             List<String> sites,
@@ -66,6 +67,7 @@ public class Figure extends BaseTimeEntity {
         this.place = place;
         this.profileUrl = profileUrl;
         this.figureType = figureType;
+        this.figureParty = figureParty;
         this.education = education;
         this.careers = careers;
         this.sites = sites;

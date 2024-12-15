@@ -93,6 +93,7 @@ public class FigureService {
                 figure.getPlace(),
                 figure.getProfileUrl(),
                 figure.getFigureType(),
+                figure.getFigureParty(),
                 figure.getEducation(),
                 figure.getCareers(),
                 figure.getSites(),
