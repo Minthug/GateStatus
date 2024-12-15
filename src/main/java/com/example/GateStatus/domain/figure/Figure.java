@@ -31,6 +31,9 @@ public class Figure extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     private FigureType figureType;
 
+    @Enumerated(EnumType.STRING)
+    private FigureParty figureParty;
+
     @ElementCollection
     private List<String> education;
 

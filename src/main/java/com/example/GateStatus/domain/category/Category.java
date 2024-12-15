@@ -20,4 +20,5 @@ public class Category extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Long id;
 
+
 }
