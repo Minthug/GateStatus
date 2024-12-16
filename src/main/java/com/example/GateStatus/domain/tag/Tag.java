@@ -3,14 +3,14 @@ package com.example.GateStatus.domain.tag;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureTag;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.List;
 
 @Entity
 @Getter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Tag {
 

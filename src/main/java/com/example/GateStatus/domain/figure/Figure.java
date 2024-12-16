@@ -84,5 +84,8 @@ public class Figure extends BaseTimeEntity {
         this.figureTag.add(figureTag);
     }
 
-    public void
+    public void removeFigureTag(Tag tag) {
+        this.figureTag.remove(tag);
+        tag.getFigureTags().remove(this);
+    }
 }
