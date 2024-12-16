@@ -1,7 +1,6 @@
 package com.example.GateStatus.domain.figure;
 
 import com.example.GateStatus.domain.career.Career;
-import com.example.GateStatus.domain.issue.Issue;
 import com.example.GateStatus.global.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -47,6 +46,9 @@ public class Figure extends BaseTimeEntity {
     private List<String> activities;
 
     private String updateSource;
+
+    @OneToMany(mappedBy = "figure")
+    private List<FigureTag> figureTag;
 
     public void update(
             String name,
