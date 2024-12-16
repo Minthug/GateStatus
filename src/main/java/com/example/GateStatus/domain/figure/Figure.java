@@ -1,6 +1,7 @@
 package com.example.GateStatus.domain.figure;
 
 import com.example.GateStatus.domain.career.Career;
+import com.example.GateStatus.domain.tag.Tag;
 import com.example.GateStatus.global.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -8,6 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -47,8 +49,8 @@ public class Figure extends BaseTimeEntity {
 
     private String updateSource;
 
-    @OneToMany(mappedBy = "figure")
-    private List<FigureTag> figureTag;
+    @OneToMany(mappedBy = "figure", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<FigureTag> figureTag = new ArrayList<>();
 
     public void update(
             String name,
@@ -76,4 +78,11 @@ public class Figure extends BaseTimeEntity {
         this.activities = activities;
         this.updateSource = updateSource;
     }
+
+    public void addFigureTag(Tag tag) {
+        FigureTag figureTag = new FigureTag(this, tag);
+        this.figureTag.add(figureTag);
+    }
+
+    public void
 }
