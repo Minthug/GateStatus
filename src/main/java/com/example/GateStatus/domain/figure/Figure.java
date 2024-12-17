@@ -79,9 +79,10 @@ public class Figure extends BaseTimeEntity {
         this.updateSource = updateSource;
     }
 
-    public void addFigureTag(Tag tag) {
+    public FigureTag addFigureTag(Tag tag) {
         FigureTag figureTag = new FigureTag(this, tag);
         this.figureTag.add(figureTag);
+        return figureTag;
     }
 
     public void removeFigureTag(Tag tag) {

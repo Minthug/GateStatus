@@ -35,8 +35,8 @@ public class TagService {
                         .tagName(command.tagName())
                         .build()));
 
-        figure.addFigureTag(tag);
-        return TagResponse.from(tag);
+        FigureTag figureTag = figure.addFigureTag(tag);
+        return TagResponse.from(figureTag);
     }
 
     @Transactional
