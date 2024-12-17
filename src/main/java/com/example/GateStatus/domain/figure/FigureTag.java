@@ -3,10 +3,18 @@ package com.example.GateStatus.domain.figure;
 import com.example.GateStatus.domain.tag.Tag;
 import com.example.GateStatus.global.BaseTimeEntity;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Entity
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class FigureTag extends BaseTimeEntity {
 
     @Id

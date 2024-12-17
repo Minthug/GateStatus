@@ -1,8 +1,10 @@
 package com.example.GateStatus.domain.tag.service;
 
 import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.figure.FigureTag;
 import com.example.GateStatus.domain.figure.exception.NotFoundFigureException;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.figure.service.response.FigureResponse;
 import com.example.GateStatus.domain.tag.Tag;
 import com.example.GateStatus.domain.tag.TagRepository;
 import com.example.GateStatus.domain.tag.exception.NotFoundTagException;
@@ -12,6 +14,9 @@ import com.example.GateStatus.domain.tag.service.response.TagResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -43,5 +48,23 @@ public class TagService {
                 .orElseThrow(() -> new NotFoundTagException("Tag not found"));
 
         figure.removeFigureTag(tag);
+    }
+
+    public List<TagResponse> getFigureTags(Long figureId) {
+        return figureRepository.findById(figureId)
+                .orElseThrow(() -> new NotFoundTagException("Figure not found"))
+                .getFigureTag().stream()
+                .map(TagResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    public List<FigureResponse> getFigureByTags(String tagName) {
+        Tag tag = tagRepository.findByName(tagName)
+                .orElseThrow(() -> new NotFoundTagException("Tag not found"));
+
+        return tag.getFigureTags().stream()
+                .map(FigureTag::getFigure)
+                .map(FigureResponse::from)
+                .collect(Collectors.toList());
     }
 }
