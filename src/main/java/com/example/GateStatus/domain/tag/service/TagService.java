@@ -30,7 +30,7 @@ public class TagService {
         Figure figure = figureRepository.findById(command.figureId())
                 .orElseThrow(() -> new NotFoundFigureException("Figure not found"));
 
-        Tag tag = tagRepository.findByName(command.tagName())
+        Tag tag = tagRepository.findByTagName(command.tagName())
                 .orElseGet(() -> tagRepository.save(Tag.builder()
                         .tagName(command.tagName())
                         .build()));
@@ -44,7 +44,7 @@ public class TagService {
         Figure figure = figureRepository.findById(command.figureId())
                 .orElseThrow(() -> new NotFoundFigureException("Figure not found"));
 
-        Tag tag = tagRepository.findByName(command.tagName())
+        Tag tag = tagRepository.findByTagName(command.tagName())
                 .orElseThrow(() -> new NotFoundTagException("Tag not found"));
 
         figure.removeFigureTag(tag);
@@ -59,7 +59,7 @@ public class TagService {
     }
 
     public List<FigureResponse> getFigureByTags(String tagName) {
-        Tag tag = tagRepository.findByName(tagName)
+        Tag tag = tagRepository.findByTagName(tagName)
                 .orElseThrow(() -> new NotFoundTagException("Tag not found"));
 
         return tag.getFigureTags().stream()

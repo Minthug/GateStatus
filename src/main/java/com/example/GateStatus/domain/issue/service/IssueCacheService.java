@@ -77,7 +77,7 @@ public class IssueCacheService {
         }
 
         Pageable pageable = PageRequest.of(0, limit, Sort.by("createdAt").descending());
-        List<Issue> recentIssues = issueRepository.findAllByCreatedAtDesc(pageable);
+        List<Issue> recentIssues = issueRepository.findAllByOrderByCreatedAtDesc(pageable);
         List<IssueRedisDto> issueRedisDtos = recentIssues.stream()
                 .map(IssueRedisDto::from)
                 .collect(Collectors.toList());

@@ -5,6 +5,7 @@ import com.example.GateStatus.domain.figure.FigureTag;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -19,7 +20,7 @@ public class Tag {
     private Long id;
 
     @OneToMany(mappedBy = "tag")
-    private List<FigureTag> figureTags;
+    private List<FigureTag> figureTags = new ArrayList<>();
 
     private String tagName;
 }

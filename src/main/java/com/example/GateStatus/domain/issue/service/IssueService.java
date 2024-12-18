@@ -39,7 +39,7 @@ public class IssueService {
     @Transactional(readOnly = true)
     public FindIssuesResponse findIssue() {
         Pageable pageable = PageRequest.of(0, 100, Sort.by(Sort.Direction.DESC, "createdAt"));
-        List<Issue> issues = issueRepository.findAllByCreatedAtDesc(pageable);
+        List<Issue> issues = issueRepository.findAllByOrderByCreatedAtDesc(pageable);
         return FindIssuesResponse.of(issues.stream()
                 .map(issue -> new FindIssueResponse(
                         issue.getId(),
