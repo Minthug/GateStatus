@@ -37,3 +37,6 @@ out/
 .vscode/
 
 application.yml
+secret.yml
+configmap.yml
+deployment.yml
