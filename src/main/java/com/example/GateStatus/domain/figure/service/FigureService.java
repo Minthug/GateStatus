@@ -10,8 +10,10 @@ import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
 import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
 import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
 import com.example.GateStatus.domain.figure.service.response.UpdateFigureResponse;
+import com.example.GateStatus.global.kubernetes.KubernetesProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,10 @@ import java.util.stream.Collectors;
 public class FigureService {
 
     private final FigureRepository figureRepository;
+    private final KubernetesProperties kubernetesProperties;
+
+    @Value("${app.db-host}")
+    private String dbHost;
 
     @Transactional
     public RegisterFigureResponse getRegisterFigure(final RegisterFigureCommand command) {
