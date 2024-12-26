@@ -1,0 +1,49 @@
+server:
+  port: 8082
+
+app:
+  db-host: localhost
+  db-port: 5432
+  redis-host: localhost
+  redis-port: 6379
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/figure_db
+    username: minthug
+    password: 1234
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health, info, metrics
+    endpoint:
+      health:
+        show-details: always
+
+  cloud:
+    kubernetes:
+      config:
+        enabled: true
+        sources:
+          - namespace: default
+            name: figure-config
+      reload:
+        enabled: true
+
