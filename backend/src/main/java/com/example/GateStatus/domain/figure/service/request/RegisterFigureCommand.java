@@ -8,7 +8,6 @@ import lombok.Builder;
 import java.util.ArrayList;
 import java.util.List;
 
-@Builder
 public record RegisterFigureCommand(String name,
                                     String englishName,
                                     String birth,
