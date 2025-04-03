@@ -1,7 +1,7 @@
 // src/pages/FigureList.tsx
 import { useEffect, useState } from 'react';
 import { Card, Grid, Typography } from '@mui/material';
-import { figureApi } from '../api/figureApi';
+import { figureApi } from '../types/api/figureApi';
 import { Figure } from '../types/figure';
 
 export default function FigureList() {
