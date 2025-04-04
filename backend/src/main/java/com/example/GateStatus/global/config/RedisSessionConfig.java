@@ -1,5 +1,6 @@
 package com.example.GateStatus.global.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -16,8 +17,10 @@ import org.springframework.session.web.http.HttpSessionIdResolver;
 @EnableRedisHttpSession(maxInactiveIntervalInSeconds = 7200) // 2시간 세션 아웃
 public class RedisSessionConfig {
 
+    @Value("${spring.data.redis.host}")
     private String host;
 
+    @Value("${spring.data.redis.port}")
     private int port;
 
     @Bean
