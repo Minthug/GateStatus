@@ -22,4 +22,6 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
     List<Figure> findByFigureType(FigureType figureType);
 
     List<Figure> findTopByOrderByViewCountDesc(PageRequest pageRequest);
+
+    void updateViewCount(Long figureId, Long viewCount);
 }

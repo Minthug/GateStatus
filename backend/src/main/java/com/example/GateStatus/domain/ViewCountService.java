@@ -3,7 +3,10 @@ package com.example.GateStatus.domain;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -34,4 +37,26 @@ public class ViewCountService {
         return count != null ? count : 0L;
     }
 
+    @Scheduled(fixedRate = 1800000)
+    public void syncViewCountsToDB() {
+        Set<String> keys = stringLongRedisTemplate.keys(VIEW_COUNT_PREFIX + "*");
+
+        if (keys == null || keys.isEmpty()) {
+            return;
+        }
+
+        for (String key : keys) {
+            try {
+                String figureIdStr = key.substring(VIEW_COUNT_PREFIX.length());
+                Long figureId = Long.parseLong(figureIdStr);
+                Long viewCount = stringLongRedisTemplate.opsForValue().get(key);
+
+                if (viewCount != null) {
+                    figureRepository.updateViewCount(figureId, viewCount);
+                }
+            } catch (Exception e) {
+
+            }
+        }
+    }
 }
