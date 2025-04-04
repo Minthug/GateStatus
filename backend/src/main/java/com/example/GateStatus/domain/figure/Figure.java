@@ -49,6 +49,8 @@ public class Figure extends BaseTimeEntity {
 
     private String updateSource;
 
+    private Long viewCount;
+
     @OneToMany(mappedBy = "figure", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FigureTag> figureTag = new ArrayList<>();
 
@@ -88,5 +90,9 @@ public class Figure extends BaseTimeEntity {
     public void removeFigureTag(Tag tag) {
         this.figureTag.remove(tag);
         tag.getFigureTags().remove(this);
+    }
+
+    public void incrementViewCount() {
+        this.viewCount++;
     }
 }
