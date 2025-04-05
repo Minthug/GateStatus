@@ -37,6 +37,15 @@ public class Issue extends BaseTimeEntity {
         this.content = content;
     }
 
+    public void update(String title, String content, String thumbnailUrl, List<String> tags, int viewCount, boolean isHot) {
+        this.title = title;
+        this.content = content;
+        this.thumbnailUrl = thumbnailUrl;
+        this.tags = tags;
+        this.viewCount = viewCount;
+        this.isHot = isHot;
+    }
+
     public void incrementViewCount() {
         this.viewCount++;
     }

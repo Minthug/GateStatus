@@ -75,6 +75,11 @@ public class IssueCacheService {
         return issues;
     }
 
+    /**
+     * 인기(HOT) 이슈 목록 조회
+     * @param limit
+     * @return
+     */
     public List<Issue> getHotIssues(int limit) {
         List<Issue> cachedHotIssues = (List<Issue>) redisTemplate.opsForValue().get(HOT_ISSUES_KEY);
 
@@ -89,6 +94,10 @@ public class IssueCacheService {
         return hotIssues;
     }
 
+    /**
+     * Issue 정보 업데이트 시 캐시 갱신
+     * @param issue
+     */
     public void updateIssueCache(Issue issue) {
         String cacheKey = CACHE_KEY_PREFIX + issue.getId();
         redisTemplate.opsForValue().set(cacheKey, issue, CACHE_TTL, TimeUnit.SECONDS);
@@ -100,6 +109,10 @@ public class IssueCacheService {
         log.info("Updated cache for issue ID: {}", issue.getId());
     }
 
+    /**
+     * Issue 삭제 시 캐시 삭제
+     * @param issue
+     */
     public void evictIssueCache(Issue issue) {
         String cacheKey = CACHE_KEY_PREFIX + issue.getId();
         redisTemplate.delete(cacheKey);
@@ -111,6 +124,10 @@ public class IssueCacheService {
         log.info("Evicted cache for issue ID: {}", issue.getId());
     }
 
+    /**
+     * 조회수 증가 시 캐시 업데이트
+     * @param issueId
+     */
     public void incrementViewCount(Long issueId) {
         String cacheKey = CACHE_KEY_PREFIX + issueId;
         Issue cachedIssue = (Issue) redisTemplate.opsForValue().get(cacheKey);
