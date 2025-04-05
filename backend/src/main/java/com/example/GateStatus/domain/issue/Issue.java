@@ -36,4 +36,8 @@ public class Issue extends BaseTimeEntity {
         this.title = title;
         this.content = content;
     }
+
+    public void incrementViewCount() {
+        this.viewCount++;
+    }
 }

@@ -89,11 +89,35 @@ public class IssueCacheService {
         return hotIssues;
     }
 
-    @Scheduled(cron = "0 0 0 * * *")
-    public void cleanOldIssues() {
-        LocalDateTime weekAgo = LocalDateTime.now().minusWeeks(1);
-        redisTemplate.opsForZSet().removeRangeByScore(RECENT_ISSUES_KEY,
-                0,
-                weekAgo.toEpochSecond(ZoneOffset.UTC));
+    public void updateIssueCache(Issue issue) {
+        String cacheKey = CACHE_KEY_PREFIX + issue.getId();
+        redisTemplate.opsForValue().set(cacheKey, issue, CACHE_TTL, TimeUnit.SECONDS);
+
+        String figureIssuesKey = FIGURE_ISSUES_KEY_PREFIX + issue.getFigure().getId();
+        redisTemplate.delete(figureIssuesKey);
+
+        redisTemplate.delete(HOT_ISSUES_KEY);
+        log.info("Updated cache for issue ID: {}", issue.getId());
+    }
+
+    public void evictIssueCache(Issue issue) {
+        String cacheKey = CACHE_KEY_PREFIX + issue.getId();
+        redisTemplate.delete(cacheKey);
+
+        String figureIssuesKey = FIGURE_ISSUES_KEY_PREFIX + issue.getFigure().getId();
+        redisTemplate.delete(figureIssuesKey);
+
+        redisTemplate.delete(HOT_ISSUES_KEY);
+        log.info("Evicted cache for issue ID: {}", issue.getId());
+    }
+
+    public void incrementViewCount(Long issueId) {
+        String cacheKey = CACHE_KEY_PREFIX + issueId;
+        Issue cachedIssue = (Issue) redisTemplate.opsForValue().get(cacheKey);
+
+        if (cachedIssue != null) {
+            cachedIssue.incrementViewCount();
+            redisTemplate.opsForValue().set(cacheKey, cachedIssue, CACHE_TTL, TimeUnit.SECONDS);
+        }
     }
 }
