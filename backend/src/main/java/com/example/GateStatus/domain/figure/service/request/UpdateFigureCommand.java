@@ -1,6 +1,7 @@
 package com.example.GateStatus.domain.figure.service.request;
 
 import com.example.GateStatus.domain.career.Career;
+import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
 import lombok.Builder;
 
@@ -13,12 +14,11 @@ public record UpdateFigureCommand(
         String place,
         String profileUrl,
         FigureType figureType,
+        FigureParty figureParty,
         List<String> education,
         List<Career> careers,
         List<String> sites,
         List<String> activities,
         String updateSource
 ) {
-    @Builder
-    public UpdateFigureCommand {}
 }

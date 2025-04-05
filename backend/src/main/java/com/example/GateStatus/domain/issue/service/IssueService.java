@@ -84,7 +84,6 @@ public class IssueService {
                 command.content(),
                 command.thumbnail(),
                 command.tags(),
-                command.viewCount(),
                 command.isHot());
 
         issueCacheService.updateIssueCache(issue);

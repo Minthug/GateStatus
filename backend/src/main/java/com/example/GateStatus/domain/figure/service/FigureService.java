@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 public class FigureService {
 
     private final FigureRepository figureRepository;
+    private final FigureCacheService figureCacheService;
     private final KubernetesProperties kubernetesProperties;
 
     @Value("${app.db-host}")
@@ -35,6 +36,7 @@ public class FigureService {
 
     @Transactional
     public RegisterFigureResponse getRegisterFigure(final RegisterFigureCommand command) {
+
         Figure findFigure = figureRepository.findByName(command.name())
                 .orElseGet(() -> {
                     Figure figure = Figure.builder()
@@ -50,25 +52,32 @@ public class FigureService {
                             .activities(command.activities())
                             .updateSource(command.updateSource())
                             .build();
-                    figureRepository.save(figure);
-                    return figure;
+                    Figure savedFigure = figureRepository.save(figure);
+
+                    figureCacheService.updateFigureCache(savedFigure);
+
+                    return savedFigure;
                 });
         return RegisterFigureResponse.from(findFigure);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public FindFigureDetailResponse findFigure(FindFigureCommand command) {
-        Figure findFigure = findFigureById(command.figureId());
+
+        Figure findFigure = figureCacheService.findFigureById(command.figureId());
+
+        figureCacheService.incrementViewCount(command.figureId());
+
         return FindFigureDetailResponse.from(findFigure);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<FindFigureDetailResponse> findAllFigures(PageRequest pageRequest, String type, String keyword) {
         Page<Figure> figures;
         if (type != null && keyword != null) {
             figures = switch (type.toLowerCase()) {
                 case "name" -> figureRepository.findByNameContaining(keyword, pageRequest);
-                case "plcae" -> figureRepository.findByPlaceContaining(keyword, pageRequest);
+                case "place" -> figureRepository.findByPlaceContaining(keyword, pageRequest);
                 default -> figureRepository.findAll(pageRequest);
             };
         } else {
@@ -82,6 +91,7 @@ public class FigureService {
                 .orElseThrow(() -> new NotFoundFigureException("Figure not found"));
     }
 
+    @Transactional(readOnly = true)
     public List<FindFigureDetailResponse> findFiguresByType(FigureType figureType) {
         return figureRepository.findByFigureType(figureType)
                 .stream()
@@ -93,19 +103,22 @@ public class FigureService {
     public UpdateFigureResponse updateFigure(Long figureId, UpdateFigureCommand command) {
         Figure figure = findFigureById(figureId);
         figure.update(
-                figure.getName(),
-                figure.getEnglishName(),
-                figure.getBirth(),
-                figure.getPlace(),
-                figure.getProfileUrl(),
-                figure.getFigureType(),
-                figure.getFigureParty(),
-                figure.getEducation(),
-                figure.getCareers(),
-                figure.getSites(),
-                figure.getActivities(),
-                figure.getUpdateSource()
+                command.name(),
+                command.englishName(),
+                command.birth(),
+                command.place(),
+                command.profileUrl(),
+                command.figureType(),
+                command.figureParty(),
+                command.education(),
+                command.careers(),
+                command.sites(),
+                command.activities(),
+                command.updateSource()
         );
+
+        figureCacheService.updateFigureCache(figure);
+
         return UpdateFigureResponse.from(figure);
     }
 
@@ -113,5 +126,14 @@ public class FigureService {
     public void deleteFigure(Long figureId) {
         Figure findFigure = findFigureById(figureId);
         figureRepository.delete(findFigure);
+
+        figureCacheService.evictFigureCache(figureId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FindFigureDetailResponse> getPopularFigures(int limit) {
+        return figureCacheService.getPopularFigures(limit).stream()
+                .map(FindFigureDetailResponse::from)
+                .collect(Collectors.toList());
     }
 }

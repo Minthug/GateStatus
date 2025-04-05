@@ -3,6 +3,7 @@ package com.example.GateStatus.domain.figure.service;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.exception.NotFoundFigureException;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.issue.Issue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -61,7 +62,7 @@ public class FigureCacheService {
      * Figure 삭제 시 캐시 삭제
      * @param figureId
      */
-    public void deleteFigureCache(Long figureId) {
+    public void evictFigureCache(Long figureId) {
         String cacheKey = CACHE_KEY_PREFIX + figureId;
         redisTemplate.delete(cacheKey);
         log.info("Evicted cache for Figure ID: {}", figureId);
@@ -79,5 +80,20 @@ public class FigureCacheService {
         redisTemplate.opsForValue().set(cacheKey, popularFigures, 1, TimeUnit.HOURS);
 
         return popularFigures;
+    }
+
+
+    /**
+     * 조회수 증가 시 캐시 업데이트
+     * @param figureId
+     */
+    public void incrementViewCount(Long figureId) {
+        String cacheKey = CACHE_KEY_PREFIX + figureId;
+        Issue cachedIssue = (Issue) redisTemplate.opsForValue().get(cacheKey);
+
+        if (cachedIssue != null) {
+            cachedIssue.incrementViewCount();
+            redisTemplate.opsForValue().set(cacheKey, cachedIssue, CACHE_TTL, TimeUnit.SECONDS);
+        }
     }
 }
