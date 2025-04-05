@@ -4,6 +4,7 @@ import com.example.GateStatus.domain.issue.Issue;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
 import com.example.GateStatus.domain.issue.repository.response.IssueRedisDto;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -19,78 +20,73 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class IssueCacheService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final IssueRepository issueRepository;
 
-    private static final String ISSUE_INFO_PREFIX = "issue:info";
-    private static final String RECENT_ISSUES_KEY = "issues:recent";
+    private static final String CACHE_KEY_PREFIX = "issue:";
+    private static final String FIGURE_ISSUES_KEY_PREFIX = "figure:issues";
+    private static final String HOT_ISSUES_KEY = "issues:hot";
+    private static final long CACHE_TTL = 1800; // 30MIN
 
-    public void cacheIssueInfo(IssueRedisDto issueRedisDto){
-        redisTemplate.opsForValue().set(
-                ISSUE_INFO_PREFIX + issueRedisDto.issueId(),
-                issueRedisDto,
-                Duration.ofHours(24)
-        );
-    }
+    /**
+     * ID로 Issue 정보 조회 - 캐싱 적용
+     * @param issueId
+     * @return
+     */
+    public Issue findIssueById(Long issueId) {
+        String cacheKey = CACHE_KEY_PREFIX + issueId;
 
-    public void addToRecentIssues(IssueRedisDto issueRedisDto) {
-        redisTemplate.opsForZSet().add(
-                RECENT_ISSUES_KEY,
-                issueRedisDto,
-                issueRedisDto.createdAt().toEpochSecond(ZoneOffset.UTC)
-        );
-        redisTemplate.opsForZSet().removeRange(RECENT_ISSUES_KEY, 0, -101);
-    }
+        Issue cachedIssue = (Issue) redisTemplate.opsForValue().get(cacheKey);
 
-    public Optional<IssueRedisDto> getIssueInfo(Long issueId) {
-        String key = ISSUE_INFO_PREFIX + issueId;
-        IssueRedisDto cacheIssue = (IssueRedisDto) redisTemplate.opsForValue().get(key);
-
-        if (cacheIssue != null) {
-            return Optional.of(cacheIssue);
+        if (cachedIssue != null) {
+            log.info("Cache hit for issue ID: {}", issueId);
         }
 
-        return issueRepository.findById(issueId)
-                .map(issue -> {
-                    IssueRedisDto issueRedisDto = IssueRedisDto.from(issue);
-                    cacheIssueInfo(issueRedisDto);
-                    return issueRedisDto;
-                });
+        return cachedIssue;
     }
 
-    public List<IssueRedisDto> getRecentIssues(int limit) {
-        Set<Object> issues = redisTemplate.opsForZSet()
-                .reverseRange(RECENT_ISSUES_KEY, 0, limit - 1);
+    /**
+     * 특정 Figure에 관련된 Issue 목록 조회
+     * @param figureId
+     * @return
+     */
+    public List<Issue> findIssuesByFigureId(Long figureId) {
+        String cacheKey = FIGURE_ISSUES_KEY_PREFIX + figureId;
 
-        if (issues != null || !issues.isEmpty()) {
-            return issues.stream()
-                    .filter(obj -> obj instanceof IssueRedisDto)
-                    .map(obj -> (IssueRedisDto) obj)
-                    .collect(Collectors.toList());
+        List<Issue> cachedIssues = (List<Issue>) redisTemplate.opsForValue().get(cacheKey);
+
+        if (cachedIssues != null) {
+            log.info("Cache hit for figure issues, figure Id: {}", figureId);
+            return cachedIssues;
         }
 
-        Pageable pageable = PageRequest.of(0, limit, Sort.by("createdAt").descending());
-        List<Issue> recentIssues = issueRepository.findAllByOrderByCreatedAtDesc(pageable);
-        List<IssueRedisDto> issueRedisDtos = recentIssues.stream()
-                .map(IssueRedisDto::from)
-                .collect(Collectors.toList());
+        List<Issue> issues = issueRepository.findByFigureIdOrderByCreatedDateDesc(figureId);
 
-        issueRedisDtos.forEach(dto -> {
-            cacheIssueInfo(dto);
-            addToRecentIssues(dto);
-        });
-        return issueRedisDtos;
+        redisTemplate.opsForValue().set(cacheKey, issues, CACHE_TTL, TimeUnit.SECONDS);
+        return issues;
     }
 
-    public void deleteIssueCache(Long issueId) {
-        redisTemplate.delete(ISSUE_INFO_PREFIX + issueId);
+    public List<Issue> getHotIssues(int limit) {
+        List<Issue> cachedHotIssues = (List<Issue>) redisTemplate.opsForValue().get(HOT_ISSUES_KEY);
+
+        if (cachedHotIssues != null) {
+            return cachedHotIssues;
+        }
+
+        List<Issue> hotIssues = issueRepository.findByIsHotOrderByViewCountDesc(true, PageRequest.of(0, limit));
+
+        redisTemplate.opsForValue().set(HOT_ISSUES_KEY, hotIssues, 1, TimeUnit.HOURS);
+
+        return hotIssues;
     }
 
     @Scheduled(cron = "0 0 0 * * *")
