@@ -32,6 +32,16 @@ public class Category extends BaseTimeEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private CategoryType categoryType;
+    private CategoryType type;
+
+    public void update(String name, String description, String iconUrl, Integer displayOrder,
+                       Boolean active, CategoryType type) {
+        if (name != null) this.name = name;
+        if (description != null) this.description = description;
+        if (iconUrl != null) this.iconUrl = iconUrl;
+        if (displayOrder != null) this.displayOrder = displayOrder;
+        if (active != null) this.active = active;
+        if (type != null) this.type = type;
+    }
 
 }

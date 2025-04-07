@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.issue;
 
+import com.example.GateStatus.domain.category.Category;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.global.BaseTimeEntity;
 import jakarta.persistence.*;
@@ -31,6 +32,10 @@ public class Issue extends BaseTimeEntity {
 
     private int viewCount;
     private boolean isHot;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category category;
 
     public Issue(String title, String content) {
         this.title = title;
