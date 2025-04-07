@@ -1,10 +1,7 @@
 package com.example.GateStatus.domain.category;
 
 import com.example.GateStatus.global.BaseTimeEntity;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,5 +17,21 @@ public class Category extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Long id;
 
+    @Column(nullable = false, unique = true)
+    private String name;
+
+    @Column(length = 500)
+    private String description;
+
+    private String iconUrl;
+
+    private int displayOrder;
+
+    @Column(nullable = false)
+    private boolean active;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private CategoryType categoryType;
 
 }
