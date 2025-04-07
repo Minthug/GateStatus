@@ -40,6 +40,7 @@ public class Figure extends BaseTimeEntity {
     private List<String> education;
 
     @ElementCollection
+    @CollectionTable(name = "figure_careers", joinColumns = @JoinColumn(name = "figure_id"))
     private List<Career> careers;
 
     @ElementCollection
@@ -99,5 +100,19 @@ public class Figure extends BaseTimeEntity {
 
     public void incrementViewCount() {
         this.viewCount++;
+    }
+
+    public void addCareer(Career career) {
+        if (this.careers == null) {
+            this.careers = new ArrayList<>();
+        }
+        this.careers.add(career);
+    }
+
+    public void updateCareer(List<Career> careers) {
+        this.careers.clear();
+        if (careers != null) {
+            this.careers.addAll(careers);
+        }
     }
 }
