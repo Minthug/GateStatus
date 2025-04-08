@@ -1,6 +1,7 @@
 package com.example.GateStatus.domain.figure.repository;
 
 import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,9 +25,9 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     List<Figure> findByFigureType(FigureType figureType);
 
-    List<Figure> findByFigureParty();
+    List<Figure> findByFigureParty(FigureParty figureParty);
 
-    List<Figure> findByNameContainingAndFigureParty();
+    List<Figure> findByNameContainingAndFigureParty(String name, FigureParty figureParty);
 
     @Query("SELECT f FROM Figure f ORDER BY f.viewCount DESC ")
     List<Figure> findTopByOrderByViewCountDesc(PageRequest pageRequest);
@@ -39,5 +40,5 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
     @Query("SELECT f FROM Figure f JOIN f.figureTag ft JOIN ft.tag t WHERE t.tagName = :tagName")
     List<Figure> findByTagName(@Param("tagName") String tagName);
 
-    List<Figure> findTop10ByOrderByModifiedDateDESC();
+    List<Figure> findTop10ByOrderByModifiedDateDesc();
 }

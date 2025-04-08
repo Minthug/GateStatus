@@ -20,7 +20,7 @@ public record IssueRedisDto(Long issueId, String title, String content,
                 issue.getId(),
                 issue.getTitle(),
                 issue.getContent(),
-                issue.getCreatedAt()
+                issue.getCreatedDate()
         );
     }
 

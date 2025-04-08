@@ -29,48 +29,4 @@ public class IssueController {
     private final IssueCacheService issueCacheService;
     private final IssueRepository issueRepository;
 
-    @PostMapping
-    public ResponseEntity<Void> registerIssue(@RequestBody RegisterIssueRequest request) {
-        RegisterIssueCommand command = RegisterIssueCommand.of(request.title(), request.content());
-        Long issueId = issueService.registerIssue(command);
-        URI location = URI.create(BASE_URL + issueId);
-        return ResponseEntity.created(location).build();
-    }
-
-    @GetMapping
-    public ResponseEntity<FindIssuesResponse> findIssues() {
-        List<IssueRedisDto> recentIssues = issueCacheService.getRecentIssues(100);
-
-        if (!recentIssues.isEmpty()) {
-            return ResponseEntity.ok(FindIssuesResponse.fromRedis(recentIssues));
-        }
-
-        FindIssuesResponse response = issueService.findIssue();
-        response.issues().forEach(issue -> issueCacheService.cacheIssueInfo(IssueRedisDto.from(issue, LocalDateTime.now())));
-        return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/{issueId}")
-    public ResponseEntity<FindIssueDetailResponse> findIssue(@PathVariable(value = "issueId") final Long issueId) {
-        return issueCacheService.getIssueInfo(issueId)
-                .map(issueRedisDto -> {
-                    IssueDetailResponse issueDetail = new IssueDetailResponse(
-                            issueRedisDto.issueId(),
-                            issueRedisDto.title(),
-                            issueRedisDto.content());
-                    return ResponseEntity.ok(FindIssueDetailResponse.of(issueDetail));
-                })
-                .orElseGet(() -> {
-                    Issue issue = issueRepository.findById(issueId)
-                            .orElseThrow(() -> new NotFoundIssueException("Issue not found"));
-
-                    IssueDetailResponse issueDetailResponse = new IssueDetailResponse(
-                            issue.getId(),
-                            issue.getTitle(),
-                            issue.getContent());
-
-                    issueCacheService.cacheIssueInfo(IssueRedisDto.from(issue));
-                    return ResponseEntity.ok(FindIssueDetailResponse.of(issueDetailResponse));
-                });
-    }
 }

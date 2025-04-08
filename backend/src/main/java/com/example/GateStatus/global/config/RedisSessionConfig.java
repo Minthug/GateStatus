@@ -24,11 +24,6 @@ public class RedisSessionConfig {
     private int port;
 
     @Bean
-    public RedisConnectionFactory connectionFactory() {
-        return new LettuceConnectionFactory(host, port);
-    }
-
-    @Bean
     public RedisSerializer<Object> springSessionDefaultRedisSerializer() {
         return new GenericJackson2JsonRedisSerializer();
     }
