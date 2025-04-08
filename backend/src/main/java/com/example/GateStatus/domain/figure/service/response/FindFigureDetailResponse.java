@@ -1,6 +1,7 @@
 package com.example.GateStatus.domain.figure.service.response;
 
 import com.example.GateStatus.domain.career.Career;
+import com.example.GateStatus.domain.category.service.response.CategoryResponse;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 
@@ -17,7 +18,8 @@ public record FindFigureDetailResponse(Long figureId,
                                        List<Career> careers,
                                        List<String> sites,
                                        List<String> activities,
-                                       String updateSource) {
+                                       String updateSource,
+                                       CategoryResponse category) {
     public static FindFigureDetailResponse from(final Figure findFigure) {
         return new FindFigureDetailResponse(
                 findFigure.getId(),
@@ -31,6 +33,7 @@ public record FindFigureDetailResponse(Long figureId,
                 findFigure.getCareers(),
                 findFigure.getSites(),
                 findFigure.getActivities(),
-                findFigure.getUpdateSource());
+                findFigure.getUpdateSource(),
+                findFigure.getCategory() != null ? CategoryResponse.from(findFigure.getCategory()) : null);
     }
 }
