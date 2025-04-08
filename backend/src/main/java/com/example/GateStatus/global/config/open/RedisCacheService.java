@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class CacheService {
+public class RedisCacheService {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
