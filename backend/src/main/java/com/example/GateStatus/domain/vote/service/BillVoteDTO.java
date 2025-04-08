@@ -23,6 +23,12 @@ public record BillVoteDTO(
         );
     }
 
+    /**
+     * JsonNode에서 특정 필드의 텍스트 값 추출
+     * @param node
+     * @param fieldName
+     * @return
+     */
     public static String getTextValue(JsonNode node, String fieldName) {
         JsonNode field = node.get(fieldName);
         return (field != null && !field.isNull()) ? field.asText() : "";

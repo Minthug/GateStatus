@@ -1,4 +1,4 @@
-package com.example.GateStatus.global.config;
+package com.example.GateStatus.global.config.open;
 
 import com.example.GateStatus.domain.vote.service.BillVoteDTO;
 import com.example.GateStatus.global.config.exception.ApiMappingException;
@@ -19,6 +19,11 @@ public class ApiResponseMapper {
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * 국회 OPEN API 응답을 BillVoteDTO 리스트로 변환
+     * @param apiResponse
+     * @return
+     */
     public List<BillVoteDTO> mapToBillVoteDTOs(AssemblyApiResponse<JsonNode> apiResponse) {
         if (apiResponse == null || apiResponse.data() == null) {
             return Collections.emptyList();
@@ -52,6 +57,13 @@ public class ApiResponseMapper {
         }
     }
 
+    /**
+     * 국회 OPEN API 응답을 다른 DTO 타입을 변환(다른 API에 활용)
+     * @param apiResponse
+     * @param targetClass
+     * @return
+     * @param <T>
+     */
     public <T> List<T> mapToList(AssemblyApiResponse<JsonNode> apiResponse, Class<T> targetClass) {
         if (apiResponse == null || apiResponse.data() == null) {
             return Collections.emptyList();

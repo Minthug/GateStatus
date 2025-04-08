@@ -1,4 +1,4 @@
-package com.example.GateStatus.global.config;
+package com.example.GateStatus.global.config.exception;
 
 import java.time.LocalDateTime;
 
