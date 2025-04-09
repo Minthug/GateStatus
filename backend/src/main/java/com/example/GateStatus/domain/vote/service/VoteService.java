@@ -83,5 +83,67 @@ public class VoteService {
             throw new ApiDataRetrievalException("투표 데이터를 가져오는 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
+
+    public BillVoteDTO getBillDetail(String billNo) {
+        String cacheKey = "bill:detail:" + billNo;
+
+        return cacheService.getOrSet(cacheKey, () -> fetchBillDetailFromApi(billNo), 86400);
+    }
+
+    private BillVoteDTO fetchBillDetailFromApi(String billNo) {
+        try {
+            log.info("법안 상세 정보 API 호출 시작: 법안번호 = {}", billNo);
+
+            AssemblyApiResponse<JsonNode> apiResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/ncocndinfopromain")
+                            .queryParam("KEY", apiKey)
+                            .queryParam("BILL_ID", billNo)
+                            .build())
+                    .retrieve()
+                    .onStatus(status -> status.is4xxClientError(), response -> {
+                        return Mono.error(new ApiClientException("Api 클라이언트 오류: " + response.statusCode()));
+                    })
+                    .onStatus(status -> status.is5xxServerError(), response -> {
+                        return Mono.error(new ApiServerException("Api 서버 오류: " + response.statusCode()));
+                    })
+                    .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {})
+                    .block();
+
+            if (apiResponse == null || apiResponse.data() == null) {
+                log.warn("법안 상세 정보 API 응답이 null 입니다", billNo);
+                return BillDetailDTO.empty(billNo);
+            }
+
+            JsonNode billInfo = dataNode.get(0);
+
+            BillDetailDTO billDetail = new BillDetailDTO(
+                    getTextValue(billInfo, "BILL_ID"),
+                    getTextValue(billInfo, "BILL_NO"),
+                    getTextValue(billInfo, "BILL_NAME"),
+                    getTextValue(billInfo, "COMMITTEE"),
+                    getTextValue(billInfo, "PROPOSER"),
+                    getTextValue(billInfo, "PROPOSE_DT"),
+                    getTextValue(billInfo, "PROC_RESULT"),
+                    getTextValue(billInfo, "PROC_DT"),
+                    getTextValue(billInfo, "BILL_URL"),
+                    getTextValue(billInfo, "DETAIL_CONTENT"),
+                    getTextValue(billInfo, "PROPOSER_INFO"),
+                    parseVoteResults(billInfo)
+            );
+
+            log.info("법안 상세 정보 API 호출 완료: {}", billNo);
+            return billDetail;
+
+        } catch (ApiClientException | ApiServerException e) {
+            log.error("법안 상세 정보 API 호출 오류: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("법안 상세 정보 조회 중 예외 발생", e);
+            throw new ApiDataRetrievalException("법안 상세 정보를 가져오는 중 오류 발생: " + e.getMessage(), e);
+        }
+        }
+    }
+
 }
 
