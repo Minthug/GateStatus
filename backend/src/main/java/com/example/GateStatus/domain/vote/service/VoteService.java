@@ -24,6 +24,8 @@ import reactor.core.publisher.Mono;
 import java.util.Collections;
 import java.util.List;
 
+import static com.example.GateStatus.domain.vote.service.BillVoteDTO.getTextValue;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -90,7 +92,7 @@ public class VoteService {
         return cacheService.getOrSet(cacheKey, () -> fetchBillDetailFromApi(billNo), 86400);
     }
 
-    private BillVoteDTO fetchBillDetailFromApi(String billNo) {
+    private BillDetailDTO fetchBillDetailFromApi(String billNo) {
         try {
             log.info("법안 상세 정보 API 호출 시작: 법안번호 = {}", billNo);
 
@@ -115,7 +117,7 @@ public class VoteService {
                 return BillDetailDTO.empty(billNo);
             }
 
-            JsonNode billInfo = dataNode.get(0);
+            JsonNode billInfo = apiResponse.data();
 
             BillDetailDTO billDetail = new BillDetailDTO(
                     getTextValue(billInfo, "BILL_ID"),
@@ -142,6 +144,38 @@ public class VoteService {
             log.error("법안 상세 정보 조회 중 예외 발생", e);
             throw new ApiDataRetrievalException("법안 상세 정보를 가져오는 중 오류 발생: " + e.getMessage(), e);
         }
+        }
+
+    private VoteResultDetail parseVoteResults(JsonNode billInfo) {
+        try {
+            int agreeCount = getIntValue(billInfo, "AGREE_COUNT");
+            int disagreeCount = getIntValue(billInfo, "DISAGREE_COUNT");
+            int abstainCount = getIntValue(billInfo, "ABSTAIN_COUNT");
+            int absentCount = getIntValue(billInfo, "ABSENT_COUNT");
+
+            return new VoteResultDetail(
+                    agreeCount,
+                    disagreeCount,
+                    abstainCount,
+                    absentCount,
+                    agreeCount + disagreeCount + abstainCount + absentCount
+            );
+    } catch (Exception e) {
+            log.warn("투표 결과 파싱 중 오류 발생: ", e);
+            return new VoteResultDetail(0, 0, 0, 0, 0);
+        }
+}
+
+    private int getIntValue(JsonNode node, String fieldName) {
+        JsonNode field = node.get(fieldName);
+        if (field == null || field.isNull()) {
+            return 0;
+        }
+
+        try {
+            return field.asInt();
+        } catch (Exception e) {
+            return 0;
         }
     }
 

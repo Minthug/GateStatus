@@ -1,5 +1,6 @@
 package com.example.GateStatus.global.config.open;
 
+import com.example.GateStatus.domain.vote.VoteResultType;
 import com.example.GateStatus.domain.vote.service.BillVoteDTO;
 import com.example.GateStatus.global.config.exception.ApiMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -36,6 +37,7 @@ public class ApiResponseMapper {
             // JSON 배열을 순회하며 DTO로 변환
             if (dataArray.isArray()) {
                 for (JsonNode item : dataArray) {
+                    String voteResult = getTextValue(item, "RESULT_VOTE_MOD_NM");
                     // Record는 생성자를 통해 직접 초기화
                     BillVoteDTO dto = new BillVoteDTO(
                             getTextValue(item, "BILL_NO"),
@@ -43,8 +45,11 @@ public class ApiResponseMapper {
                             getTextValue(item, "PROPOSER"),
                             getTextValue(item, "COMMITTEE_NM"),
                             getTextValue(item, "PROPOSE_DT"),
-                            getTextValue(item, "RESULT_VOTE_MOD_NM"),
-                            getTextValue(item, "VOTE_DT")
+                            voteResult,
+                            getTextValue(item, "VOTE_DT"),
+                            VoteResultType.fromString(voteResult),
+                            getTextValue(item, "PROC_RESULT"),
+                            getTextValue(item, "LINK_URL")
                     );
 
                     result.add(dto);
