@@ -4,4 +4,5 @@ public class ApiDataRetrievalException extends ClientException {
     public ApiDataRetrievalException(String message) {
         super(message);
     }
+
 }

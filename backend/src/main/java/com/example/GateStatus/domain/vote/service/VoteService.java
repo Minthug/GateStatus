@@ -5,7 +5,6 @@ import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.global.config.exception.ApiClientException;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.example.GateStatus.global.config.exception.ApiServerException;
-import com.example.GateStatus.global.config.open.ApiResponse;
 import com.example.GateStatus.global.config.open.ApiResponseMapper;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.example.GateStatus.global.config.open.RedisCacheService;
@@ -13,10 +12,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.common.requests.VoteResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -86,7 +83,7 @@ public class VoteService {
         }
     }
 
-    public BillVoteDTO getBillDetail(String billNo) {
+    public BillDetailDTO getBillDetail(String billNo) {
         String cacheKey = "bill:detail:" + billNo;
 
         return cacheService.getOrSet(cacheKey, () -> fetchBillDetailFromApi(billNo), 86400);
@@ -142,9 +139,9 @@ public class VoteService {
             throw e;
         } catch (Exception e) {
             log.error("법안 상세 정보 조회 중 예외 발생", e);
-            throw new ApiDataRetrievalException("법안 상세 정보를 가져오는 중 오류 발생: " + e.getMessage(), e);
+            throw new ApiDataRetrievalException("법안 상세 정보를 가져오는 중 오류 발생: ");
         }
-        }
+    }
 
     private VoteResultDetail parseVoteResults(JsonNode billInfo) {
         try {
@@ -178,6 +175,5 @@ public class VoteService {
             return 0;
         }
     }
-
 }
 

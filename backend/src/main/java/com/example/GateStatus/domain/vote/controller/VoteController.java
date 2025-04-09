@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.vote.controller;
 
+import com.example.GateStatus.domain.vote.service.BillDetailDTO;
 import com.example.GateStatus.domain.vote.service.BillVoteDTO;
 import com.example.GateStatus.domain.vote.service.VoteService;
 import lombok.RequiredArgsConstructor;
@@ -21,5 +22,10 @@ public class VoteController {
     @GetMapping("/figure/{figureId}")
     public ResponseEntity<List<BillVoteDTO>> getVotesFigureId(@PathVariable Long figureId) {
         return ResponseEntity.ok(voteService.getVotesByFigureId(figureId));
+    }
+
+    @GetMapping("/bill/{billNo}")
+    public ResponseEntity<BillDetailDTO> getBillDetail(@PathVariable String billNo) {
+        return ResponseEntity.ok(voteService.getBillDetail(billNo));
     }
 }
