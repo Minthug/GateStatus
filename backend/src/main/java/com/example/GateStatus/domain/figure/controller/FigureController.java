@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.figure.controller;
 
+import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureService;
@@ -13,9 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -62,5 +65,20 @@ public class FigureController {
     public ResponseEntity<Void> deleteFigure(@PathVariable Long figureId) {
         figureService.deleteFigure(figureId);
         return ResponseEntity.noContent().build();
+    }
+
+
+    @PostMapping("/sync/{name}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<FindFigureDetailResponse> syncFigureByName(@PathVariable String name) {
+        Figure figure = figureApiService.syncFigureInfoByName(name);
+        return ResponseEntity.ok(FindFigureDetailResponse.from(figure));
+    }
+
+    @PostMapping("/sync/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Integer>> syncAllFigures() {
+        int count = figureApiService.syncAllFigures();
+        return ResponseEntity.ok(Map.of("syncCount", count));
     }
 }
