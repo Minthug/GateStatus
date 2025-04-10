@@ -41,7 +41,7 @@ public class FigureApiService {
 
 
     @Transactional
-    public Figure syncFigureFromApi(String figureName) {
+    public Figure syncFigureInfoByName(String figureName) {
         FigureInfoDTO info = fetchFigureInfoFromApi(figureName);
 
         if (info == null) {

@@ -28,11 +28,9 @@ import java.util.stream.Collectors;
 public class FigureService {
 
     private final FigureRepository figureRepository;
+    private final FigureApiService figureApiService;
     private final FigureCacheService figureCacheService;
-    private final KubernetesProperties kubernetesProperties;
 
-    @Value("${app.db-host}")
-    private String dbHost;
 
     @Transactional
     public RegisterFigureResponse getRegisterFigure(final RegisterFigureCommand command) {
@@ -43,7 +41,7 @@ public class FigureService {
                             .name(command.name())
                             .englishName(command.englishName())
                             .birth(command.birth())
-                            .place(command.place())
+                            .constituency(command.constituency())
                             .profileUrl(command.profileUrl())
                             .figureType(command.figureType())
                             .education(command.education())
@@ -135,5 +133,14 @@ public class FigureService {
         return figureCacheService.getPopularFigures(limit).stream()
                 .map(FindFigureDetailResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    public Figure syncFromApi(String name) {
+        return figureApiService.syncFigureInfoByName(name);
+    }
+
+    public FindFigureDetailResponse findFigureWithCache(Long id) {
+        Figure figure = figureCacheService.findFigureById(id);
+        return FindFigureDetailResponse.from(figure);
     }
 }
