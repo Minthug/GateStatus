@@ -90,6 +90,45 @@ public class FigureApiService {
     public int syncAllFigures() {
         try {
             log.info("모든 국회의원 정보 동기화 시작");
+            List<FigureInfoDTO> allFigures = fetchAllFiguresFromApi();
+            int count = 0;
+
+            for (FigureInfoDTO infoDTO : allFigures) {
+                try {
+                    Figure figure = figureRepository.findByName(infoDTO.name())
+                            .orElseGet(() -> Figure.builder()
+                                    .name(infoDTO.name())
+                                    .figureType(FigureType.POLITICIAN)
+                                    .viewCount(0L)
+                                    .build());
+
+                    figureMapper.updateFigureFromDTO(figure, infoDTO);
+                    figureRepository.save(figure);
+                    count++;
+                } catch (Exception e) {
+                    log.error("국회의원 동기화 중 오류 발생: {}", infoDTO.name());
+                }
+            }
+            log.info("국회의원 정보 동기화 완료: {}", count);
+            return count;
+        } catch (Exception e) {
+            throw new ApiDataRetrievalException("전체 국회의원 정보를 동기화 하는 중 오류 발생");
+        }
+    }
+
+    private List<FigureInfoDTO> fetchAllFiguresFromApi() {
+        try {
+            AssemblyApiResponse<JsonNode> apiResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("nwvrqwxyaytdsfvhu")
+                            .queryParam("key", apiKey)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {})
+                    .block();
+            return apiMapper.map(apiResponse);
+        } catch (Exception e) {
+            throw new ApiDataRetrievalException("전체 국회의원 정보를 가져오는 중 오류 발생");
         }
     }
 }
