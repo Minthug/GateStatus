@@ -19,11 +19,13 @@ public class Career {
     private String period; // 기간
     private String position; // 직위
     private String organization; // 소속
+    private String title;
     private LocalDate startDate;
     private LocalDate endDate;
 
-    public static Career of(String position, String organization, LocalDate startDate, LocalDate endDate) {
+    public static Career of(String title, String position, String organization, LocalDate startDate, LocalDate endDate) {
         return Career.builder()
+                .title(title)
                 .position(position)
                 .organization(organization)
                 .startDate(startDate)

@@ -83,7 +83,6 @@ public class FigureApiMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>>
         };
     }
 
-
     private List<String> parseEducation(JsonNode item) {
         String edu = getTextValue(item, "EDU");
         if (edu == null || edu.isEmpty()) {
