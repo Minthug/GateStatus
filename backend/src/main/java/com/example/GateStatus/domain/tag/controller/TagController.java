@@ -1,6 +1,6 @@
 package com.example.GateStatus.domain.tag.controller;
 
-import com.example.GateStatus.domain.figure.service.response.FigureResponse;
+import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
 import com.example.GateStatus.domain.tag.service.TagService;
 import com.example.GateStatus.domain.tag.service.request.AddTagCommand;
 import com.example.GateStatus.domain.tag.service.request.RemoveTagCommand;
@@ -36,7 +36,7 @@ public class TagController {
     }
 
     @GetMapping("/search/{tagName}")
-    public ResponseEntity<List<FigureResponse>> getFiguresByTags(@PathVariable String tagName) {
+    public ResponseEntity<List<FindFigureDetailResponse>> getFiguresByTags(@PathVariable String tagName) {
         return ResponseEntity.ok(tagService.getFigureByTags(tagName));
     }
 }

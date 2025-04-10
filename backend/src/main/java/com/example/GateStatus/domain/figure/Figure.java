@@ -27,7 +27,7 @@ public class Figure extends BaseTimeEntity {
     private String name;
     private String englishName;
     private String birth; // 출생일
-    private String place; // 활동지
+    private String constituency; // 활동지
     private String profileUrl;
 
     @Enumerated(EnumType.STRING)
@@ -64,7 +64,7 @@ public class Figure extends BaseTimeEntity {
             String name,
             String englishName,
             String birth,
-            String place,
+            String constituency,
             String profileUrl,
             FigureType figureType,
             FigureParty figureParty,
@@ -76,7 +76,7 @@ public class Figure extends BaseTimeEntity {
         this.name = name;
         this.englishName = englishName;
         this.birth = birth;
-        this.place = place;
+        this.constituency = constituency;
         this.profileUrl = profileUrl;
         this.figureType = figureType;
         this.figureParty = figureParty;

@@ -4,7 +4,7 @@ import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureTag;
 import com.example.GateStatus.domain.figure.exception.NotFoundFigureException;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.figure.service.response.FigureResponse;
+import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
 import com.example.GateStatus.domain.tag.Tag;
 import com.example.GateStatus.domain.tag.TagRepository;
 import com.example.GateStatus.domain.tag.exception.NotFoundTagException;
@@ -58,13 +58,13 @@ public class TagService {
                 .collect(Collectors.toList());
     }
 
-    public List<FigureResponse> getFigureByTags(String tagName) {
+    public List<FindFigureDetailResponse> getFigureByTags(String tagName) {
         Tag tag = tagRepository.findByTagName(tagName)
                 .orElseThrow(() -> new NotFoundTagException("Tag not found"));
 
         return tag.getFigureTags().stream()
                 .map(FigureTag::getFigure)
-                .map(FigureResponse::from)
+                .map(FindFigureDetailResponse::from)
                 .collect(Collectors.toList());
     }
 }

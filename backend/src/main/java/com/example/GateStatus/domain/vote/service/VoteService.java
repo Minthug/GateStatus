@@ -32,6 +32,7 @@ public class VoteService {
     private final FigureRepository figureRepository;
     private final RedisCacheService cacheService;
     private final ApiResponseMapper mapper;
+    private final ApiResponseMapper apiResponseMapper;
 
     @Value("${spring.openapi.assembly.url}")
     private String voteApiUrl;
@@ -73,8 +74,8 @@ public class VoteService {
 
             List<BillVoteDTO> votes = mapper.mapToBillVoteDTOs(apiResponse);
             log.info("API 호출 완료: 정치인= {}, 결과 수= {}", figure.getName(), votes.size());
-
             return votes;
+
         } catch (EntityNotFoundException e) {
             throw e;
         } catch (Exception e) {
@@ -109,30 +110,10 @@ public class VoteService {
                     .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {})
                     .block();
 
-            if (apiResponse == null || apiResponse.data() == null) {
-                log.warn("법안 상세 정보 API 응답이 null 입니다", billNo);
-                return BillDetailDTO.empty(billNo);
-            }
-
-            JsonNode billInfo = apiResponse.data();
-
-            BillDetailDTO billDetail = new BillDetailDTO(
-                    getTextValue(billInfo, "BILL_ID"),
-                    getTextValue(billInfo, "BILL_NO"),
-                    getTextValue(billInfo, "BILL_NAME"),
-                    getTextValue(billInfo, "COMMITTEE"),
-                    getTextValue(billInfo, "PROPOSER"),
-                    getTextValue(billInfo, "PROPOSE_DT"),
-                    getTextValue(billInfo, "PROC_RESULT"),
-                    getTextValue(billInfo, "PROC_DT"),
-                    getTextValue(billInfo, "BILL_URL"),
-                    getTextValue(billInfo, "DETAIL_CONTENT"),
-                    getTextValue(billInfo, "PROPOSER_INFO"),
-                    parseVoteResults(billInfo)
-            );
+            BillDetailDTO result = apiResponseMapper.mapToBillDetailDTO(apiResponse, billNo);
 
             log.info("법안 상세 정보 API 호출 완료: {}", billNo);
-            return billDetail;
+            return result;
 
         } catch (ApiClientException | ApiServerException e) {
             log.error("법안 상세 정보 API 호출 오류: {}", e.getMessage());
