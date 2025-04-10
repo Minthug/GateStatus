@@ -30,13 +30,13 @@ public class FigureApiService {
     private final FigureMapper figureMapper;
 
 
-    @Value("${openapi.assembly.url}")
+    @Value("${spring.openapi.assembly.url}")
     private String baseUrl;
 
-    @Value("${openapi.assembly.key}")
+    @Value("${spring.openapi.assembly.key}")
     private String apiKey;
 
-    @Value("${openapi.assembly.figure-api-path}")
+    @Value("${spring.openapi.assembly.figure-api-path}")
     private String figureApiPath;
 
 

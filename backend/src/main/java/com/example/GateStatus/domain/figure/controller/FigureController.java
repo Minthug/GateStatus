@@ -1,6 +1,7 @@
 package com.example.GateStatus.domain.figure.controller;
 
 import com.example.GateStatus.domain.figure.FigureType;
+import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureService;
 import com.example.GateStatus.domain.figure.service.request.FindFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.RegisterFigureCommand;
@@ -22,6 +23,7 @@ import java.util.List;
 public class FigureController {
 
     private final FigureService figureService;
+    private final FigureApiService figureApiService;
 
     @PostMapping
     public ResponseEntity<RegisterFigureResponse> registerFigure(@RequestBody RegisterFigureCommand command) {

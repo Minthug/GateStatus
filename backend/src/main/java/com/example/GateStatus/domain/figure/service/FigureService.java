@@ -75,7 +75,7 @@ public class FigureService {
         if (type != null && keyword != null) {
             figures = switch (type.toLowerCase()) {
                 case "name" -> figureRepository.findByNameContaining(keyword, pageRequest);
-                case "place" -> figureRepository.findByPlaceContaining(keyword, pageRequest);
+                case "place" -> figureRepository.findByConstituencyContaining(keyword, pageRequest);
                 default -> figureRepository.findAll(pageRequest);
             };
         } else {
