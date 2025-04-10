@@ -5,7 +5,6 @@ import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.global.config.exception.ApiClientException;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.example.GateStatus.global.config.exception.ApiServerException;
-import com.example.GateStatus.global.config.open.ApiResponseMapper;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.example.GateStatus.global.config.open.RedisCacheService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -21,8 +20,6 @@ import reactor.core.publisher.Mono;
 import java.util.Collections;
 import java.util.List;
 
-import static com.example.GateStatus.domain.vote.service.BillVoteDTO.getTextValue;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -31,8 +28,7 @@ public class VoteService {
     private final WebClient webClient;
     private final FigureRepository figureRepository;
     private final RedisCacheService cacheService;
-    private final ApiResponseMapper mapper;
-    private final ApiResponseMapper apiResponseMapper;
+    private final BillApiMapper mapper;
 
     @Value("${spring.openapi.assembly.url}")
     private String voteApiUrl;
@@ -110,7 +106,7 @@ public class VoteService {
                     .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {})
                     .block();
 
-            BillDetailDTO result = apiResponseMapper.mapToBillDetailDTO(apiResponse, billNo);
+            BillDetailDTO result = mapper.mapToBillDetail(apiResponse, billNo);
 
             log.info("법안 상세 정보 API 호출 완료: {}", billNo);
             return result;
