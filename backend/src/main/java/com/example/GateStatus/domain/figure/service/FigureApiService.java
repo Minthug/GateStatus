@@ -36,8 +36,8 @@ public class FigureApiService {
     @Value("${openapi.assembly.key}")
     private String apiKey;
 
-    @Value("${openapi.assembly.member-api-path}")
-    private String memberApiPath;
+    @Value("${openapi.assembly.figure-api-path}")
+    private String figureApiPath;
 
 
     @Transactional
@@ -86,6 +86,10 @@ public class FigureApiService {
         }
     }
 
+    /**
+     * 모든 국회의원 정보를 동기화 합니다
+     * @return
+     */
     @Transactional
     public int syncAllFigures() {
         try {
@@ -116,19 +120,100 @@ public class FigureApiService {
         }
     }
 
+    /**
+     * 모든 국회의원 정보를 API에서 가져옵니다
+     * @return
+     */
     private List<FigureInfoDTO> fetchAllFiguresFromApi() {
         try {
+            log.info("전체 국회의원 정보 API 호출 시작");
+
             AssemblyApiResponse<JsonNode> apiResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path("nwvrqwxyaytdsfvhu")
+                            .path(figureApiPath)
                             .queryParam("key", apiKey)
                             .build())
                     .retrieve()
                     .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {})
                     .block();
-            return apiMapper.map(apiResponse);
+
+            List<FigureInfoDTO> figures = apiMapper.map(apiResponse);
+            log.info("전체 국회의원 정보 API 호출 완료: {}명", figures.size());
+
+            return figures;
         } catch (Exception e) {
             throw new ApiDataRetrievalException("전체 국회의원 정보를 가져오는 중 오류 발생");
+        }
+    }
+
+    /**
+     * 특정 정당 소속 국회의원 정보를 동기화합니다
+     * @param partyName
+     * @return
+     */
+    @Transactional
+    public int syncFigureByParty(String partyName) {
+        try {
+            log.info("{}당 소속 국회의원 정보 동기화 시작", partyName);
+            List<FigureInfoDTO> partyFigures = fetchAllFiguresByPartyFromApi(partyName);
+            int count = 0;
+
+            for (FigureInfoDTO figureInfoDTO : partyFigures) {
+                try {
+                    Figure figure = figureRepository.findByName(figureInfoDTO.name())
+                            .orElseGet(() -> Figure.builder()
+                                    .name(figureInfoDTO.name())
+                                    .figureType(FigureType.POLITICIAN)
+                                    .viewCount(0L)
+                                    .build());
+
+                    figureMapper.updateFigureFromDTO(figure, figureInfoDTO);
+
+                    figureRepository.save(figure);
+                    count++;
+                    log.debug("국회의원 정보 동기화 완료: {}", figureInfoDTO.name());
+
+                } catch (Exception e) {
+                    log.error("국회의원 동기화 중 오류 발생: {}", figureInfoDTO.name(), e);
+                    // 개별 국회의원 동기화 오류는 무시하고 계속 진행
+                }
+            }
+
+            log.info("{}당 소속 국회의원 정보 동기화 완료: {}명", partyName, count);
+            return count;
+        } catch (Exception e) {
+            log.error("정당별 국회의원 동기화 중 오류 발생: {}", partyName, e);
+            throw new ApiDataRetrievalException("정당별 국회의원 정보를 동기화하는 중 오류 발생");
+        }
+    }
+
+    /**
+     * 특정 정당 소속 국회의원 정보를 API에서 가져옵니다.
+     * @param partyName 정당 이름
+     * @return 국회의원 정보 DTO 목록
+     */
+    private List<FigureInfoDTO> fetchAllFiguresByPartyFromApi(String partyName) {
+        try {
+            log.info("{}당 소속 국회의원 정보 API 호출 시작", partyName);
+
+            AssemblyApiResponse<JsonNode> apiResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(figureApiPath)
+                            .queryParam("KEY", apiKey)
+                            .queryParam("POLY_NM", partyName)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {})
+                    .block();
+
+            List<FigureInfoDTO> figures = apiMapper.map(apiResponse);
+            log.info("{}당 소속 국회의원 정보 API 호출 완료: {}명", partyName, figures.size());
+
+            return figures;
+        } catch (Exception e) {
+
+            log.error("정당별 국회의원 정보 조회 중 오류 발생: {}", partyName, e);
+            throw new ApiDataRetrievalException("정당별 국회의원 정보를 가져오는 중 오류 발생");
         }
     }
 }
