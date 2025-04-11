@@ -30,7 +30,7 @@ public class ProposedBill extends BaseTimeEntity {
     private String billId;
     private String billNo;
     private String billName;
-    private LocalDateTime proposeDate;
+    private LocalDate proposeDate;
     private String summary;
     private String content;
     private String billUrl;
