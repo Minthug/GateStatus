@@ -48,10 +48,27 @@ public class ProposedBill extends BaseTimeEntity {
 
     private Integer viewCount = 0;
 
-    public void update(BillStatus billStatus, String processResult, LocalDate processDate) {
+    public void update(
+            String billNo,
+            String billName,
+            LocalDate proposeDate,
+            String summary,
+            String billUrl,
+            BillStatus billStatus,
+            LocalDate processDate,
+            String processResult,
+            String committee,
+            List<String> coProposers) {
+        this.billNo = billNo;
+        this.billName = billName;
+        this.proposeDate = proposeDate;
+        this.summary = summary;
+        this.billUrl = billUrl;
         this.billStatus = billStatus;
-        this.processResult = processResult;
         this.processDate = processDate;
+        this.processResult = processResult;
+        this.committee = committee;
+        this.coProposers = coProposers;
     }
 
     public void incrementViewCount() {

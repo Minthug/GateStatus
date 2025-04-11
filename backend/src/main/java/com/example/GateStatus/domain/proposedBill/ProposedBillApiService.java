@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -96,6 +98,53 @@ public class ProposedBillApiService {
     }
 
     private void updateBillFromDto(ProposedBill bill, ProposedBillApiDTO dto) {
+        bill.update(
+                dto.billNo(),
+                dto.billName(),
+                parseDate(dto.proposedDate()),
+                dto.summary(),
+                dto.billUrl(),
+                parsebillStatus(dto.billStatus(), dto.processResult()),
+                parseDate(dto.processDate()),
+                dto.processResult(),
+                dto.committee(),
+                dto.coProposers()
+        );
+    }
 
+    private BillStatus parsebillStatus(String statusCode, String processResult) {
+        if (statusCode == null || statusCode.isEmpty()) {
+            return BillStatus.PROPOSED;
+        }
+
+        return switch (statusCode) {
+            case "1" -> BillStatus.PASSED;
+            case "2" -> BillStatus.REJECTED;
+            case "3" -> BillStatus.WITHDRAWN;
+            case "4" -> BillStatus.EXPIRED;
+            default -> {
+                if (processResult != null && processResult.contains("위원회")) {
+                    yield BillStatus.IN_COMMITTEE;
+                } else if (processResult != null && processResult.contains("본회의")) {
+                    yield BillStatus.IN_PLENARY;
+                } else {
+                    yield BillStatus.PROPOSED;
+                }
+            }
+        };
+    }
+
+    private LocalDate parseDate(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) {
+            return null;
+        }
+
+        try {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+            return LocalDate.parse(dateStr, formatter);
+        } catch (Exception e) {
+            log.warn("날짜 형식 변환 오류: {}", dateStr, e);
+            return null;
+        }
     }
 }
