@@ -1,12 +1,34 @@
 package com.example.GateStatus.domain.proposedBill.repository;
 
+import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.proposedBill.BillStatus;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long> {
 
     Optional<ProposedBill> findByBillId(String billId);
+
+    List<ProposedBill> findByProposer(Figure proposer);
+
+    Page<ProposedBill> findByProposer(Figure proposer, Pageable pageable);
+
+    Page<ProposedBill> findByBillNameContaining(String keyword, Pageable pageable);
+
+    List<ProposedBill> findByBillStatus(BillStatus status);
+
+    @Query("SELECT p FROM ProposedBill p WHERE p.proposeDate BETWEEN :startDate AND :endDate")
+    List<ProposedBill> findByPeriod(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT p FROM ProposedBill p ORDER BY p.viewCount DESC")
+    List<ProposedBill> findTopByOrderByViewCountDesc(Pageable pageable);
 
 }
