@@ -2,6 +2,7 @@ package com.example.GateStatus.domain.proposedBill.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.proposedBill.BillStatus;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;
 import com.example.GateStatus.domain.proposedBill.ProposedBillApiService;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
@@ -14,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -81,5 +83,40 @@ public class ProposedBillService {
         return bills.map(ProposedBillResponse::from);
     }
 
+    /**
+     * 특정 상태의 법안 목록 조회
+     * @param status
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<ProposedBillResponse> findBillByStatus(BillStatus status) {
+        return billRepository.findByBillStatus(status)
+                .stream()
+                .map(ProposedBillResponse::from)
+                .collect(Collectors.toList());
+    }
 
+    /**
+     * 기간별 법안 목록 조회
+     * @param startDate
+     * @param endDate
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<ProposedBillResponse> findBillsByPeriod(LocalDate startDate, LocalDate endDate) {
+        return billRepository.findByPeriod(startDate, endDate)
+                .stream()
+                .map(ProposedBillResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * API 데이터 동기화 메서드(퍼사드 패턴)
+     * @param proposerName
+     * @return
+     */
+    @Transactional
+    public int syncBillsByProposer(String proposerName) {
+        return proposedBillApiService.syncBillByProposer(proposerName);
+    }
 }
