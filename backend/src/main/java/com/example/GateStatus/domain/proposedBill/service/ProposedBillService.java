@@ -9,9 +9,13 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -51,4 +55,31 @@ public class ProposedBillService {
         Page<ProposedBill> bills = billRepository.findByProposer(proposer, pageable);
         return bills.map(ProposedBillResponse::from);
     }
+
+    /**
+     * 인기 법안 목록 조회
+     * @param limit
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<ProposedBillResponse> findPopularBills(int limit) {
+        return billRepository.findTopByOrderByViewCountDesc(PageRequest.of(0, limit))
+                .stream()
+                .map(ProposedBillResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 키워드로 법안 검색
+     * @param keyword
+     * @param pageable
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public Page<ProposedBillResponse> searchBills(String keyword, Pageable pageable) {
+        Page<ProposedBill> bills = billRepository.findByBillNameContaining(keyword, pageable);
+        return bills.map(ProposedBillResponse::from);
+    }
+
+
 }
