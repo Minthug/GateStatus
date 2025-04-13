@@ -38,6 +38,11 @@ public class ProposedBillApiService {
     @Value("${spring.openapi.assembly.proposed-bill-path}")
     private String proposedBillPath;
 
+    /**
+     * 특정 국회의원이 대표 발의한 법안 정보 동기화
+     * @param proposedName
+     * @return
+     */
     @Transactional
     public int syncBillByProposer(String proposedName) {
         try {
@@ -74,6 +79,11 @@ public class ProposedBillApiService {
         }
     }
 
+    /**
+     * API에서 특정 국회의원의 발의 법안 조회
+     * @param proposedName
+     * @return
+     */
     private List<ProposedBillApiDTO> fetchBillsByProposerFromApi(String proposedName) {
         try {
             log.info("{}의 발의 법안 API 호출", proposedName);
@@ -97,6 +107,11 @@ public class ProposedBillApiService {
         }
     }
 
+    /**
+     * DTO 데이터로 법안 엔티티 업데이트
+     * @param bill
+     * @param dto
+     */
     private void updateBillFromDto(ProposedBill bill, ProposedBillApiDTO dto) {
         bill.update(
                 dto.billNo(),
@@ -112,6 +127,12 @@ public class ProposedBillApiService {
         );
     }
 
+    /**
+     * 법안 상태 코드 변환
+     * @param statusCode
+     * @param processResult
+     * @return
+     */
     private BillStatus parsebillStatus(String statusCode, String processResult) {
         if (statusCode == null || statusCode.isEmpty()) {
             return BillStatus.PROPOSED;
@@ -134,6 +155,11 @@ public class ProposedBillApiService {
         };
     }
 
+    /**
+     * 문자열 날짜를 LocalDate로 변환
+     * @param dateStr
+     * @return
+     */
     private LocalDate parseDate(String dateStr) {
         if (dateStr == null || dateStr.isEmpty()) {
             return null;
