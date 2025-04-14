@@ -45,7 +45,7 @@ public class Statement extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     private StatementType type;
 
-    private Integer factCheckSource;
+    private Integer factCheckScore;
 
     private String factCheckResult;
 
