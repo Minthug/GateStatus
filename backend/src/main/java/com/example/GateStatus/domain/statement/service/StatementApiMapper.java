@@ -121,8 +121,10 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
      * @return
      */
     private String generateOriginalUrl(String regDate, String title) {
+        // 날짜에서 특수문자 제거
         String dateStr = regDate.replaceAll("[^0-9]", "");
 
+        // 제목에서 URL 안전한 문자열 생성(50자 제한)
         String slugTitle;
         if (title.length() > 50) {
             slugTitle = title.substring(0, 50);
