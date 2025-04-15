@@ -1,6 +1,6 @@
 package com.example.GateStatus.global.config.open;
 
-public record AssemblyApiResponse<T>(String resultCode, String resultMessage, T data, int totalCount) {
+public record AssemblyApiResponse<T>(String resultCode, String resultMessage, T data) {
 
     public T getData() {
         return data;

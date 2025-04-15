@@ -11,12 +11,14 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import javax.swing.text.html.Option;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,6 +39,11 @@ public class StatementApiService {
     private String apikey;
 
 
+    /**
+     * 국회방송국 API에서 특정 인물의 뉴스/발언 정보를 가져와 저장
+     * @param figureName
+     * @return
+     */
     @Transactional
     public int syncStatementsByFigure(String figureName) {
         log.info("국회방송국 API에서 '{}' 인물 발언 정보 동기화 시작", figureName);
@@ -72,6 +79,38 @@ public class StatementApiService {
         return syncCount;
     }
 
+    /**
+     * API에서 특정 인물의 발언 정보 가져오기
+     * @param figureName
+     * @return
+     */
+    private AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {
+        WebClient webClient = webclientBuilder.baseUrl(baseUrl)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
+                .build();
+
+        String xmlResponse = webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/news/figure")
+                        .queryParam("apiKey", apikey)
+                        .queryParam("name", figureName)
+                        .build())
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+        String resultCode = extractResultCode(xmlResponse);
+        String resultMessage = extractResultMessage(xmlResponse);
+
+        return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
+    }
+
+    /**
+     * 특정 기간 동안의 모든 발언 정보를 동기화
+     * @param startDate
+     * @param endDate
+     * @return
+     */
     @Transactional
     public int syncStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
         log.info("국회방송국 API에서 기간({} ~ {}) 발언 정보 동기화 시작", startDate, endDate);
@@ -111,6 +150,74 @@ public class StatementApiService {
         return syncCount;
     }
 
+    /**
+     * API에서 특정 기간의 발언 정보 가져오기
+     * @param startDate
+     * @param endDate
+     * @return
+     */
+    private AssemblyApiResponse<String> fetchStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
+        WebClient webClient = webclientBuilder.baseUrl(baseUrl)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
+                .build();
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+        String xmlResponse = webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/news/period")
+                        .queryParam("apiKey", apikey)
+                        .queryParam("startDate", startDate.format(formatter))
+                        .queryParam("endDate", endDate.format(formatter))
+                        .build())
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+        String resultCode = extractResultCode(xmlResponse);
+        String resultMessage = extractResultMessage(xmlResponse);
+
+        return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
+    }
+
+    /**
+     * XML 응답에서 결과 메시지 추출
+     * @param xmlResponse
+     * @return
+     */
+    private String extractResultMessage(String xmlResponse) {
+        if (xmlResponse.contains("<MESSAGE>")) {
+            int start = xmlResponse.indexOf("<MESSAGE>") + "<MESSAGE>".length();
+            int end = xmlResponse.indexOf("</MESSAGE>");
+            if (start > 0 && end > start) {
+                return xmlResponse.substring(start, end);
+            }
+        }
+        return "처리 중 오류가 발생했습니다";
+    }
+
+    /**
+     * XML 응답에서 결과 코드 추출
+     * @param xmlResponse
+     * @return
+     */
+    private String extractResultCode(String xmlResponse) {
+        if (xmlResponse.contains("<CODE>")) {
+            int start = xmlResponse.indexOf("<CODE>") + "<CODE>".length();
+            int end = xmlResponse.indexOf("</CODE>");
+            if (start > 0 && end > start) {
+                return xmlResponse.substring(start, end);
+            }
+        }
+        return "99";
+    }
+
+    /**
+     * StatementAPiDto를 Statement 엔티티로 반환
+     * @param dto
+     * @param figure
+     * @return
+     */
     private Statement convertToStatement(StatementApiDTO dto, Figure figure) {
         return Statement.builder()
                 .figure(figure)
@@ -124,6 +231,11 @@ public class StatementApiService {
                 .build();
     }
 
+    /**
+     * API의 발언 유형 코드를 애플리케이션 StatementType으로 변환
+     * @param typeCode
+     * @return
+     */
     private StatementType determineStatementType(String typeCode) {
         switch (typeCode) {
             case "SPEECH":
