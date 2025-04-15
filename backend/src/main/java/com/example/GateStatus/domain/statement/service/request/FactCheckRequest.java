@@ -1,4 +1,4 @@
-package com.example.GateStatus.domain.statement.service;
+package com.example.GateStatus.domain.statement.service.request;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

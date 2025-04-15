@@ -1,4 +1,4 @@
-package com.example.GateStatus.domain.statement.service;
+package com.example.GateStatus.domain.statement.service.response;
 
 import com.example.GateStatus.domain.statement.Statement;
 import com.example.GateStatus.domain.statement.StatementType;

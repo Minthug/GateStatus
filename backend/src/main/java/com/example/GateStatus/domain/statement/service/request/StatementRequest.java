@@ -1,10 +1,9 @@
-package com.example.GateStatus.domain.statement.service;
+package com.example.GateStatus.domain.statement.service.request;
 
 import com.example.GateStatus.domain.statement.StatementType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
-import kotlin.jvm.Strictfp;
 
 import java.time.LocalDateTime;
 

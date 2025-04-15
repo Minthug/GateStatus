@@ -5,4 +5,9 @@ public record AssemblyApiResponse<T>(String resultCode, String resultMessage, T 
     public T getData() {
         return data;
     }
+
+
+    public boolean isSuccess() {
+        return "00".equals(resultCode);
+    }
 }
