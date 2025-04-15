@@ -72,7 +72,7 @@ public class Statement extends BaseTimeEntity {
     }
 
     public void updateFactCheck(Integer score, String result) {
-        this.factCheckSource = score;
+        this.factCheckScore = score;
         this.factCheckResult = result;
     }
 }
