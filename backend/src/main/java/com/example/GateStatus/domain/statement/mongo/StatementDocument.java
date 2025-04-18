@@ -24,10 +24,10 @@ public class StatementDocument {
 
     private String figureName;
 
-    @TextIndexed
+    @TextIndexed(weight = 2)
     private String title;
 
-    @TextIndexed
+    @TextIndexed(weight = 1)
     private String content;
 
     private LocalDate statementDate;

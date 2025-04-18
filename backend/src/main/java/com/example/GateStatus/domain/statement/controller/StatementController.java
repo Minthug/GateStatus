@@ -29,7 +29,7 @@ public class StatementController {
      * @return
      */
     @GetMapping("/{id}")
-    public ResponseEntity<StatementResponse> getStatementById(@PathVariable Long id) {
+    public ResponseEntity<StatementResponse> getStatementById(@PathVariable String id) {
         log.info("발언 상세 정보 조회 요청: {}", id);
         StatementResponse statement = statementService.findStatementById(id);
         return ResponseEntity.ok(statement);
@@ -68,10 +68,10 @@ public class StatementController {
      * @return
      */
     @GetMapping("/search")
-    public ResponseEntity<Page<StatementResponse>> searchStatements(@RequestParam String keyword,
+    public ResponseEntity<List<StatementResponse>> searchStatements(@RequestParam String keyword,
                                                                     @PageableDefault(size = 10) Pageable pageable) {
         log.info("발언 검색 요청: keyword = {}", keyword);
-        Page<StatementResponse> statements = statementService.searchStatements(keyword, pageable);
+        List<StatementResponse> statements = statementService.searchStatements(keyword);
         return ResponseEntity.ok(statements);
     }
 

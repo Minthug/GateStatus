@@ -17,8 +17,8 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
 
     List<StatementDocument> findByType(StatementType type);
 
-    @Query("{ $text: { $search: ?0 } }")
-    Page<StatementDocument> fullTextSearch(String keyword, Pageable pageable);
+//    @Query("{$text: { $search: ?0 } }")
+//    Page<StatementDocument> fullTextSearch(String keyword, Pageable pageable);
 
     @Query("{ 'statementDate': { $gte: ?0, $lte: ?1 } }")
     List<StatementDocument> findByPeriod(LocalDate startDate, LocalDate endDate);

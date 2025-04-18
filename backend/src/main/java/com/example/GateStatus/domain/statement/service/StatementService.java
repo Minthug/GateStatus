@@ -2,10 +2,9 @@ package com.example.GateStatus.domain.statement.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
+import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
-import com.example.GateStatus.domain.statement.repository.StatementRepository;
 import com.example.GateStatus.domain.statement.service.request.StatementRequest;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import jakarta.persistence.EntityNotFoundException;
@@ -26,7 +25,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class StatementService {
 
-    private final StatementMongoRepository statementMongoRepositoryRepository;
     private final FigureRepository figureRepository;
     private final StatementApiService apiService;
     private final StatementMongoRepository statementMongoRepository;
@@ -37,8 +35,8 @@ public class StatementService {
      * @return
      */
     @Transactional
-    public StatementResponse findStatementById(Long id) {
-        Statement statement = statementRepository.findById(id)
+    public StatementResponse findStatementById(String id) {
+        StatementDocument statement = statementMongoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("해당 발언이 존재하지 않습니다: " + id));
 
         statement.incrementViewCount();
@@ -56,33 +54,34 @@ public class StatementService {
         Figure figure = figureRepository.findById(figureId)
                 .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다 " + figureId));
 
-        Page<Statement> statements = statementRepository.findByFigure(figure, pageable);
+        Page<StatementDocument> statements = statementMongoRepository.findByFigureId(figureId, pageable);
         return statements.map(StatementResponse::from);
     }
 
-    /**
-     * 인기 발언 목록 조회
-     * @param limit
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public List<StatementResponse> findPopularStatements(int limit) {
-        return statementRepository.findTopByOrderByViewCountDesc(PageRequest.of(0, limit))
-                .stream()
-                .map(StatementResponse::from)
-                .collect(Collectors.toList());
-    }
+//    /**
+//     * 인기 발언 목록 조회
+//     * @param limit
+//     * @return
+//     */
+//    @Transactional(readOnly = true)
+//    public List<StatementResponse> findPopularStatements(int limit) {
+//        return statementMongoRepository.findTopByOrderByViewCountDesc(PageRequest.of(0, limit))
+//                .stream()
+//                .map(StatementResponse::from)
+//                .collect(Collectors.toList());
+//    }
 
     /**
      * 키워드로 발언 검색
      * @param keyword
-     * @param pageable
      * @return
      */
     @Transactional(readOnly = true)
-    public Page<StatementResponse> searchStatements(String keyword, Pageable pageable) {
-        Page<Statement> statements = statementRepository.findByContentContainingOrTitleContaining(keyword, keyword, pageable);
-        return statements.map(StatementResponse::from);
+    public List<StatementResponse> searchStatements(String keyword) {
+        List<StatementDocument> statements = statementMongoRepository.findByContentContainingKeyword(keyword);
+        return statements.stream()
+                .map(StatementResponse::from)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -92,7 +91,7 @@ public class StatementService {
      */
     @Transactional(readOnly = true)
     public List<StatementResponse> findStatementsByType(StatementType type) {
-        return statementMongoRepositoryRepository.findByType(type)
+        return statementMongoRepository.findByType(type)
                 .stream()
                 .map(StatementResponse::from)
                 .collect(Collectors.toList());
@@ -119,7 +118,7 @@ public class StatementService {
      */
     @Transactional(readOnly = true)
     public List<StatementResponse> findStatementsFactCheckScore(Integer minScore) {
-        return statementRepository.findByFactCheckScoreGreaterThanEqual(minScore)
+        return statementMongoRepository.findByFactCheckScoreGreaterThanEqual(minScore)
                 .stream()
                 .map(StatementResponse::from)
                 .collect(Collectors.toList());
@@ -132,7 +131,7 @@ public class StatementService {
      */
     @Transactional(readOnly = true)
     public List<StatementResponse> findStatementsBySource(String source) {
-        return statementRepository.findBySource(source)
+        return statementMongoRepository.findBySource(source)
                 .stream()
                 .map(StatementResponse::from)
                 .collect(Collectors.toList());
@@ -147,8 +146,9 @@ public class StatementService {
         Figure figure = figureRepository.findById(request.figureId())
                 .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다: " + request.figureId()));
 
-        Statement statement = Statement.builder()
-                .figure(figure)
+        StatementDocument statement = StatementDocument.builder()
+                .figureId(request.figureId())
+                .figureName(request.figureName())
                 .title(request.title())
                 .content(request.content())
                 .statementDate(request.statementDate())
@@ -158,7 +158,7 @@ public class StatementService {
                 .type(request.type())
                 .build();
 
-        Statement savedStatement = statementRepository.save(statement);
+        StatementDocument savedStatement = statementMongoRepository.save(statement);
         return StatementResponse.from(savedStatement);
     }
 
@@ -170,8 +170,8 @@ public class StatementService {
      * @return
      */
     @Transactional
-    public StatementResponse updateFactCheck(Long id, Integer score, String result) {
-        Statement statement = statementRepository.findById(id)
+    public StatementResponse updateFactCheck(String id, Integer score, String result) {
+        StatementDocument statement = statementMongoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("해당 발언이 존재하지 않습니다: " + id));
 
         statement.updateFactCheck(score, result);
