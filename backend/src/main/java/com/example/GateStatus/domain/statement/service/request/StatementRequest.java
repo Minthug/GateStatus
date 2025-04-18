@@ -1,12 +1,11 @@
 package com.example.GateStatus.domain.statement.service.request;
 
-import com.example.GateStatus.domain.statement.StatementType;
+import com.example.GateStatus.domain.statement.entity.StatementType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 public record StatementRequest(@NotNull(message = "발언자 ID는 필수 입니다") Long figureId,
                                @NotBlank(message = "제목은 필수 입니다") String title,

@@ -2,8 +2,8 @@ package com.example.GateStatus.domain.statement.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.statement.Statement;
-import com.example.GateStatus.domain.statement.StatementType;
+import com.example.GateStatus.domain.statement.entity.Statement;
+import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.repository.StatementRepository;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;

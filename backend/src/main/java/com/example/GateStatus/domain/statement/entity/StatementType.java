@@ -1,4 +1,4 @@
-package com.example.GateStatus.domain.statement;
+package com.example.GateStatus.domain.statement.entity;
 
 public enum StatementType {
     SPEECH("연설문"),

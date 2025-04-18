@@ -1,7 +1,57 @@
 package com.example.GateStatus.domain.statement.mongo;
 
+import com.example.GateStatus.domain.statement.entity.StatementType;
+import jakarta.persistence.Id;
+import lombok.Builder;
+import lombok.Getter;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 @Document(collection = "statements")
+@Getter
+@Builder
 public class StatementDocument {
+
+    @Id
+    private String id;
+
+    @Indexed
+    private Long figureId;
+
+    private String figureName;
+
+    @TextIndexed
+    private String title;
+
+    @TextIndexed
+    private String content;
+
+    private LocalDate statementDate;
+
+    private String source;
+    private String context;
+    private String originalUrl;
+
+    @Indexed
+    private StatementType type;
+
+    private Integer factCheckScore;
+    private String factCheckResult;
+
+    private Integer viewCount;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    public void incrementViewCount() {
+        this.viewCount++;
+    }
+
+    public void updateFactCheck(Integer score, String result) {
+        this.factCheckScore = score;
+        this.factCheckResult = result;
+    }
 }

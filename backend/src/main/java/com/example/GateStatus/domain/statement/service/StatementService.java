@@ -2,8 +2,9 @@ package com.example.GateStatus.domain.statement.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.statement.Statement;
-import com.example.GateStatus.domain.statement.StatementType;
+import com.example.GateStatus.domain.statement.entity.Statement;
+import com.example.GateStatus.domain.statement.entity.StatementType;
+import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
 import com.example.GateStatus.domain.statement.repository.StatementRepository;
 import com.example.GateStatus.domain.statement.service.request.StatementRequest;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
@@ -13,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,9 +26,10 @@ import java.util.stream.Collectors;
 @Slf4j
 public class StatementService {
 
-    private final StatementRepository statementRepository;
+    private final StatementMongoRepository statementMongoRepositoryRepository;
     private final FigureRepository figureRepository;
     private final StatementApiService apiService;
+    private final StatementMongoRepository statementMongoRepository;
 
     /**
      * 발언 ID로 발언 상세 정보 조회
@@ -91,7 +92,7 @@ public class StatementService {
      */
     @Transactional(readOnly = true)
     public List<StatementResponse> findStatementsByType(StatementType type) {
-        return statementRepository.findByType(type)
+        return statementMongoRepositoryRepository.findByType(type)
                 .stream()
                 .map(StatementResponse::from)
                 .collect(Collectors.toList());
@@ -105,7 +106,7 @@ public class StatementService {
      */
     @Transactional(readOnly = true)
     public List<StatementResponse> findStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
-        return statementRepository.findByPeriod(startDate, endDate)
+        return statementMongoRepository.findByPeriod(startDate, endDate)
                 .stream()
                 .map(StatementResponse::from)
                 .collect(Collectors.toList());

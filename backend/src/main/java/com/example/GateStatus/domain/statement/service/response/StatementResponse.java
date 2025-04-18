@@ -1,12 +1,12 @@
 package com.example.GateStatus.domain.statement.service.response;
 
-import com.example.GateStatus.domain.statement.Statement;
-import com.example.GateStatus.domain.statement.StatementType;
+import com.example.GateStatus.domain.statement.entity.StatementType;
+import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-public record StatementResponse(Long id,
+public record StatementResponse(String id,
                                 Long figureId,
                                 String figureName,
                                 String title,
@@ -22,11 +22,11 @@ public record StatementResponse(Long id,
                                 LocalDateTime createdAt,
                                 LocalDateTime updatedAt) {
 
-    public static StatementResponse from(Statement statement) {
+    public static StatementResponse from(StatementDocument statement) {
         return new StatementResponse(
                 statement.getId(),
-                statement.getFigure().getId(),
-                statement.getFigure().getName(),
+                statement.getFigureId(),
+                statement.getFigureName(),
                 statement.getTitle(),
                 statement.getContent(),
                 statement.getStatementDate(),

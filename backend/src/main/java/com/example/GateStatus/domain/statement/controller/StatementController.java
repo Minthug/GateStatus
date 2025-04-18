@@ -1,7 +1,6 @@
 package com.example.GateStatus.domain.statement.controller;
 
-import com.example.GateStatus.domain.statement.Statement;
-import com.example.GateStatus.domain.statement.StatementType;
+import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.service.StatementService;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +12,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.swing.plaf.nimbus.State;
 import java.time.LocalDate;
 import java.util.List;
 
