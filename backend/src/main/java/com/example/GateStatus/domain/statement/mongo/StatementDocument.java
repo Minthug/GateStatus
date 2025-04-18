@@ -2,8 +2,8 @@ package com.example.GateStatus.domain.statement.mongo;
 
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import jakarta.persistence.Id;
-import lombok.Builder;
-import lombok.Getter;
+import lombok.*;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -12,8 +12,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Document(collection = "statements")
-@Getter
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
+@CompoundIndex(name = "figure_data_idx", def = "{'figureId': 1, 'statementDate': -1}")
 public class StatementDocument {
 
     @Id
@@ -34,6 +37,8 @@ public class StatementDocument {
 
     private String source;
     private String context;
+
+    @Indexed(unique = true)
     private String originalUrl;
 
     @Indexed
@@ -47,11 +52,16 @@ public class StatementDocument {
     private LocalDateTime updatedAt;
 
     public void incrementViewCount() {
+        if (this.viewCount == null) {
+            this.viewCount = 0;
+        }
         this.viewCount++;
+        this.updatedAt = LocalDateTime.now();
     }
 
     public void updateFactCheck(Integer score, String result) {
         this.factCheckScore = score;
         this.factCheckResult = result;
+        this.updatedAt = LocalDateTime.now();
     }
 }

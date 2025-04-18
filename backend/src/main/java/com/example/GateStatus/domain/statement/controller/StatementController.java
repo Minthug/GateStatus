@@ -49,17 +49,17 @@ public class StatementController {
         return ResponseEntity.ok(statements);
     }
 
-    /**
-     * 인기 발언 목록 조회
-     * @param limit
-     * @return
-     */
-    @GetMapping("/popular")
-    public ResponseEntity<List<StatementResponse>> getPopularStatements(@RequestParam(defaultValue = "10") int limit) {
-        log.info("인기 발언 목록 조회 요청: 상위 {}", limit);
-        List<StatementResponse> statements = statementService.findPopularStatements(limit);
-        return ResponseEntity.ok(statements);
-    }
+//    /**
+//     * 인기 발언 목록 조회
+//     * @param limit
+//     * @return
+//     */
+//    @GetMapping("/popular")
+//    public ResponseEntity<List<StatementResponse>> getPopularStatements(@RequestParam(defaultValue = "10") int limit) {
+//        log.info("인기 발언 목록 조회 요청: 상위 {}", limit);
+//        List<StatementResponse> statements = statementService.findPopularStatements(limit);
+//        return ResponseEntity.ok(statements);
+//    }
 
     /**
      * 키워드로 발언 검색

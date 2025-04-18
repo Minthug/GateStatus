@@ -28,6 +28,7 @@ public class StatementService {
     private final FigureRepository figureRepository;
     private final StatementApiService apiService;
     private final StatementMongoRepository statementMongoRepository;
+    private final StatementApiMapper mapper;
 
     /**
      * 발언 ID로 발언 상세 정보 조회
@@ -40,6 +41,8 @@ public class StatementService {
                 .orElseThrow(() -> new EntityNotFoundException("해당 발언이 존재하지 않습니다: " + id));
 
         statement.incrementViewCount();
+        statementMongoRepository.save(statement);
+
         return StatementResponse.from(statement);
     }
 
@@ -49,7 +52,7 @@ public class StatementService {
      * @param pageable
      * @return
      */
-    @Transactional(readOnly = true)
+//    @Transactional(readOnly = true)
     public Page<StatementResponse> findStatementsByFigure(Long figureId, Pageable pageable) {
         Figure figure = figureRepository.findById(figureId)
                 .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다 " + figureId));
@@ -58,18 +61,18 @@ public class StatementService {
         return statements.map(StatementResponse::from);
     }
 
-//    /**
-//     * 인기 발언 목록 조회
-//     * @param limit
-//     * @return
-//     */
+    /**
+     * 인기 발언 목록 조회
+     * @param limit
+     * @return
+     */
 //    @Transactional(readOnly = true)
-//    public List<StatementResponse> findPopularStatements(int limit) {
-//        return statementMongoRepository.findTopByOrderByViewCountDesc(PageRequest.of(0, limit))
-//                .stream()
-//                .map(StatementResponse::from)
-//                .collect(Collectors.toList());
-//    }
+    public List<StatementResponse> findPopularStatements(int limit) {
+        return statementMongoRepository.findAllByOrderByViewCountDesc(PageRequest.of(0, limit))
+                .stream()
+                .map(StatementResponse::from)
+                .collect(Collectors.toList());
+    }
 
     /**
      * 키워드로 발언 검색

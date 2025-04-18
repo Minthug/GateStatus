@@ -4,6 +4,7 @@ import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
+import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
 import com.example.GateStatus.domain.statement.repository.StatementRepository;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
@@ -28,7 +29,7 @@ import java.util.Optional;
 public class StatementApiService {
 
     private final WebClient.Builder webclientBuilder;
-    private final StatementRepository statementRepository;
+    private final StatementMongoRepository statementRepository;
     private final FigureRepository figureRepository;
     private final StatementApiMapper statementApiMapper;
 

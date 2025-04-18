@@ -17,7 +17,8 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
 
     List<StatementDocument> findByType(StatementType type);
 
-//    @Query("{$text: { $search: ?0 } }")
+    // 텍스트 인덱스 기반 검색 (인덱스 설정 필요)
+//    @Query("{$text: {$search: ?0}}")
 //    Page<StatementDocument> fullTextSearch(String keyword, Pageable pageable);
 
     @Query("{ 'statementDate': { $gte: ?0, $lte: ?1 } }")
@@ -29,6 +30,12 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
 
     List<StatementDocument> findBySource(String source);
 
+    // 정규식 기반 검색 (대안)
     @Query("{ 'content': { $regex: ?0, $options:  'i' } }")
     List<StatementDocument> findByContentContainingKeyword(String keyword);
+
+    @Query("{ $or: [ { 'title': { $regex: ?0, $options: 'i' } }, { 'content': { $regex: ?0, $options: 'i' } } ] }")
+    Page<StatementDocument> searchByRegex(String keyword, Pageable pageable);
+
+
 }
