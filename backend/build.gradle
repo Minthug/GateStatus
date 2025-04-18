@@ -47,6 +47,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'com.github.iamport:iamport-rest-client-java:0.2.21'
+	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+
 
 
 	// 쿠버네티스 환경에서 필요한 의존성들
