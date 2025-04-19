@@ -2,6 +2,7 @@ package com.example.GateStatus.domain.statement.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -74,6 +76,13 @@ public class StatementService {
                 .collect(Collectors.toList());
     }
 
+    public Page<StatementResponse> searchStatement(String keyword, Pageable pageable) {
+        return statementMongoRepository.fullTextSearch(keyword, pageable)
+                .map(this::convertToResponse);
+    }
+
+
+
     /**
      * 키워드로 발언 검색
      * @param keyword
@@ -96,7 +105,7 @@ public class StatementService {
     public List<StatementResponse> findStatementsByType(StatementType type) {
         return statementMongoRepository.findByType(type)
                 .stream()
-                .map(StatementResponse::from)
+                .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
 
@@ -110,7 +119,7 @@ public class StatementService {
     public List<StatementResponse> findStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
         return statementMongoRepository.findByPeriod(startDate, endDate)
                 .stream()
-                .map(StatementResponse::from)
+                .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
 
@@ -123,7 +132,7 @@ public class StatementService {
     public List<StatementResponse> findStatementsFactCheckScore(Integer minScore) {
         return statementMongoRepository.findByFactCheckScoreGreaterThanEqual(minScore)
                 .stream()
-                .map(StatementResponse::from)
+                .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
 
@@ -136,7 +145,14 @@ public class StatementService {
     public List<StatementResponse> findStatementsBySource(String source) {
         return statementMongoRepository.findBySource(source)
                 .stream()
-                .map(StatementResponse::from)
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<StatementResponse> findStatementByKeyword(String keyword) {
+        return statementMongoRepository.findByContentContainingKeyword(keyword)
+                .stream()
+                .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
 
@@ -145,6 +161,7 @@ public class StatementService {
      * @param request
      * @return
      */
+    @Transactional
     public StatementResponse addStatement(StatementRequest request) {
         Figure figure = figureRepository.findById(request.figureId())
                 .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다: " + request.figureId()));
@@ -159,6 +176,11 @@ public class StatementService {
                 .context(request.context())
                 .originalUrl(request.originalUrl())
                 .type(request.type())
+                .factCheckScore(null)
+                .factCheckResult(null)
+                .viewCount(0)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build();
 
         StatementDocument savedStatement = statementMongoRepository.save(statement);
@@ -191,5 +213,53 @@ public class StatementService {
     @Transactional
     public int syncStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
         return apiService.syncStatementsByPeriod(startDate, endDate);
+    }
+
+    private StatementDocument convertToDocument(Statement entity) {
+        return StatementDocument.builder()
+                .figureId(entity.getFigure().getId())
+                .figureName(entity.getFigure().getName())
+                .title(entity.getTitle())
+                .content(entity.getContent())
+                .statementDate(entity.getStatementDate())
+                .source(entity.getSource())
+                .context(entity.getContext())
+                .originalUrl(entity.getOriginalUrl())
+                .type(entity.getType())
+                .factCheckScore(entity.getFactCheckScore())
+                .factCheckResult(entity.getFactCheckResult())
+                .viewCount(entity.getViewCount())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .build();
+    }
+
+    private StatementResponse convertToResponse(StatementDocument document) {
+        return new StatementResponse(
+                document.getId(),
+                document.getFigureId(),
+                document.getFigureName(),
+                document.getTitle(),
+                document.getContent(),
+                document.getStatementDate(),
+                document.getSource(),
+                document.getContext(),
+                document.getOriginalUrl(),
+                document.getType(),
+                document.getFactCheckScore(),
+                document.getFactCheckResult(),
+                document.getViewCount(),
+                document.getCreatedAt(),
+                document.getUpdatedAt()
+        );
+    }
+
+    public void migrateFromJpa(List<Statement> statements) {
+        List<StatementDocument> documents = statements.stream()
+                .map(this::convertToDocument)
+                .collect(Collectors.toList());
+
+        statementMongoRepository.saveAll(documents);
+        log.info("{}개의 발언 데이터를 JPA에서 MongoDB로 마이그레이션 했습니다", documents.size());
     }
 }
