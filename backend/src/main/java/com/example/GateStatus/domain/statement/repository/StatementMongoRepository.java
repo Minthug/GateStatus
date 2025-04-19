@@ -2,7 +2,6 @@ package com.example.GateStatus.domain.statement.repository;
 
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
-import org.apache.kafka.common.metrics.Stat;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
