@@ -18,8 +18,8 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     List<StatementDocument> findByType(StatementType type);
 
     // 텍스트 인덱스 기반 검색 (인덱스 설정 필요)
-//    @Query("{$text: {$search: ?0}}")
-//    Page<StatementDocument> fullTextSearch(String keyword, Pageable pageable);
+    @Query("{$text: {$search: ?0}}")
+    Page<StatementDocument> fullTextSearch(String keyword, Pageable pageable);
 
     @Query("{ 'statementDate': { $gte: ?0, $lte: ?1 } }")
     List<StatementDocument> findByPeriod(LocalDate startDate, LocalDate endDate);

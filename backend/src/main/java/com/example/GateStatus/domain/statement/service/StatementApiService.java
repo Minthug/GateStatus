@@ -2,10 +2,9 @@ package com.example.GateStatus.domain.statement.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
+import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
-import com.example.GateStatus.domain.statement.repository.StatementRepository;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import jakarta.persistence.EntityNotFoundException;
@@ -62,7 +61,7 @@ public class StatementApiService {
         int syncCount = 0;
 
         for (StatementApiDTO dto : apiDtos) {
-            Optional<Statement> existingStatement = statementRepository.findAll().stream()
+            Optional<StatementDocument> existingStatement = statementRepository.findAll().stream()
                     .filter(s -> s.getOriginalUrl().equals(dto.originalUrl()))
                     .findFirst();
 
@@ -71,7 +70,7 @@ public class StatementApiService {
                 continue;
             }
 
-            Statement statement = convertToStatement(dto, figure);
+            StatementDocument statement = convertToStatement(dto, figure);
             statementRepository.save(statement);
             syncCount++;
         }
@@ -125,7 +124,7 @@ public class StatementApiService {
         int syncCount = 0;
 
         for (StatementApiDTO dto : apiDtos) {
-            Optional<Statement> existingStatement = statementRepository.findAll().stream()
+            Optional<StatementDocument> existingStatement = statementRepository.findAll().stream()
                     .filter(s -> s.getOriginalUrl().equals(dto.originalUrl()))
                     .findFirst();
 
@@ -142,7 +141,7 @@ public class StatementApiService {
                         return figureRepository.save(newFigure);
                     });
 
-            Statement statement = convertToStatement(dto, figure);
+            StatementDocument statement = convertToStatement(dto, figure);
             statementRepository.save(statement);
             syncCount++;
         }
@@ -219,9 +218,9 @@ public class StatementApiService {
      * @param figure
      * @return
      */
-    private Statement convertToStatement(StatementApiDTO dto, Figure figure) {
-        return Statement.builder()
-                .figure(figure)
+    private StatementDocument convertToStatement(StatementApiDTO dto, Figure figure) {
+        return StatementDocument.builder()
+                .figureId(figure.getId())
                 .title(dto.title())
                 .content(dto.content())
                 .statementDate(dto.statementDate())
