@@ -84,7 +84,7 @@ public class StatementApiService {
      * @param figureName
      * @return
      */
-    private AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {
+    public AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {
         WebClient webClient = webclientBuilder.baseUrl(baseUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
                 .build();
@@ -156,7 +156,7 @@ public class StatementApiService {
      * @param endDate
      * @return
      */
-    private AssemblyApiResponse<String> fetchStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
+    public AssemblyApiResponse<String> fetchStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
         WebClient webClient = webclientBuilder.baseUrl(baseUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
                 .build();
@@ -218,7 +218,7 @@ public class StatementApiService {
      * @param figure
      * @return
      */
-    private StatementDocument convertToStatement(StatementApiDTO dto, Figure figure) {
+    public StatementDocument convertToStatement(StatementApiDTO dto, Figure figure) {
         return StatementDocument.builder()
                 .figureId(figure.getId())
                 .title(dto.title())
@@ -236,7 +236,7 @@ public class StatementApiService {
      * @param typeCode
      * @return
      */
-    private StatementType determineStatementType(String typeCode) {
+    public StatementType determineStatementType(String typeCode) {
         switch (typeCode) {
             case "SPEECH":
                 return StatementType.SPEECH;

@@ -37,4 +37,5 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     Page<StatementDocument> searchByRegex(String keyword, Pageable pageable);
 
 
+    boolean existsByOriginalUrl(String originalUrl);
 }

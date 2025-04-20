@@ -7,15 +7,19 @@ import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
 import com.example.GateStatus.domain.statement.service.request.StatementRequest;
+import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
+import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,6 +35,13 @@ public class StatementService {
     private final StatementApiService apiService;
     private final StatementMongoRepository statementMongoRepository;
     private final StatementApiMapper mapper;
+    private final WebClient.Builder webclientBuilder;
+
+    @Value("${spring.openapi.assembly.url}")
+    private String baseUrl;
+
+    @Value("${spring.openapi.assembly.key}")
+    private String apikey;
 
     /**
      * 발언 ID로 발언 상세 정보 조회
@@ -54,7 +65,7 @@ public class StatementService {
      * @param pageable
      * @return
      */
-//    @Transactional(readOnly = true)
+    @Transactional
     public Page<StatementResponse> findStatementsByFigure(Long figureId, Pageable pageable) {
         Figure figure = figureRepository.findById(figureId)
                 .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다 " + figureId));
@@ -68,7 +79,7 @@ public class StatementService {
      * @param limit
      * @return
      */
-//    @Transactional(readOnly = true)
+    @Transactional
     public List<StatementResponse> findPopularStatements(int limit) {
         return statementMongoRepository.findAllByOrderByViewCountDesc(PageRequest.of(0, limit))
                 .stream()
@@ -76,15 +87,9 @@ public class StatementService {
                 .collect(Collectors.toList());
     }
 
-    public Page<StatementResponse> searchStatement(String keyword, Pageable pageable) {
-        return statementMongoRepository.fullTextSearch(keyword, pageable)
-                .map(this::convertToResponse);
-    }
-
-
 
     /**
-     * 키워드로 발언 검색
+     * 키워드로 발언 검색 (정규식 기반)
      * @param keyword
      * @return
      */
@@ -94,6 +99,24 @@ public class StatementService {
         return statements.stream()
                 .map(StatementResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 키워드로 발언 검색 (페이징 적용)
+     * @param keyword
+     * @param pageable
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public Page<StatementResponse> searchStatements(String keyword, Pageable pageable) {
+        try {
+            return statementMongoRepository.fullTextSearch(keyword, pageable)
+                    .map(StatementResponse::from);
+        } catch (Exception e) {
+            log.warn("텍스트 검색 실패, 정규식 검색으로 대체: {}", e.getMessage());
+            return statementMongoRepository.searchByRegex(keyword, pageable)
+                    .map(StatementResponse::from);
+        }
     }
 
     /**
@@ -108,6 +131,7 @@ public class StatementService {
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
+
 
     /**
      * 기간별 발언 목록 조회
@@ -212,7 +236,38 @@ public class StatementService {
      */
     @Transactional
     public int syncStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
-        return apiService.syncStatementsByPeriod(startDate, endDate);
+        int count = 0;
+
+        try {
+            AssemblyApiResponse<String> apiResponse = apiService.fetchStatementsByPeriod(startDate, endDate);
+
+            List<StatementApiDTO> dtos = mapper.map(apiResponse);
+
+            for (StatementApiDTO dto : dtos) {
+                if (statementMongoRepository.existsByOriginalUrl(dto.originalUrl())) {
+                    continue;
+                }
+
+                Figure figure = figureRepository.findByName(dto.figureName())
+                        .orElseGet(() -> {
+                            Figure newFigure = Figure.builder()
+                                    .name(dto.figureName())
+                                    .build();
+                            return figureRepository.save(newFigure);
+                        });
+
+                StatementDocument document = StatementDocument.builder()
+                        .figureId(figure.getId())
+                        .figureName(figure.getName())
+                        .title(dto.title())
+                        .content(dto.content())
+                        .statementDate(dto.statementDate())
+                        .source(dto.source())
+                        .context(dto.context())
+                        .originalUrl(dto.originalUrl())
+                        .type(())
+            }
+        }
     }
 
     private StatementDocument convertToDocument(Statement entity) {

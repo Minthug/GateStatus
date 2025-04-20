@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.statement.service.response;
 
+import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 
@@ -39,6 +40,26 @@ public record StatementResponse(String id,
                 statement.getViewCount(),
                 statement.getCreatedAt(),
                 statement.getUpdatedAt()
+        );
+    }
+
+    public static StatementResponse from(Statement entity) {
+        return new StatementResponse(
+                entity.getId().toString(),
+                entity.getFigure().getId(),
+                entity.getFigure().getName(),
+                entity.getTitle(),
+                entity.getContent(),
+                entity.getStatementDate(),
+                entity.getSource(),
+                entity.getContext(),
+                entity.getOriginalUrl(),
+                entity.getType(),
+                entity.getFactCheckScore(),
+                entity.getFactCheckResult(),
+                entity.getViewCount(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
         );
     }
 }
