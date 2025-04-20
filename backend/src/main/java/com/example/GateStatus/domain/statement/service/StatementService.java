@@ -18,12 +18,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,7 +36,6 @@ import java.util.stream.Collectors;
 public class StatementService {
 
     private final FigureRepository figureRepository;
-    private final StatementApiService apiService;
     private final StatementMongoRepository statementMongoRepository;
     private final StatementApiMapper mapper;
     private final WebClient.Builder webclientBuilder;
@@ -129,7 +131,7 @@ public class StatementService {
     public List<StatementResponse> findStatementsByType(StatementType type) {
         return statementMongoRepository.findByType(type)
                 .stream()
-                .map(this::convertToResponse)
+                .map(StatementResponse::from)
                 .collect(Collectors.toList());
     }
 
@@ -144,7 +146,7 @@ public class StatementService {
     public List<StatementResponse> findStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
         return statementMongoRepository.findByPeriod(startDate, endDate)
                 .stream()
-                .map(this::convertToResponse)
+                .map(StatementResponse::from)
                 .collect(Collectors.toList());
     }
 
@@ -157,7 +159,7 @@ public class StatementService {
     public List<StatementResponse> findStatementsFactCheckScore(Integer minScore) {
         return statementMongoRepository.findByFactCheckScoreGreaterThanEqual(minScore)
                 .stream()
-                .map(this::convertToResponse)
+                .map(StatementResponse::from)
                 .collect(Collectors.toList());
     }
 
@@ -170,7 +172,7 @@ public class StatementService {
     public List<StatementResponse> findStatementsBySource(String source) {
         return statementMongoRepository.findBySource(source)
                 .stream()
-                .map(this::convertToResponse)
+                .map(StatementResponse::from)
                 .collect(Collectors.toList());
     }
 
@@ -256,13 +258,34 @@ public class StatementService {
                 continue;
             }
 
-            StatementDocument document = convertToResponse(dto, figure);
+            StatementDocument document = convertApiDtoToDocument(dto, figure);
             statementMongoRepository.save(document);
             syncCount++;
         }
 
         log.info("'{}' 인물 발언 정보 동기화 완료. 총 {} 건 처리됨", figureName, syncCount);
         return syncCount;
+    }
+
+    public AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {
+        WebClient webClient = webclientBuilder.baseUrl(baseUrl)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
+                .build();
+
+        String xmlResponse = webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/news/figure")
+                        .queryParam("apiKey", apikey)
+                        .queryParam("name", figureName)
+                        .build())
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+        String resultCode = extractResultCode(xmlResponse);
+        String resultMessage = extractResultMessage(xmlResponse);
+
+        return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
     }
 
     /**
@@ -299,7 +322,7 @@ public class StatementService {
                         return figureRepository.save(newFigure);
                     });
 
-            StatementDocument document = convertToStatement(dto, figure);
+            StatementDocument document = convertApiDtoToDocument(dto, figure);
             statementMongoRepository.save(document);
             syncCount++;
         }
@@ -308,7 +331,12 @@ public class StatementService {
         return syncCount;
     }
 
-    private StatementDocument convertToDocument(Statement entity) {
+    /**
+     * JPA entity -> MongoDB Document로 변환
+     * @param entity
+     * @return
+     */
+    private StatementDocument convertJpaEntityToDocument(Statement entity) {
         return StatementDocument.builder()
                 .figureId(entity.getFigure().getId())
                 .figureName(entity.getFigure().getName())
@@ -327,31 +355,125 @@ public class StatementService {
                 .build();
     }
 
-    private StatementResponse convertToResponse(StatementDocument document) {
-        return new StatementResponse(
-                document.getId(),
-                document.getFigureId(),
-                document.getFigureName(),
-                document.getTitle(),
-                document.getContent(),
-                document.getStatementDate(),
-                document.getSource(),
-                document.getContext(),
-                document.getOriginalUrl(),
-                document.getType(),
-                document.getFactCheckScore(),
-                document.getFactCheckResult(),
-                document.getViewCount(),
-                document.getCreatedAt(),
-                document.getUpdatedAt()
-        );
+    /**
+     * API DTO -> MongoDB Document로 변환
+     * @param dto
+     * @param figure
+     * @return
+     */
+    public StatementDocument convertApiDtoToDocument(StatementApiDTO dto, Figure figure) {
+        return StatementDocument.builder()
+                .figureId(figure.getId())
+                .figureName(figure.getName())
+                .title(dto.title())
+                .content(dto.content())
+                .statementDate(dto.statementDate())
+                .source(dto.source())
+                .context(dto.context())
+                .originalUrl(dto.originalUrl())
+                .type(determineStatementType(dto.typeCode()))
+                .viewCount(0)
+                .factCheckScore(null)
+                .factCheckResult(null)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+    }
+
+    /**
+     * API의 발언 유형 코드를 애플리케이션 StatementType으로 변환
+     * @param typeCode
+     * @return
+     */
+    public StatementType determineStatementType(String typeCode) {
+        switch (typeCode) {
+            case "SPEECH":
+                return StatementType.SPEECH;
+            case "INTERVIEW":
+                return StatementType.INTERVIEW;
+            case "PRESS":
+                return StatementType.PRESS_RELEASE;
+            case "DEBATE":
+                return StatementType.DEBATE;
+            case "ASSEMBLY":
+                return StatementType.ASSEMBLY_SPEECH;
+            case "COMMITTEE":
+                return StatementType.COMMITTEE_SPEECH;
+            case "MEDIA":
+                return StatementType.MEDIA_COMMENT;
+            case "SNS":
+                return StatementType.SOCIAL_MEDIA;
+            default:
+                return StatementType.OTHER;
+        }
     }
 
 
+    /**
+     * API에서 특정 기간의 발언 정보 가져오기
+     * @param startDate
+     * @param endDate
+     * @return
+     */
+    public AssemblyApiResponse<String> fetchStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
+        WebClient webClient = webclientBuilder.baseUrl(baseUrl)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
+                .build();
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+        String xmlResponse = webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/news/period")
+                        .queryParam("apiKey", apikey)
+                        .queryParam("startDate", startDate.format(formatter))
+                        .queryParam("endDate", endDate.format(formatter))
+                        .build())
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+        String resultCode = extractResultCode(xmlResponse);
+        String resultMessage = extractResultMessage(xmlResponse);
+
+        return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
+    }
+
+    /**
+     * XML 응답에서 결과 메시지 추출
+     * @param xmlResponse
+     * @return
+     */
+    private String extractResultMessage(String xmlResponse) {
+        if (xmlResponse.contains("<MESSAGE>")) {
+            int start = xmlResponse.indexOf("<MESSAGE>") + "<MESSAGE>".length();
+            int end = xmlResponse.indexOf("</MESSAGE>");
+            if (start > 0 && end > start) {
+                return xmlResponse.substring(start, end);
+            }
+        }
+        return "처리 중 오류가 발생했습니다";
+    }
+
+    /**
+     * XML 응답에서 결과 코드 추출
+     * @param xmlResponse
+     * @return
+     */
+    private String extractResultCode(String xmlResponse) {
+        if (xmlResponse.contains("<CODE>")) {
+            int start = xmlResponse.indexOf("<CODE>") + "<CODE>".length();
+            int end = xmlResponse.indexOf("</CODE>");
+            if (start > 0 && end > start) {
+                return xmlResponse.substring(start, end);
+            }
+        }
+        return "99";
+    }
 
     public void migrateFromJpa(List<Statement> statements) {
         List<StatementDocument> documents = statements.stream()
-                .map(this::convertToDocument)
+                .map(this::convertJpaEntityToDocument)
                 .collect(Collectors.toList());
 
         statementMongoRepository.saveAll(documents);
