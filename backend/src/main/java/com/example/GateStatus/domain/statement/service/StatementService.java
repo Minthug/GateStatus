@@ -6,6 +6,7 @@ import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
+import com.example.GateStatus.domain.statement.service.request.FactCheckRequest;
 import com.example.GateStatus.domain.statement.service.request.StatementRequest;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
@@ -173,13 +174,6 @@ public class StatementService {
                 .collect(Collectors.toList());
     }
 
-    public List<StatementResponse> findStatementByKeyword(String keyword) {
-        return statementMongoRepository.findByContentContainingKeyword(keyword)
-                .stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-    }
-
     /**
      * 새 발언 추가
      * @param request
@@ -191,8 +185,8 @@ public class StatementService {
                 .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다: " + request.figureId()));
 
         StatementDocument statement = StatementDocument.builder()
-                .figureId(request.figureId())
-                .figureName(request.figureName())
+                .figureId(figure.getId())
+                .figureName(figure.getName())
                 .title(request.title())
                 .content(request.content())
                 .statementDate(request.statementDate())
@@ -224,50 +218,94 @@ public class StatementService {
                 .orElseThrow(() -> new EntityNotFoundException("해당 발언이 존재하지 않습니다: " + id));
 
         statement.updateFactCheck(score, result);
+        statementMongoRepository.save(statement);
 
         return StatementResponse.from(statement);
     }
 
     /**
-     * 기간별 API 데이터 동기화 메서드 (퍼사드 패턴)
+     * 팩트체크 요청으로 업데이트 (편의 메서드)
+     * @param id
+     * @param request
+     * @return
+     */
+    @Transactional
+    public StatementResponse updateFactCheck(String id, FactCheckRequest request) {
+        return updateFactCheck(id, request.score(), request.result());
+    }
+
+    @Transactional
+    public int syncStatementsByFigure(String figureName) {
+        log.info("국회방송국 API에서 '{}' 인물 발언 정보 동기화 시작", figureName);
+
+        Figure figure = figureRepository.findByName(figureName)
+                .orElseThrow(() -> new EntityNotFoundException("해당 인물이 존재하지 않습니다: " + figureName));
+
+        AssemblyApiResponse<String> apiResponse = fetchStatementsByFigure(figureName);
+        if (!apiResponse.isSuccess()) {
+            log.error("API 호출 실패: {}", apiResponse.resultMessage());
+            throw new RuntimeException("API 호출 실패: " + apiResponse.resultMessage());
+        }
+
+        List<StatementApiDTO> apiDtos = mapper.map(apiResponse);
+        int syncCount = 0;
+
+        for (StatementApiDTO dto : apiDtos) {
+            if (statementMongoRepository.existsByOriginalUrl(dto.originalUrl())) {
+                log.debug("이미 존재하는 발언 건너뜀: {}", dto.originalUrl());
+                continue;
+            }
+
+            StatementDocument document = convertToResponse(dto, figure);
+            statementMongoRepository.save(document);
+            syncCount++;
+        }
+
+        log.info("'{}' 인물 발언 정보 동기화 완료. 총 {} 건 처리됨", figureName, syncCount);
+        return syncCount;
+    }
+
+    /**
+     * 기간별 API 데이터 동기화 메서드
      * @param startDate
      * @param endDate
      * @return
      */
     @Transactional
     public int syncStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
-        int count = 0;
+        log.info("국회방송국 API에서 기간({} ~ {}) 발언 정보 동기화 시작", startDate, endDate);
 
-        try {
-            AssemblyApiResponse<String> apiResponse = apiService.fetchStatementsByPeriod(startDate, endDate);
-
-            List<StatementApiDTO> dtos = mapper.map(apiResponse);
-
-            for (StatementApiDTO dto : dtos) {
-                if (statementMongoRepository.existsByOriginalUrl(dto.originalUrl())) {
-                    continue;
-                }
-
-                Figure figure = figureRepository.findByName(dto.figureName())
-                        .orElseGet(() -> {
-                            Figure newFigure = Figure.builder()
-                                    .name(dto.figureName())
-                                    .build();
-                            return figureRepository.save(newFigure);
-                        });
-
-                StatementDocument document = StatementDocument.builder()
-                        .figureId(figure.getId())
-                        .figureName(figure.getName())
-                        .title(dto.title())
-                        .content(dto.content())
-                        .statementDate(dto.statementDate())
-                        .source(dto.source())
-                        .context(dto.context())
-                        .originalUrl(dto.originalUrl())
-                        .type(())
-            }
+        AssemblyApiResponse<String> apiResponse = fetchStatementsByPeriod(startDate, endDate);
+        if (!apiResponse.isSuccess()) {
+            throw new RuntimeException("API 호출 실패: " + apiResponse.resultMessage());
         }
+
+        List<StatementApiDTO> apiDtos = mapper.map(apiResponse);
+        int syncCount = 0;
+
+        for (StatementApiDTO dto : apiDtos) {
+            // 중복 체크 - exists 메서드 사용으로 최적화
+            if (statementMongoRepository.existsByOriginalUrl(dto.originalUrl())) {
+                log.debug("이미 존재하는 발언 건너뜀: {}", dto.originalUrl());
+                continue;
+            }
+
+            // 발언자 확인
+            Figure figure = figureRepository.findByName(dto.figureName())
+                    .orElseGet(() -> {
+                        Figure newFigure = Figure.builder()
+                                .name(dto.figureName())
+                                .build();
+                        return figureRepository.save(newFigure);
+                    });
+
+            StatementDocument document = convertToStatement(dto, figure);
+            statementMongoRepository.save(document);
+            syncCount++;
+        }
+
+        log.info("기간({} ~ {}) 발언 정보 동기화 완료. 총 {}건 처리됨", startDate, endDate, syncCount);
+        return syncCount;
     }
 
     private StatementDocument convertToDocument(Statement entity) {
@@ -308,6 +346,8 @@ public class StatementService {
                 document.getUpdatedAt()
         );
     }
+
+
 
     public void migrateFromJpa(List<Statement> statements) {
         List<StatementDocument> documents = statements.stream()
