@@ -11,9 +11,13 @@ public enum TimelineEventType {
     SCANDAL("논란/사건"),
     OTHER("기타");
 
-    private final String displayName;
+    private String displayName;
 
     TimelineEventType(String displayName) {
         this.displayName = displayName;
+    }
+
+    public String getDisplayName() {
+        return displayName;
     }
 }

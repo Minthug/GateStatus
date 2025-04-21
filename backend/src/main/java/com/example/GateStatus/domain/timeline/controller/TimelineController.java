@@ -1,9 +1,12 @@
 package com.example.GateStatus.domain.timeline.controller;
 
 import com.example.GateStatus.domain.timeline.TimelineEventType;
+import com.example.GateStatus.domain.timeline.service.TimelineEventRequest;
 import com.example.GateStatus.domain.timeline.service.TimelineEventResponse;
 import com.example.GateStatus.domain.timeline.service.TimelineService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -11,6 +14,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import retrofit2.Response;
 import retrofit2.http.Path;
 
 import java.time.LocalDate;
@@ -73,19 +77,38 @@ public class TimelineController {
         return ResponseEntity.ok(timeline);
     }
 
-    @PostMapping("/add/{statementId}")
-    public ResponseEntity<TimelineEventResponse> addStatementToTimeline(@PathVariable String statementId) {
-        log.info("발언 타임라인 추가 요청: {}", statementId);
-        TimelineEventResponse response = timelineService.addStatementToTimeline(statementId);
+    @PostMapping("/events")
+    public ResponseEntity<TimelineEventResponse> addTimelineEvent(@Valid @RequestBody TimelineEventRequest request) {
+        log.info("타임라인 이벤트 추가 요청: 소스타입={}, 정치인 ID={}", request.sourceType(), request.figureId());
+
+        TimelineEventResponse response;
+        switch (request.sourceType()) {
+            case "STATEMENT":
+                response = timelineService.addStatementToTimeline(request.sourceId());
+                break;
+            case "BILL":
+                response = timelineService.addBillToTimeline(Long.parseLong(request.sourceId()), request.figureId());
+                break;
+            case "CUSTOM":
+                response = timelineService.addCustomEvent(
+                        request.figureId(),
+                        request.title(),
+                        request.description(),
+                        request.eventDate(),
+                        request.eventType());
+                break;
+            default:
+                return ResponseEntity.badRequest().body(null);
+        }
+
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/add/bill")
-    public ResponseEntity<TimelineEventResponse> addBillToTimeline(@RequestParam Long billId,
-                                                                   @RequestParam Long figureId) {
-        log.info("법안 타임라인 추가 요청: 법안 ID={}, 정치인 ID={}", billId, figureId);
-        TimelineEventResponse response = timelineService.addBillToTimeline(billId, figureId);
-        return ResponseEntity.ok(response);
-    }
+    @DeleteMapping("/events/{eventId}")
+    public ResponseEntity<Void> deleteTimelineEvent(@PathVariable String eventId) {
+        log.info("타임라인 이벤트 삭제 요청: {}", eventId);
+        timelineService.deleteTimelineEvent(eventId);
+        return ResponseEntity.noContent().build();
 
+    }
 }
