@@ -8,11 +8,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import retrofit2.http.Path;
+
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/v1/timeline")
@@ -52,5 +53,39 @@ public class TimelineController {
         return ResponseEntity.ok(timeline);
     }
 
+    @GetMapping("/{figureId}/period")
+    public ResponseEntity<Page<TimelineEventResponse>> getFigureTimelineByDateRange(@PathVariable Long figureId,
+                                                                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                                                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+                                                                                    @PageableDefault(size = 10) Pageable pageable) {
+        log.info("정치인 타임라인 조회 요청 (기간 필터): {}. 기간: {} ~ {}", figureId, startDate, endDate);
+
+        Page<TimelineEventResponse> timeline = timelineService.getFigureTimelineByDateRange(figureId, startDate, endDate, pageable);
+        return ResponseEntity.ok(timeline);
+    }
+
+    @GetMapping("/{figureId}/search")
+    public ResponseEntity<Page<TimelineEventResponse>> searchFigureTimeline(@PathVariable Long figureId,
+                                                                            @RequestParam String keyword,
+                                                                            @PageableDefault(size = 10) Pageable pageable) {
+        log.info("정치인 타임라인 검 요청: {}, 키워드 = {}", figureId, keyword);
+        Page<TimelineEventResponse> timeline = timelineService.searchFigureTimeline(figureId, keyword, pageable);
+        return ResponseEntity.ok(timeline);
+    }
+
+    @PostMapping("/add/{statementId}")
+    public ResponseEntity<TimelineEventResponse> addStatementToTimeline(@PathVariable String statementId) {
+        log.info("발언 타임라인 추가 요청: {}", statementId);
+        TimelineEventResponse response = timelineService.addStatementToTimeline(statementId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/add/bill")
+    public ResponseEntity<TimelineEventResponse> addBillToTimeline(@RequestParam Long billId,
+                                                                   @RequestParam Long figureId) {
+        log.info("법안 타임라인 추가 요청: 법안 ID={}, 정치인 ID={}", billId, figureId);
+        TimelineEventResponse response = timelineService.addBillToTimeline(billId, figureId);
+        return ResponseEntity.ok(response);
+    }
 
 }
