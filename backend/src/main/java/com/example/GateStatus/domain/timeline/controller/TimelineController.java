@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.timeline.controller;
 
+import com.example.GateStatus.domain.timeline.TimelineEventType;
 import com.example.GateStatus.domain.timeline.service.TimelineEventResponse;
 import com.example.GateStatus.domain.timeline.service.TimelineService;
 import lombok.RequiredArgsConstructor;
@@ -21,11 +22,35 @@ public class TimelineController {
 
     private final TimelineService timelineService;
 
+    /**
+     * 특정 정치인의 타임라인 조회
+     * @param figureId
+     * @param pageable
+     * @return
+     */
     @GetMapping("/{figureId}")
     public ResponseEntity<Page<TimelineEventResponse>> getFigureTimeline(@PathVariable Long figureId,
-                                                                   @PageableDefault(value = 10) Pageable pageable) {
+                                                                   @PageableDefault(size = 10) Pageable pageable) {
         log.info("정치인 타임라인 조회 요청: {}", figureId);
         Page<TimelineEventResponse> timeline = timelineService.getFigureTimeline(figureId, pageable);
         return ResponseEntity.ok(timeline);
     }
+
+    /**
+     * 특정 정치인의 타임라인 조회 (이벤트 타입 필터)
+     * @param figureId
+     * @param eventType
+     * @param pageable
+     * @return
+     */
+    @GetMapping("/{figureId}/type/{eventType}")
+    public ResponseEntity<Page<TimelineEventResponse>> getFigureTimelineByType(@PathVariable Long figureId,
+                                                                               @PathVariable TimelineEventType eventType,
+                                                                               @PageableDefault(size = 10) Pageable pageable) {
+        log.info("정치인 타임라인 조회 요청 (타입 필터): {}, 타입 {}", figureId, eventType);
+        Page<TimelineEventResponse> timeline = timelineService.getFigureTimelineByType(figureId, eventType, pageable);
+        return ResponseEntity.ok(timeline);
+    }
+
+
 }
