@@ -16,12 +16,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -178,4 +180,60 @@ public class TimelineService {
     }
 
 
+    @Transactional
+    public TimelineEventResponse addCustomEvent(Long figureId, String title, String description,
+                                                LocalDate eventDate, TimelineEventType type) {
+        Figure figure = figureRepository.findById(figureId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다" + figureId));
+
+        TimelineEventDocument event = TimelineEventDocument.builder()
+                .figureId(figureId)
+                .figureName(figure.getName())
+                .eventDate(eventDate)
+                .title(title)
+                .description(description)
+                .eventType(type)
+                .sourceType("CUSTOM")
+                .sourceId(null) // 커스텀 이벤트는 소스 ID 없음
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        TimelineEventDocument savedEvent = timelineRepository.save(event);
+        return TimelineEventResponse.from(savedEvent);
+    }
+
+    /**
+     * 발언 데이터를 자동으로 타임라인에 동기화
+     * 매일 자정 실행
+     */
+    @Scheduled(cron = "0 0 0 * * ?")
+    @Transactional
+    public void syncStatementsToTimeline() {
+        log.info("발언 데이터 타임라인 동기화 시작");
+
+        LocalDate startDate = LocalDate.now().minusWeeks(1);
+        List<StatementDocument> statements = statementRepository.findByPeriod(startDate, LocalDate.now());
+
+        int count = 0;
+        for (StatementDocument statement : statements) {
+            if (timelineRepository.existsBySourceTypeAndSourceId("STATEMENT", statement.getId())) {
+                continue;
+            }
+
+            addStatementToTimeline(statement.getId());
+            count++;
+        }
+
+        log.info("발언 데이터 타임라인 동기화 완료: {} 건 처리", count);
+    }
+
+    @Transactional
+    public void deleteTimelineEvent(String eventId) {
+        TimelineEventDocument event = timelineRepository.findById(eventId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 타임라인 이벤트가 존재하지 않습니다 " + eventId));
+
+        timelineRepository.delete(event);
+        log.info("타임라인 이벤트 삭제: {}", eventId);
+    }
 }
