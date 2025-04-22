@@ -1,46 +1,40 @@
 package com.example.GateStatus.domain.issue.repository;
 
-import com.example.GateStatus.domain.issue.Issue;
+import com.example.GateStatus.domain.issue.IssueDocument;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
-public interface IssueRepository extends JpaRepository<Issue, Long> {
+public interface IssueRepository extends MongoRepository<IssueDocument, String> {
 
-    Page<Issue> findAllByOrderByCreatedDateDesc(Pageable pageable);
+    Page<IssueDocument> findByCategoryCodeAndIsActiveTrue(String categoryCode, Pageable pageable);
 
-    List<Issue> findByFigureIdOrderByCreatedDateDesc(Long figureId);
+    Page<IssueDocument> findByIsHotTrueAndIsActiveTrueOrderByPriorityDescViewCountDesc(Pageable pageable);
 
-    Page<Issue> findByFigureIdOrderByCreatedDateDesc(Long figureId, Pageable pageable);
+    @Query("{'relatedFigureIds': ?0, 'isActive': true}")
+    Page<IssueDocument> findIssueByFigureId(Long figureId, Pageable pageable);
 
-    List<Issue> findByIsHotOrderByViewCountDesc(boolean isHot, Pageable pageable);
+    Page<IssueDocument> findByParentIssueIdAndIsActiveTrue(String parentIssueId, Pageable pageable);
 
-    Page<Issue> findByTitleContainingOrContentContaining(String titleKeyword, String contentKeyword, Pageable pageable);
+    Page<IssueDocument> findByTagsContainingAndIsActiveTrue(String tag, Pageable pageable);
 
-    @Query("SELECT i FROM Issue i JOIN i.tags t WHERE t = :tag")
-    List<Issue> findByTag(@Param("tag") String tag);
+    Page<IssueDocument> searchByKeyword(String keyword, Pageable pageable);
 
-    @Modifying
-    @Transactional
-    @Query("UPDATE Issue i SET i.viewCount = :viewCount + 1 WHERE i.id = :issueId")
-    void incrementViewCount(@Param("issueId") Long issueId);
+    List<IssueDocument> findIssuesByBillId(String billId);
 
-    @Modifying
-    @Transactional
-    @Query("UPDATE Issue i SET i.isHot = :isHot WHERE i.id = :issueId")
-    void updateHotStatus(@Param("issueId") Long issueId, @Param("isHot") boolean isHot);
+    List<IssueDocument> findIssuesByStatementId(String statementId);
 
-    List<Issue> findByFigureIdAndTagsContaining(Long figureId, String tag);
+    Page<IssueDocument> findByIsActiveTrueAndOrderByCreatedAtDesc(Pageable pageable);
 
-    @Query("SELECT i FROM Issue i WHERE i.createdDate >= :date")
-    List<Issue> findRecentIssues(@Param("date") LocalDateTime date);
+    Optional<IssueDocument> findByIdAndIsActiveTrue(String id);
+
+    List<IssueDocument> findRelatedIssuesByCategoryAndNotId(String categoryCode, String currentIssueId, Pageable pageable);
+
+    List<IssueDocument> findRelatedIssuesByKeywordsOrTags(List<String> keywords, String currentIssueId, Pageable pageable);
+
 
 }

@@ -1,4 +1,4 @@
-package com.example.GateStatus.domain.issue.repository.request;
+package com.example.GateStatus.domain.issue.service.request;
 
 import java.util.ArrayList;
 import java.util.List;

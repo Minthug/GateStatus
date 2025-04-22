@@ -1,4 +1,4 @@
-package com.example.GateStatus.domain.issue.repository.request;
+package com.example.GateStatus.domain.issue.service.request;
 
 public record RegisterIssueCommand(String title, String content) {
 

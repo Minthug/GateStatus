@@ -1,14 +1,13 @@
-package com.example.GateStatus.domain.issue.repository.response;
+package com.example.GateStatus.domain.issue.service.response;
 
 import com.example.GateStatus.domain.issue.Issue;
-import com.example.GateStatus.domain.issue.repository.response.FindIssuesResponse.FindIssueResponse;
+import com.example.GateStatus.domain.issue.service.response.FindIssuesResponse.FindIssueResponse;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
 
 public record IssueRedisDto(Long issueId, String title, String content,
                             @JsonSerialize(using = LocalDateTimeSerializer.class)

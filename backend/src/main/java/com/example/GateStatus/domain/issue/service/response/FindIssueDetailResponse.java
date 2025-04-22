@@ -1,4 +1,4 @@
-package com.example.GateStatus.domain.issue.repository.response;
+package com.example.GateStatus.domain.issue.service.response;
 
 public record FindIssueDetailResponse(IssueDetailResponse issue) {
 

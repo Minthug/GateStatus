@@ -1,6 +1,4 @@
-package com.example.GateStatus.domain.issue.repository.request;
-
-import com.example.GateStatus.domain.issue.repository.response.FindIssueDetailResponse;
+package com.example.GateStatus.domain.issue.service.request;
 
 public record FindIssueDetailCommand(Long issueId) {
 
