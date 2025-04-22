@@ -57,6 +57,9 @@ public class Figure extends BaseTimeEntity {
     @JoinColumn(name = "category_id")
     private Category category;
 
+    @ElementCollection
+    private List<String> issueIds;
+
     @OneToMany(mappedBy = "figure", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FigureTag> figureTag = new ArrayList<>();
 

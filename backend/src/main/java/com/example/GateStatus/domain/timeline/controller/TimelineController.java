@@ -6,7 +6,6 @@ import com.example.GateStatus.domain.timeline.service.TimelineEventResponse;
 import com.example.GateStatus.domain.timeline.service.TimelineService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,8 +13,6 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import retrofit2.Response;
-import retrofit2.http.Path;
 
 import java.time.LocalDate;
 
@@ -57,6 +54,14 @@ public class TimelineController {
         return ResponseEntity.ok(timeline);
     }
 
+    /**
+     * 특정 기간 내 정치인의 타임라인 조회
+     * @param figureId
+     * @param startDate
+     * @param endDate
+     * @param pageable
+     * @return
+     */
     @GetMapping("/{figureId}/period")
     public ResponseEntity<Page<TimelineEventResponse>> getFigureTimelineByDateRange(@PathVariable Long figureId,
                                                                                     @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -68,6 +73,13 @@ public class TimelineController {
         return ResponseEntity.ok(timeline);
     }
 
+    /**
+     * 특정 키워드를 포함한 타임라인 검색
+     * @param figureId
+     * @param keyword
+     * @param pageable
+     * @return
+     */
     @GetMapping("/{figureId}/search")
     public ResponseEntity<Page<TimelineEventResponse>> searchFigureTimeline(@PathVariable Long figureId,
                                                                             @RequestParam String keyword,
@@ -77,6 +89,11 @@ public class TimelineController {
         return ResponseEntity.ok(timeline);
     }
 
+    /**
+     * 타임라인 이벤트 추가 (통합 엔드포인트)
+     * @param request
+     * @return
+     */
     @PostMapping("/events")
     public ResponseEntity<TimelineEventResponse> addTimelineEvent(@Valid @RequestBody TimelineEventRequest request) {
         log.info("타임라인 이벤트 추가 요청: 소스타입={}, 정치인 ID={}", request.sourceType(), request.figureId());
@@ -104,6 +121,11 @@ public class TimelineController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * 타임라인 삭제
+     * @param eventId
+     * @return
+     */
     @DeleteMapping("/events/{eventId}")
     public ResponseEntity<Void> deleteTimelineEvent(@PathVariable String eventId) {
         log.info("타임라인 이벤트 삭제 요청: {}", eventId);
