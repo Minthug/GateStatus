@@ -6,6 +6,8 @@ import com.example.GateStatus.domain.issue.repository.IssueRepository;
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +42,18 @@ public class IssueService {
                 .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + id));
 
         return IssueResponse.from(issue);
+    }
+
+    /**
+     * 카테고리별 이슈 목록 조회
+     * @param categoryCode
+     * @param pageable
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public Page<IssueResponse> getIssuesByCategory(String categoryCode, Pageable pageable) {
+        return issueRepository.findByCategoryCodeAndIsActiveTrue(categoryCode, pageable)
+                .map(IssueResponse::from);
     }
 
 
