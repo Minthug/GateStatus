@@ -25,7 +25,7 @@ import java.util.List;
 public class IssueDocument {
 
     @Id
-    private Long id;
+    private String id;
 
     @TextIndexed(weight = 2)
     private String name;
