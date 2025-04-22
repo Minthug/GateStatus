@@ -61,7 +61,7 @@ public class IssueDocument {
     private List<String> relatedBillIds = new ArrayList<>();
 
     @Builder.Default
-    private List<String> relatedFigureIds = new ArrayList<>();
+    private List<Long> relatedFigureIds = new ArrayList<>();
 
     @Builder.Default
     private List<String> tags = new ArrayList<>();
@@ -88,5 +88,38 @@ public class IssueDocument {
         if (!this.relatedStatementIds.contains(statementId)) {
             this.relatedStatementIds.add(statementId);
         }
+    }
+
+    public void addRelatedBill(String billId) {
+        if (this.relatedBillIds == null) {
+            this.relatedBillIds = new ArrayList<>();
+        }
+
+        if (!relatedBillIds.contains(billId)) {
+            this.relatedBillIds.add(billId);
+        }
+    }
+
+    public void addRelatedFigure(Long figureId) {
+        if (this.relatedFigureIds == null) {
+            this.relatedFigureIds = new ArrayList<>();
+        }
+
+        if (!relatedFigureIds.contains(figureId)) {
+            this.relatedFigureIds.add(figureId);
+        }
+    }
+
+    public void update(String name, String description, String categoryCode, String categoryName,
+                       List<String> keywords, String thumbnailUrl, List<String> tags, Boolean isActive, Boolean isHot) {
+        if (name != null) this.name = name;
+        if (description != null) this.description = description;
+        if (categoryCode != null) this.categoryCode = categoryCode;
+        if (categoryName != null) this.categoryName = categoryName;
+        if (keywords != null) this.keywords = keywords;
+        if (thumbnailUrl != null) this.thumbnailUrl = thumbnailUrl;
+        if (tags != null) this.tags = tags;
+        if (isActive != null) this.isActive = isActive;
+        if (isHot != null) this.isHot = isHot;
     }
 }
