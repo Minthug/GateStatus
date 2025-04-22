@@ -1,9 +1,13 @@
 package com.example.GateStatus.domain.issue.service;
 
+import com.example.GateStatus.domain.issue.IssueDocument;
+import com.example.GateStatus.domain.issue.exception.NotFoundIssueException;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
+import com.example.GateStatus.domain.issue.service.response.IssueResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Slf4j
@@ -12,5 +16,40 @@ public class IssueService {
 
     private final IssueRepository issueRepository;
 
-    public
+    /**
+     * 이슈 상세 조회
+     * @param id
+     * @return
+     */
+    @Transactional
+    public IssueResponse getIssue(String id) {
+        IssueDocument issue = findByIssueById(id);
+        issue.incrementViewCount();
+        issueRepository.save(issue);
+        return IssueResponse.from(issue);
+    }
+
+    /**
+     * 활성화된 이슈만 찾기
+     * @param id
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public IssueResponse getActiveIssue(String id) {
+        IssueDocument issue = issueRepository.findByIdAndIsActiveTrue(id)
+                .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + id));
+
+        return IssueResponse.from(issue);
+    }
+
+
+    /**
+     * 내부용 ID 찾기
+     * @param id
+     * @return
+     */
+    private IssueDocument findByIssueById(String id) {
+        return issueRepository.findById(id)
+                .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + id));
+    }
 }
