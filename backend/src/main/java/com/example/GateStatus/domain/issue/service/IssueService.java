@@ -9,7 +9,6 @@ import com.example.GateStatus.global.config.EventListner.EventPublisher;
 import com.example.GateStatus.global.config.EventListner.IssueLinkedToStatementEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -19,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 @Service
@@ -74,7 +72,7 @@ public class IssueService {
      * @return
      */
     @Transactional(readOnly = true)
-    public Page<IssueResponse> getHostIssues(Pageable pageable) {
+    public Page<IssueResponse> getHotIssues(Pageable pageable) {
         return issueRepository.findByIsHotTrueAndIsActiveTrueOrderByPriorityDescViewCountDesc(pageable)
                 .map(IssueResponse::from);
     }
@@ -339,18 +337,16 @@ public class IssueService {
     }
 
 
-
-
-
     @Transactional
     public void linkIssueToStatement(String issueId, String statementId) {
+        // 이슈에 발언 ID 추가
         IssueDocument issue = findByIssueById(issueId);
         issue.addRelatedStatement(statementId);
         issueRepository.save(issue);
 
+        // 이벤트 발행
         eventPublisher.publish(new IssueLinkedToStatementEvent(issueId, statementId));
     }
-
 
     /**
      * 내부용 ID 찾기
