@@ -3,16 +3,19 @@ package com.example.GateStatus.domain.issue.service;
 import com.example.GateStatus.domain.issue.IssueDocument;
 import com.example.GateStatus.domain.issue.exception.NotFoundIssueException;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
+import com.example.GateStatus.domain.issue.service.request.IssueRequest;
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
 import com.example.GateStatus.global.config.EventListner.EventPublisher;
 import com.example.GateStatus.global.config.EventListner.IssueLinkedToStatementEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -147,6 +150,107 @@ public class IssueService {
                 .map(IssueResponse::from);
     }
 
+    /**
+     * 새 이슈 생성
+     * @param request
+     * @return
+     */
+    @Transactional
+    public IssueResponse createIssue(IssueRequest request) {
+        IssueDocument document = IssueDocument.builder()
+                .name(request.name())
+                .description(request.description())
+                .categoryCode(request.categoryCode())
+                .categoryName(request.categoryName())
+                .keywords(request.keywords())
+                .thumbnailUrl(request.thumbnailUrl())
+                .parentIssueId(request.parentIssueId())
+                .isActive(true)
+                .priority(request.priority())
+                .isHot(request.isHot() != null ? request.isHot() : false)
+                .relatedStatementIds(request.relatedStatementIds())
+                .relatedBillIds(request.relatedBillIds())
+                .relatedFigureIds(request.relatedFigureIds())
+                .tags(request.tags())
+                .viewCount(0)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        IssueDocument savedIssue = issueRepository.save(document);
+        return IssueResponse.from(savedIssue);
+    }
+
+    /**
+     * 이슈 정보 업데이트
+     * @param id
+     * @param request
+     * @return
+     */
+    @Transactional
+    public IssueResponse updateIssue(String id, IssueRequest request) {
+        IssueDocument issue = findByIssueById(id);
+
+        issue.update(
+                request.name(),
+                request.description(),
+                request.categoryCode(),
+                request.categoryName(),
+                request.keywords(),
+                request.thumbnailUrl(),
+                request.tags(),
+                request.isActive(),
+                request.isHot()
+        );
+
+        if (request.relatedStatementIds() != null) {
+            issue.setRelatedStatementIds(request.relatedStatementIds());
+        }
+
+        if (request.relatedBillIds() != null) {
+            issue.setRelatedBillIds(request.relatedBillIds());
+        }
+
+        if (request.relatedFigureIds() != null) {
+            issue.setRelatedFigureIds(request.relatedFigureIds());
+        }
+
+        if (request.priority() != null) {
+            issue.setPriority(request.priority());
+        }
+
+        if (request.parentIssueId() != null) {
+            issue.setParentIssueId(request.parentIssueId());
+        }
+
+        issue.setUpdatedAt(LocalDateTime.now());
+        IssueDocument updatedIssue = issueRepository.save(issue);
+        return IssueResponse.from(updatedIssue);
+    }
+
+    /**
+     * 이슈 삭제 (논리적 삭제)
+     * @param id
+     */
+    @Transactional
+    public void deleteIssue(String id) {
+        IssueDocument issue = findByIssueById(id);
+        issue.setIsActive(false);
+        issue.setUpdatedAt(LocalDateTime.now());
+        issueRepository.save(issue);
+        log.info("이슈가 비활성화 되었습니다");
+    }
+
+    /**
+     * 물리적 이슈 삭제 (관리자 전용)
+     * @param id
+     */
+    @Transactional
+    public void hardDeleteIssue(String id) {
+        issueRepository.deleteById(id);
+        log.info("이슈가 완전히 삭제 되었습니다: {}", id);
+    }
+
 
 
     @Transactional
@@ -157,8 +261,6 @@ public class IssueService {
 
         eventPublisher.publish(new IssueLinkedToStatementEvent(issueId, statementId));
     }
-
-
 
     /**
      * 내부용 ID 찾기
