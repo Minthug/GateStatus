@@ -4,6 +4,8 @@ import com.example.GateStatus.domain.issue.IssueDocument;
 import com.example.GateStatus.domain.issue.exception.NotFoundIssueException;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
+import com.example.GateStatus.global.config.EventListner.EventPublisher;
+import com.example.GateStatus.global.config.EventListner.IssueLinkedToStatementEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class IssueService {
 
     private final IssueRepository issueRepository;
+    private final EventPublisher eventPublisher;
 
     /**
      * 이슈 상세 조회
@@ -56,6 +59,16 @@ public class IssueService {
                 .map(IssueResponse::from);
     }
 
+
+
+    @Transactional
+    public void linkIssueToStatement(String issueId, String statementId) {
+        IssueDocument issue = findByIssueById(issueId);
+        issue.addRelatedStatement(statementId);
+        issueRepository.save(issue);
+
+        eventPublisher.publish(new IssueLinkedToStatementEvent(issueId, statementId));
+    }
 
     /**
      * 내부용 ID 찾기

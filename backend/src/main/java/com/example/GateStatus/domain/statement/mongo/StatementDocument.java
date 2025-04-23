@@ -13,6 +13,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Document(collection = "statements")
 @Data
@@ -53,6 +54,8 @@ public class StatementDocument {
     private Integer viewCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private List<String> issueIds;
 
     public void incrementViewCount() {
         if (this.viewCount == null) {

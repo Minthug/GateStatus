@@ -2,7 +2,6 @@ package com.example.GateStatus.domain.issue.controller;
 
 import com.example.GateStatus.domain.issue.Issue;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
-import com.example.GateStatus.domain.issue.service.IssueCacheService;
 import com.example.GateStatus.domain.issue.service.IssueService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
