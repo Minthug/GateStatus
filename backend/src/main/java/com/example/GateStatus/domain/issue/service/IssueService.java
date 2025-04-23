@@ -13,6 +13,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -59,6 +63,90 @@ public class IssueService {
                 .map(IssueResponse::from);
     }
 
+    /**
+     * 인기(핫) 이슈 목록 조회
+     * @param pageable
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public Page<IssueResponse> getHostIssues(Pageable pageable) {
+        return issueRepository.findByIsHotTrueAndIsActiveTrueOrderByPriorityDescViewCountDesc(pageable)
+                .map(IssueResponse::from);
+    }
+
+    /**
+     * 특정 정치인 관련 이슈 목록 조회
+     * @param figureId
+     * @param pageable
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public Page<IssueResponse> getIssuesByFigure(Long figureId, Pageable pageable) {
+        return issueRepository.findIssueByFigureId(figureId, pageable)
+                .map(IssueResponse::from);
+    }
+
+    /**
+     * 특정 법안 관련 이슈 목록 조회
+     * @param billId
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<IssueResponse> getIssuesByBill(String billId) {
+        return issueRepository.findIssuesByBillId(billId)
+                .stream()
+                .map(IssueResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 특정 발언 관련 이슈 목록 조회
+     * @param statementId
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<IssueResponse> getIssuesByStatement(String statementId) {
+        return issueRepository.findIssuesByStatementId(statementId)
+                .stream()
+                .map(IssueResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 키워드 검색
+     * @param keyword
+     * @param pageable
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public Page<IssueResponse> searchIssues(String keyword, Pageable pageable) {
+        return issueRepository.searchByKeyword(keyword, pageable)
+                .map(IssueResponse::from);
+    }
+
+    /**
+     * 태그로 이슈 검색
+     * @param tag
+     * @param pageable
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public Page<IssueResponse> getIssuesByTag(String tag, Pageable pageable) {
+        return issueRepository.findByTagsContainingAndIsActiveTrue(tag, pageable)
+                .map(IssueResponse::from);
+    }
+
+    /**
+     * 최근 이슈 목록 조회
+     * @param pageable
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public Page<IssueResponse> getRecentIssues(Pageable pageable) {
+        return issueRepository.findByIsActiveTrueAndOrderByCreatedAtDesc(pageable)
+                .map(IssueResponse::from);
+    }
+
 
 
     @Transactional
@@ -69,6 +157,8 @@ public class IssueService {
 
         eventPublisher.publish(new IssueLinkedToStatementEvent(issueId, statementId));
     }
+
+
 
     /**
      * 내부용 ID 찾기
