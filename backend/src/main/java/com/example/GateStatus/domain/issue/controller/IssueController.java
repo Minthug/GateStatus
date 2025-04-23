@@ -164,5 +164,83 @@ public class IssueController {
         return ResponseEntity.ok(issue);
     }
 
+    /**
+     * 이슈 삭제 (논리적 삭제)
+     * @param issueId
+     * @return
+     */
+    @DeleteMapping("/{issueId}")
+    public ResponseEntity<Void> deleteIssue(@PathVariable String issueId) {
+        log.info("이슈 삭제 요청: {}", issueId);
+        issueService.deleteIssue(issueId);
+        return ResponseEntity.noContent().build();
+    }
 
+    /**
+     * 물리적 이슈 삭제 (관리자 전용)
+     * @param issueId
+     * @return
+     */
+    @DeleteMapping("/{issueId}/hard")
+    public ResponseEntity<Void> hardDeleteIssue(@PathVariable String issueId) {
+        log.info("이슈 영구 삭제 요청: {}", issueId);
+        issueService.hardDeleteIssue(issueId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 관련 이슈 찾기
+     * @param issueId
+     * @param limit
+     * @return
+     */
+    @GetMapping("/{issueId}/related")
+    public ResponseEntity<List<IssueResponse>> getRelatedIssue(@PathVariable String issueId,
+                                                               @RequestParam(defaultValue = "5") int limit) {
+        log.info("관련 이슈 조회: {}, 제한: {}", issueId, limit);
+        List<IssueResponse> issues = issueService.findRelatedIssue(issueId, limit);
+        return ResponseEntity.ok(issues);
+    }
+
+    /**
+     * 특정 법안에 관련된 이슈 연결
+     * @param issueId
+     * @param billId
+     * @return
+     */
+    @GetMapping("/{issueId}/link/{billId}")
+    public ResponseEntity<Void> linkIssueToBill(@PathVariable String issueId,
+                                                @PathVariable String billId) {
+        log.info("이슈-법안 연결: {} - {}", issueId, billId);
+        issueService.linkIssuesToBill(issueId, billId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 특정 발언에 관련된 이슈 연결
+     * @param issueId
+     * @param statementId
+     * @return
+     */
+    @GetMapping("/{issueId}/link/{statementId}")
+    public ResponseEntity<Void> linkIssueToStatement(@PathVariable String issueId,
+                                                     @PathVariable String statementId) {
+        log.info("이슈-발언 연결: {} - {}", issueId, statementId);
+        issueService.linkIssueToStatement(issueId, statementId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 특정 정치인에 관련된 이슈 연결
+     * @param issueId
+     * @param figureId
+     * @return
+     */
+    @GetMapping("/{issueId}/link/{figureId}")
+    public ResponseEntity<Void> linkIssueToFigure(@PathVariable String issueId,
+                                                  @PathVariable Long figureId) {
+        log.info("이슈-정치인 연결: {} - {}", issueId, figureId);
+        issueService.linkIssuesToFigure(issueId, figureId);
+        return ResponseEntity.ok().build();
+    }
 }
