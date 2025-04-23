@@ -11,11 +11,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -252,6 +254,93 @@ public class IssueService {
     }
 
 
+    /**
+     * 관련 이슈 찾기
+     * @param issueId
+     * @param limit
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<IssueResponse> findRelatedIssue(String issueId, int limit) {
+        IssueDocument issue = findByIssueById(issueId);
+
+        // 1. 같은 카테고리 이슈 조회
+        List<IssueDocument> relatedByCategory = issueRepository.findRelatedIssuesByCategoryAndNotId(
+                issue.getCategoryCode(), issueId, PageRequest.of(0, limit));
+
+        // 2. 관련 이슈가 충분하지 않으면 키워드나 태그 기반으로 추가 조회
+        if (relatedByCategory.size() < limit) {
+            List<String> searchTerms = new ArrayList<>();
+            if (issue.getKeywords() != null) {
+                searchTerms.addAll(issue.getKeywords());
+            }
+            if (issue.getTags() != null) {
+                searchTerms.addAll(issue.getTags());
+            }
+
+            if (!searchTerms.isEmpty()) {
+                List<IssueDocument> relatedByKeywords = issueRepository.findRelatedIssuesByKeywordsOrTags(
+                        searchTerms, issueId, PageRequest.of(0, limit - relatedByCategory.size()));
+
+                // 이미 포함된 이슈 제외하고 추가
+                for (IssueDocument relatedIssue : relatedByKeywords) {
+                    if (relatedByCategory.stream().noneMatch(i -> i.getId().equals(relatedIssue.getId()))) {
+                        relatedByCategory.add(relatedIssue);
+                        if (relatedByCategory.size() >= limit) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        return relatedByCategory.stream()
+                .map(IssueResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 특정 발언에 관련된 이슈 연결
+     * @param issueId
+     * @param statementId
+     */
+    @Transactional
+    public void linkIssuesToStatement(String issueId, String statementId) {
+        IssueDocument issue = findByIssueById(issueId);
+        issue.addRelatedStatement(statementId);
+        issueRepository.save(issue);
+        log.info("이슈 {} 에 발언 {} 연결됨", issueId, statementId);
+    }
+
+    /**
+     * 특정 법안에 관련된 이슈 연결 **
+     * @param issueId
+     * @param billId
+     */
+    @Transactional
+    public void linkIssuesToBill(String issueId, String billId) {
+        IssueDocument issue = findByIssueById(issueId);
+        issue.addRelatedBill(billId);
+        issueRepository.save(issue);
+        log.info("이슈 {} 에 법안 {} 연결됨", issueId ,billId);
+    }
+
+    /**
+     * 특정 정치인에 관련된 이슈 연결
+     * @param issueId
+     * @param figureId
+     */
+    @Transactional
+    public void linkIssuesToFigure(String issueId, Long figureId) {
+        IssueDocument issue = findByIssueById(issueId);
+        issue.addRelatedFigure(figureId);
+        issueRepository.save(issue);
+        log.info("이슈 {} 에 정치인 {} 연결됨", issueId, figureId);
+    }
+
+
+
+
 
     @Transactional
     public void linkIssueToStatement(String issueId, String statementId) {
@@ -261,6 +350,7 @@ public class IssueService {
 
         eventPublisher.publish(new IssueLinkedToStatementEvent(issueId, statementId));
     }
+
 
     /**
      * 내부용 ID 찾기
