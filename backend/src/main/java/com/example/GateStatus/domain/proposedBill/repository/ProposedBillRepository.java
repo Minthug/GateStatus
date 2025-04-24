@@ -3,6 +3,7 @@ package com.example.GateStatus.domain.proposedBill.repository;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.proposedBill.BillStatus;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;
+import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -32,5 +33,9 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
 
     @Query("SELECT p FROM ProposedBill p ORDER BY p.viewCount DESC")
     List<ProposedBill> findTopByOrderByViewCountDesc(Pageable pageable);
+
+    List<ProposedBill> findByProposerIdAndProposeDateBetween(Long proposerId, LocalDate startDate, LocalDate endDate);
+
+    List<ProposedBill> findByProposerIdAndIdInAndProposeDateBetween(Long proposerId, List<String> billIds, LocalDate startDate, LocalDate endDae);
 
 }

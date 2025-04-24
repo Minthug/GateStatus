@@ -38,5 +38,14 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
 
     boolean existsByOriginalUrl(String originalUrl);
 
+    // 특정 정치인의 특정 기간 내 발언 조회
+    List<StatementDocument> findByFigureIdAndStatementDateBetween(Long figureId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
+    // 특정 정치인의 특정 기간 내 모든 발언 조회(페이징없음)
+    List<StatementDocument> findByFigureIdAndStatementDateBetween(Long figureId, LocalDate startDate, LocalDate endDate);
+
+    // 특정 정치인의 특정 이슈에 관한 특정 기간 내 발언 조회
+    @Query("{'figureId': ?0, 'issueIds': ?1, 'statementDate': {$gte: ?2, $lte: ?3}}")
+    List<StatementDocument> findByFigureIdAndIssueIdsContainingAndStatementDateBetween(
+            Long figureId, String issueId, LocalDate startDate, LocalDate endDate);
 }
