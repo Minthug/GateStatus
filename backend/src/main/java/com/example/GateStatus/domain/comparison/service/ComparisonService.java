@@ -301,28 +301,45 @@ public class ComparisonService {
     }
 
     private String summarizeText(String text, int maxLength) {
+
+        if (text == null) {
+            return "";
+        }
+
         if (text == null || text.length() <= maxLength) {
             return text;
+        }
+
+        int lastSentenceEnd = text.lastIndexOf(". ", maxLength - 3);
+        if (lastSentenceEnd > maxLength / 2) {
+            return text.substring(0, lastSentenceEnd + 1) + "...";
+        }
+
+        int lastSpace = text.lastIndexOf(" ", maxLength - 3);
+        if (lastSpace > 0) {
+            return text.substring(0, lastSpace) + "...";
         }
 
         return text.substring(0, maxLength - 3) + "...";
     }
 
     private Map<String, Integer> analyzeKeywords(List<StatementDocument> statements) {
-        Map<String, Integer> keywordCount = new HashMap<>();
 
-        for (StatementDocument statement : statements) {
-            if (statement.getContent() == null ) continue;
+        // 의미 없는 불용어(stopwords) 필터링
+        Set<String> stopwords = Set.of("이", "그", "저", "이것", "그것", "저것", "이런", "그런", "저런",
+                "및", "등", "을", "를", "이다", "있다", "하다");
 
-            String[] words = statement.getContent().split("\\s+");
-            for (String word : words) {
-                if (word.length() >= 2) {
-                    keywordCount.put(word, keywordCount.getOrDefault(word, 0) + 1);
-                }
-            }
-        }
-
-        return keywordCount.entrySet().stream()
+        return statements.stream()
+                .filter(statement -> statement.getContent() != null && !statement.getContent().isEmpty())
+                .flatMap(statement -> Arrays.stream(statement.getContent().split("\\s+")))
+                .filter(word -> word.length() >= 2) // 너무 짧은 단어 제외
+                .filter(word -> !stopwords.contains(word)) // 불용어 제외
+                .filter(word -> !word.matches("\\d+")) // 숫자만 있는 단어 제외
+                .collect(Collectors.groupingBy(
+                        word -> word,
+                        Collectors.summingInt(word -> 1)
+                ))
+                .entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                 .limit(10)
                 .collect(Collectors.toMap(
@@ -338,15 +355,45 @@ public class ComparisonService {
             return "입장 정보 없음";
         }
 
-        StatementDocument latestStatement = statements.stream()
-                .max(Comparator.comparing(StatementDocument::getStatementDate))
-                .orElse(statements.get(0));
+        List<StatementDocument> recentStatements = statements.stream()
+                .filter(s -> s.getContent() != null && !s.getContent().isEmpty())
+                .sorted(Comparator.comparing(StatementDocument::getStatementDate).reversed())
+                .limit(3)
+                .collect(Collectors.toList());
 
-        if (latestStatement.getContent() == null || latestStatement.getContent().isEmpty()) {
+        if (recentStatements.isEmpty()) {
             return "입장 정보 없음";
         }
 
-        return summarizeText(latestStatement.getContent(), 100);
+        StringBuilder combinedContent = new StringBuilder();
+        for (int i = 0; i < recentStatements.size(); i++) {
+            String content = recentStatements.get(i).getContent();
+            String importantSentence = extractImportantSentence(content);
+            combinedContent.append(importantSentence);
+            if (i < recentStatements.size() - 1) {
+                combinedContent.append(" ");
+            }
+        }
+
+        return summarizeText(combinedContent.toString(), 150);
+    }
+
+    private String extractImportantSentence(String text) {
+        // 주요 문장 추출 로직
+        String[] sentences = text.split("\\. ");
+        for (String sentence : sentences) {
+            if (sentence.contains("주장") || sentence.contains("입장") ||
+                sentence.contains("생각") || sentence.contains("의견") ||
+                sentence.contains("해결") || sentence.contains("방안")) {
+                return sentence + ".";
+            }
+        }
+
+        if (sentences.length > 0) {
+            return sentences[0] + (sentences[0].endsWith(".") ? "" : ".");
+        }
+
+        return text;
     }
 
 }
