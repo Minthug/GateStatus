@@ -11,6 +11,7 @@ import com.example.GateStatus.domain.issue.exception.NotFoundIssueException;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
+import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
 import com.example.GateStatus.domain.vote.Vote;
@@ -22,10 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -111,6 +109,7 @@ public class ComparisonService {
         return new ComparisonResult(figureDataList, issueInfo, summaryData);
     }
 
+
     private StatementComparisonData getStatementComparison(Long figureId, String issueId, LocalDate startDate, LocalDate endDate) {
         List<StatementDocument> statements;
 
@@ -141,6 +140,8 @@ public class ComparisonService {
                 keywordCounts
         );
     }
+
+
 
     /**
      * 투표 비교 데이터 조회
@@ -240,5 +241,112 @@ public class ComparisonService {
         );
     }
 
+    private Object calculateActiveDays(Long figureId, LocalDate startDate, LocalDate endDate) {
+        Set<LocalDate> statementDates = statementRepository.findByFigureIdAndStatementDateBetween(figureId, startDate, endDate)
+                .stream().map(StatementDocument::getStatementDate)
+                .collect(Collectors.toSet());
+
+        Set<LocalDate> voteDates = voteRepository.findByFigureIdAndVoteDateBetween(figureId, startDate, endDate)
+                .stream().map(Vote::getVoteDate).collect(Collectors.toSet());
+
+        Set<LocalDate> billDates = billRepository.findByProposerIdAndProposeDateBetween(figureId, startDate, endDate)
+                .stream().map(ProposedBill::getProposeDate).collect(Collectors.toSet());
+
+        Set<LocalDate> allDates = new HashSet<>(statementDates);
+        allDates.addAll(voteDates);
+        allDates.addAll(billDates);
+
+        return allDates.size();
+    }
+
+    private Map<String, Object> generateSummaryData(List<FigureComparisonData> figureDataList, IssueInfo issueInfo) {
+        Map<String, Object> summary = new HashMap<>();
+
+        if (!figureDataList.isEmpty()) {
+            FigureComparisonData mostActive = figureDataList.stream()
+                    .max(Comparator.comparingInt(f -> (Integer) f.additionalData().get("activeDays")))
+                    .orElse(null);
+
+            if (mostActive != null) {
+                summary.put("mostActiveFigureId", mostActive.figureId());
+                summary.put("mostActiveFigureName", mostActive.figureName());
+            }
+        }
+
+        if (figureDataList.stream().anyMatch(f -> f.statements() != null)) {
+            FigureComparisonData mostStatements = figureDataList.stream()
+                    .filter(f -> f.statements() != null)
+                    .max(Comparator.comparingInt(f -> f.statements().statementCount()))
+                    .orElse(null);
+
+            if (mostStatements != null) {
+                summary.put("mostStatementsFigureId", mostStatements.figureId());
+                summary.put("mostStatementsFigureName", mostStatements.figureName());
+            }
+        }
+
+        if (figureDataList.stream().anyMatch(f -> f.bills() != null)) {
+            FigureComparisonData mostBills = figureDataList.stream()
+                    .filter(f -> f.bills() != null)
+                    .max(Comparator.comparingInt(f -> f.bills().proposedCount()))
+                    .orElse(null);
+
+            if (mostBills != null) {
+                summary.put("mostBillsFigureId", mostBills.figureId());
+                summary.put("mostBillsFigureName", mostBills.figureName());
+            }
+        }
+
+        return summary;
+    }
+
+    private String summarizeText(String text, int maxLength) {
+        if (text == null || text.length() <= maxLength) {
+            return text;
+        }
+
+        return text.substring(0, maxLength - 3) + "...";
+    }
+
+    private Map<String, Integer> analyzeKeywords(List<StatementDocument> statements) {
+        Map<String, Integer> keywordCount = new HashMap<>();
+
+        for (StatementDocument statement : statements) {
+            if (statement.getContent() == null ) continue;
+
+            String[] words = statement.getContent().split("\\s+");
+            for (String word : words) {
+                if (word.length() >= 2) {
+                    keywordCount.put(word, keywordCount.getOrDefault(word, 0) + 1);
+                }
+            }
+        }
+
+        return keywordCount.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(10)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (e1, e2) -> e1,
+                        LinkedHashMap::new
+                ));
+    }
+
+    private String analyzeMainStance(List<StatementDocument> statements) {
+        if (statements.isEmpty()) {
+            return "입장 정보 없음";
+        }
+
+        StatementDocument latestStatement = statements.stream()
+                .max(Comparator.comparing(StatementDocument::getStatementDate))
+                .orElse(statements.get(0));
+
+        if (latestStatement.getContent() == null || latestStatement.getContent().isEmpty()) {
+            return "입장 정보 없음";
+        }
+
+        return summarizeText(latestStatement.getContent(), 100);
+    }
 
 }
