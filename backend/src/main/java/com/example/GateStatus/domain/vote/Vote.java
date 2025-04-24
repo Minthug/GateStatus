@@ -3,15 +3,15 @@ package com.example.GateStatus.domain.vote;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "votes")
+@Builder
 @Getter
+@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Vote {
 
@@ -35,7 +35,5 @@ public class Vote {
     private String meetingName;
 
     private String voteTitle;
-
-
 
 }

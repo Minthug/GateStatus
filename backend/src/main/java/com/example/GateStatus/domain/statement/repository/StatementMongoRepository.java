@@ -36,6 +36,7 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     @Query("{ $or: [ { 'title': { $regex: ?0, $options: 'i' } }, { 'content': { $regex: ?0, $options: 'i' } } ] }")
     Page<StatementDocument> searchByRegex(String keyword, Pageable pageable);
 
-
     boolean existsByOriginalUrl(String originalUrl);
+
+
 }

@@ -2,6 +2,11 @@ package com.example.GateStatus.domain.vote.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.proposedBill.ProposedBill;
+import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
+import com.example.GateStatus.domain.vote.Vote;
+import com.example.GateStatus.domain.vote.VoteResultType;
+import com.example.GateStatus.domain.vote.repository.VoteRepository;
 import com.example.GateStatus.global.config.exception.ApiClientException;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.example.GateStatus.global.config.exception.ApiServerException;
@@ -14,9 +19,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 
@@ -27,6 +34,8 @@ public class VoteService {
 
     private final WebClient webClient;
     private final FigureRepository figureRepository;
+    private final VoteRepository voteRepository;
+    private final ProposedBillRepository billRepository;
     private final RedisCacheService cacheService;
     private final BillApiMapper mapper;
 
@@ -36,9 +45,61 @@ public class VoteService {
     @Value("${spring.openapi.assembly.key}")
     private String apiKey;
 
+    @Transactional
     public List<BillVoteDTO> getVotesByFigureId(Long figureId) {
         String cacheKey = "votes:figure:" + figureId;
-        return cacheService.getOrSet(cacheKey, () -> fetchVotesFromApi(figureId), 86400);
+        List<BillVoteDTO> votes = cacheService.getOrSet(cacheKey, () -> fetchVotesFromApi(figureId), 86400);
+
+        saveVoteToDB(figureId, votes);
+
+        return votes;
+    }
+
+    private void saveVoteToDB(Long figureId, List<BillVoteDTO> votes) {
+        Figure figure = figureRepository.findById(figureId)
+                .orElseThrow(() -> new EntityNotFoundException("정치인을 찾을 수 없습니다"));
+
+        for (BillVoteDTO voteDTO : votes) {
+            if (voteRepository.existsByFigureIdAndBillNo(figureId, voteDTO.billNo())) {
+                continue;
+            }
+
+            ProposedBill bill = findOrCreateBill(voteDTO.billNo(), voteDTO.billName());
+
+            LocalDate voteDate = null;
+            if (voteDTO.voteDate() != null && !voteDTO.voteDate().isEmpty()) {
+                try {
+                    voteDate = LocalDate.parse(voteDTO.voteDate());
+                } catch (Exception e) {
+                    log.warn("날짜 파싱 오류: {}", voteDTO.voteDate());
+                    voteDate = LocalDate.now();
+                }
+            }
+
+            VoteResultType voteResult = voteDTO.voteResultType();
+
+            Vote vote = Vote.builder()
+                    .figure(figure)
+                    .bill(bill)
+                    .voteDate(voteDate)
+                    .voteResult(voteResult)
+                    .meetingName(voteDTO.committee())
+                    .voteTitle(voteDTO.billName())
+                    .build();
+
+            voteRepository.save(vote);
+        }
+    }
+
+    private ProposedBill findOrCreateBill(String billNo, String billName) {
+        return billRepository.findByBillNo(billNo)
+                .orElseGet(() -> {
+                    ProposedBill newBill = ProposedBill.builder()
+                            .billNo(billNo)
+                            .billName(billName)
+                            .build();
+                    return billRepository.save(newBill);
+                });
     }
 
     private List<BillVoteDTO> fetchVotesFromApi(Long figureId) {

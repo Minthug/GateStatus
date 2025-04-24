@@ -17,6 +17,8 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
 
     Optional<ProposedBill> findByBillId(String billId);
 
+    Optional<ProposedBill> findByBillNo(String BillNo);
+
     List<ProposedBill> findByProposer(Figure proposer);
 
     Page<ProposedBill> findByProposer(Figure proposer, Pageable pageable);
