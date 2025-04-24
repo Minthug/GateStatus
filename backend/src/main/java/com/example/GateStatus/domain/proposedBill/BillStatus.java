@@ -19,4 +19,8 @@ public enum BillStatus {
     public String getDisplayName() {
         return displayName;
     }
+
+    public boolean isPassed() {
+        return this == PASSED;
+    }
 }

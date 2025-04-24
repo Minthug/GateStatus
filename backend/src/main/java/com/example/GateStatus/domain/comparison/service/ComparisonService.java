@@ -9,12 +9,15 @@ import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.issue.IssueDocument;
 import com.example.GateStatus.domain.issue.exception.NotFoundIssueException;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
+import com.example.GateStatus.domain.proposedBill.ProposedBill;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
+import com.example.GateStatus.domain.vote.Vote;
 import com.example.GateStatus.domain.vote.repository.VoteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -111,7 +115,130 @@ public class ComparisonService {
         List<StatementDocument> statements;
 
         if (issueId != null && !issueId.isEmpty()) {
-            statements = statementRepository.
+            statements = statementRepository.findByFigureIdAndIssueIdsContainingAndStatementDateBetween(figureId, issueId,startDate, endDate);
+        } else {
+            statements = statementRepository.findByFigureIdAndStatementDateBetween(figureId, startDate, endDate, PageRequest.of(0, 20));
         }
+
+        List<StatementInfo> statementInfos = statements.stream()
+                .map(s -> new StatementInfo(
+                        s.getId(),
+                        s.getTitle(),
+                        summarizeText(s.getContent(), 100),
+                        s.getStatementDate(),
+                        s.getSource()
+                ))
+                .collect(Collectors.toList());
+
+        Map<String, Integer> keywordCounts = analyzeKeywords(statements);
+
+        String mainStance = analyzeMainStance(statements);
+
+        return new StatementComparisonData(
+                statementInfos,
+                statements.size(),
+                mainStance,
+                keywordCounts
+        );
     }
+
+    /**
+     * 투표 비교 데이터 조회
+     */
+    private VoteComparisonData getVoteComparison(Long figureId, String issueId, LocalDate startDate, LocalDate endDate) {
+        List<Vote> votes;
+
+        if (issueId != null && !issueId.isEmpty()) {
+            IssueDocument issue = issueRepository.findById(issueId)
+                    .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + issueId));
+
+            votes = voteRepository.findByFigureIdAndBillIdAndVoteDateBetween(
+                    figureId, issue.getRelatedBillIds().stream().collect(Collectors.toList()),
+                    startDate,
+                    endDate
+            );
+        } else {
+            votes = voteRepository.findByFigureIdAndVoteDateBetween(figureId, startDate, endDate);
+        }
+
+        int agreeCount = 0;
+        int disagreeCount = 0;
+        int abstainCount = 0;
+
+        for (Vote vote : votes) {
+            switch (vote.getVoteResult()) {
+                case AGREE -> agreeCount++;
+                case DISAGREE -> disagreeCount++;
+                case ABSTAIN -> abstainCount++;
+            }
+        }
+
+        double agreementRate = votes.isEmpty() ? 0 : (double) agreeCount / votes.size() * 100;
+
+        List<VoteInfo> voteInfos = votes.stream()
+                .map(v -> new VoteInfo(
+                        v.getId().toString(),
+                        v.getBill() != null ? v.getBill().getBillName() : "알 수 없음",
+                        v.getVoteDate(),
+                        v.getVoteResult().name()
+                ))
+                .collect(Collectors.toList());
+
+        return new VoteComparisonData(
+                voteInfos,
+                agreeCount,
+                disagreeCount,
+                abstainCount,
+                agreementRate
+        );
+    }
+
+    /**
+     * 법안 비교 데이터 조회
+     */
+    private BillComparisonData getBillComparison(Long figureId, String issueId, LocalDate startDate, LocalDate endDate) {
+        List<ProposedBill> bills;
+
+        if (issueId != null && !issueId.isEmpty()) {
+            IssueDocument issue = issueRepository.findById(issueId)
+                    .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + issueId));
+
+            bills = billRepository.findByProposerIdAndIdInAndProposeDateBetween(
+                    figureId,
+                    issue.getRelatedBillIds().stream().collect(Collectors.toList()),
+                    startDate,
+                    endDate
+            );
+        } else {
+            bills = billRepository.findByProposerIdAndProposeDateBetween(figureId, startDate, endDate);
+        }
+
+        int passedCount = 0;
+        for (ProposedBill bill : bills) {
+            if (bill.getBillStatus() != null && bill.getBillStatus().isPassed()) {
+                passedCount++;
+            }
+        }
+
+        double passRate = bills.isEmpty() ? 0 : (double) passedCount / bills.size() * 100;
+
+        List<BillInfo> billInfos = bills.stream()
+                .map(b -> new BillInfo(
+                        b.getId(),
+                        b.getBillName(),
+                        b.getProposeDate(),
+                        b.getBillStatus() != null ? b.getBillStatus().name() : "알 수 없음",
+                        b.getBillStatus() != null && b.getBillStatus().isPassed()
+                ))
+                .collect(Collectors.toList());
+
+        return new BillComparisonData(
+                billInfos,
+                bills.size(),
+                passedCount,
+                passRate
+        );
+    }
+
+
 }
