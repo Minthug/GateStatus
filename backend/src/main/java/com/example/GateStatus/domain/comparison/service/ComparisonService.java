@@ -18,6 +18,7 @@ import com.example.GateStatus.domain.vote.Vote;
 import com.example.GateStatus.domain.vote.repository.VoteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -323,7 +324,8 @@ public class ComparisonService {
         return text.substring(0, maxLength - 3) + "...";
     }
 
-    private Map<String, Integer> analyzeKeywords(List<StatementDocument> statements) {
+    @Cacheable(value = "keywordAnalysis", key = "#statements.hashCode()")
+    public Map<String, Integer> analyzeKeywords(List<StatementDocument> statements) {
 
         // 의미 없는 불용어(stopwords) 필터링
         Set<String> stopwords = Set.of("이", "그", "저", "이것", "그것", "저것", "이런", "그런", "저런",
