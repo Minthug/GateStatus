@@ -244,3 +244,7 @@ public class IssueController {
         return ResponseEntity.ok().build();
     }
 }
+
+/**
+ * Link 관련 3개의 메서드를 한개로 합치는 방법 구상하기
+ */
