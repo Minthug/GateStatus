@@ -18,6 +18,10 @@ public enum VoteResultType {
         return displayName;
     }
 
+    public boolean isParticipated() {
+        return this != ABSENT;
+    }
+
     public static VoteResultType fromString(String value) {
         if (value == null) return UNKNOWN;
 
