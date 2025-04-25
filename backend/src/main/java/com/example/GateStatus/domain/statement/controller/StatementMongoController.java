@@ -53,7 +53,7 @@ public class StatementMongoController {
     public ResponseEntity<Page<StatementResponse>> searchStatements(@RequestParam String keyword,
                                                                     @PageableDefault(size = 10) Pageable pageable) {
         log.info("[MongoDB] 발언 검색 요청: 키워드 = {}", keyword);
-        Page<StatementResponse> responses = statementService.searchStatement(keyword, pageable);
+        Page<StatementResponse> responses = statementService.searchStatements(keyword, pageable);
         return ResponseEntity.ok(responses);
     }
 
@@ -89,7 +89,7 @@ public class StatementMongoController {
     @GetMapping("/keyword/{keyword}")
     public ResponseEntity<List<StatementResponse>> getStatementsByKeyword(@PathVariable String keyword) {
         log.info("[MongoDB] 키워드 포함 발언 검색 요청: {}", keyword);
-        List<StatementResponse> responses = statementService.findStatementByKeyword(keyword);
+        List<StatementResponse> responses = statementService.searchStatements(keyword);
         return ResponseEntity.ok(responses);
     }
 

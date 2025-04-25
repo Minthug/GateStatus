@@ -64,7 +64,7 @@ public class FigureService {
 
         Figure findFigure = figureCacheService.findFigureById(command.figureId());
 
-        figureCacheService.incrementViewCount(command.figureId());
+//        figureCacheService.incrementViewCount(command.figureId());
 
         return FindFigureDetailResponse.from(findFigure);
     }
