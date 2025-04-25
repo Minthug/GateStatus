@@ -34,14 +34,19 @@ public class Category extends BaseTimeEntity {
     @Column(nullable = false)
     private CategoryType type;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private CategorySubject subject;
+
     public void update(String name, String description, String iconUrl, Integer displayOrder,
-                       Boolean active, CategoryType type) {
+                       Boolean active, CategoryType type, CategorySubject subject) {
         if (name != null) this.name = name;
         if (description != null) this.description = description;
         if (iconUrl != null) this.iconUrl = iconUrl;
         if (displayOrder != null) this.displayOrder = displayOrder;
         if (active != null) this.active = active;
         if (type != null) this.type = type;
+        if (subject != null) this.subject = subject;
     }
 
 }

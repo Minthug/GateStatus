@@ -2,13 +2,13 @@ package com.example.GateStatus.domain.category.controller;
 
 import com.example.GateStatus.domain.category.CategoryType;
 import com.example.GateStatus.domain.category.service.CategoryService;
+import com.example.GateStatus.domain.category.service.request.CreateCategoryCommand;
+import com.example.GateStatus.domain.category.service.request.UpdateCategoryCommand;
 import com.example.GateStatus.domain.category.service.response.CategoryResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -27,5 +27,19 @@ public class CategoryAdminController {
     @GetMapping("/type/{type}")
     public ResponseEntity<List<CategoryResponse>> getCategoriesByType(@PathVariable CategoryType type) {
         return ResponseEntity.ok(categoryService.getCategoriesByType(type));
+    }
+
+    @PostMapping
+    public ResponseEntity<CategoryResponse> createCategory(@RequestBody CreateCategoryCommand command) {
+        CategoryResponse response = categoryService.createCategory(command);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PatchMapping
+    public ResponseEntity<CategoryResponse> updateCategory(@PathVariable Long id,
+                                                           @RequestBody UpdateCategoryCommand command) {
+        CategoryResponse response = categoryService.updateCategory(id, command);
+
+        return ResponseEntity.ok(response);
     }
 }
