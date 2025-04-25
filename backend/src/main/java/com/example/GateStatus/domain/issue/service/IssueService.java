@@ -1,6 +1,8 @@
 package com.example.GateStatus.domain.issue.service;
 
+import com.example.GateStatus.domain.issue.IssueCategory;
 import com.example.GateStatus.domain.issue.IssueDocument;
+import com.example.GateStatus.domain.issue.exception.InvalidCategoryException;
 import com.example.GateStatus.domain.issue.exception.NotFoundIssueException;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
 import com.example.GateStatus.domain.issue.service.request.IssueRequest;
@@ -157,11 +159,14 @@ public class IssueService {
      */
     @Transactional
     public IssueResponse createIssue(IssueRequest request) {
+
+        IssueCategory category = validateCategory(request.categoryCode());
+
         IssueDocument document = IssueDocument.builder()
                 .name(request.name())
                 .description(request.description())
-                .categoryCode(request.categoryCode())
-                .categoryName(request.categoryName())
+                .categoryCode(category.getCode())
+                .categoryName(category.getDisplayName())
                 .keywords(request.keywords())
                 .thumbnailUrl(request.thumbnailUrl())
                 .parentIssueId(request.parentIssueId())
@@ -356,5 +361,17 @@ public class IssueService {
     private IssueDocument findByIssueById(String id) {
         return issueRepository.findById(id)
                 .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + id));
+    }
+
+    private IssueCategory validateCategory(String code) {
+        if (code == null || code.isEmpty()) {
+            throw new InvalidCategoryException("카테고리 코드가 필요합니다");
+        }
+
+        try {
+            return IssueCategory.fromCode(code);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidCategoryException("유효하지 않은 카테고리 코드: " + code);
+        }
     }
 }
