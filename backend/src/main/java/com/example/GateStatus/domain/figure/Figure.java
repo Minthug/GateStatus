@@ -1,7 +1,6 @@
 package com.example.GateStatus.domain.figure;
 
 import com.example.GateStatus.domain.career.Career;
-import com.example.GateStatus.domain.category.Category;
 import com.example.GateStatus.domain.tag.Tag;
 import com.example.GateStatus.global.BaseTimeEntity;
 import jakarta.persistence.*;
@@ -53,9 +52,9 @@ public class Figure extends BaseTimeEntity {
 
     private Long viewCount;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id")
-    private Category category;
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "category_id")
+//    private Category category;
 
     @ElementCollection
     private List<String> issueIds;

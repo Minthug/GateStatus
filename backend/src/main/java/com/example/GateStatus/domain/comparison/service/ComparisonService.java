@@ -11,7 +11,6 @@ import com.example.GateStatus.domain.issue.exception.NotFoundIssueException;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
-import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
 import com.example.GateStatus.domain.vote.Vote;
