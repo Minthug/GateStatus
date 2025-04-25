@@ -4,6 +4,8 @@ import com.example.GateStatus.domain.comparison.ComparisonType;
 import com.example.GateStatus.domain.comparison.service.ComparisonService;
 import com.example.GateStatus.domain.comparison.service.request.ComparisonRequest;
 import com.example.GateStatus.domain.comparison.service.response.ComparisonResult;
+import com.example.GateStatus.domain.issue.IssueCategory;
+import com.example.GateStatus.domain.issue.exception.IssueException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -98,18 +100,21 @@ public class ComparisonController {
      * URL 경로에 카테고리 포함 (예: /comparisons/{category}/figures)
      * 카테고리 중심 API 설계
      */
-    @GetMapping("/{category}/figures")
-    public ResponseEntity<ComparisonResult> compareInCategory(@PathVariable String category,
+    @GetMapping("/{categoryCode}/figures")
+    public ResponseEntity<ComparisonResult> compareInCategory(@PathVariable String categoryCode,
                                                               @RequestParam List<Long> figureIds,
                                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
                                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-        log.info("카테고리별 정치인 비교 요청: 카테고리={}, 정치인={}", category, figureIds);
+        IssueCategory category = IssueCategory.fromCode(categoryCode);
+
+        log.info("카테고리별 정치인 비교 요청: 카테고리={}, 정치인={}", category.getDisplayName(), figureIds);
+
 
         ComparisonRequest request = new ComparisonRequest(
                 figureIds,
                 null,
-                category,
+                categoryCode,
                 startDate,
                 endDate,
                 List.of(ComparisonType.STATEMENT, ComparisonType.VOTE, ComparisonType.BILL)

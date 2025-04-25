@@ -13,6 +13,8 @@ public interface IssueRepository extends MongoRepository<IssueDocument, String> 
 
     Page<IssueDocument> findByCategoryCodeAndIsActiveTrue(String categoryCode, Pageable pageable);
 
+    List<IssueDocument> findByCategoryCodeAndIsActiveTrue(String categoryCode);
+
     Page<IssueDocument> findByIsHotTrueAndIsActiveTrueOrderByPriorityDescViewCountDesc(Pageable pageable);
 
     @Query("{'relatedFigureIds': ?0, 'isActive': true}")

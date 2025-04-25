@@ -6,6 +6,7 @@ import com.example.GateStatus.domain.comparison.service.request.ComparisonReques
 import com.example.GateStatus.domain.comparison.service.response.*;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.issue.IssueCategory;
 import com.example.GateStatus.domain.issue.IssueDocument;
 import com.example.GateStatus.domain.issue.exception.NotFoundIssueException;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -62,6 +64,18 @@ public class ComparisonService {
                     issue.getDescription(),
                     issue.getCategoryName()
             );
+        }
+
+        // 카테고리 정보 처리
+        IssueCategory category = null;
+        List<IssueDocument> categoryIssues = null;
+        if (request.category() != null && !request.category().isEmpty()) {
+            try {
+                category = IssueCategory.fromCode(request.category());
+                categoryIssues = issueRepository.findByCategoryCodeAndIsActiveTrue(request.category());
+            } catch (IllegalArgumentException e) {
+                log.warn("유효하지 않은 카테고리 코드: {]", request.category());
+            }
         }
 
         // 날짜 범위 설정
@@ -105,7 +119,8 @@ public class ComparisonService {
             figureDataList.add(figureData);
         }
 
-        Map<String, Object> summaryData = generateSummaryData(figureDataList, issueInfo);
+        // 요약 데이터 생성 (카테고리 정보 포함)
+        Map<String, Object> summaryData = generateSummaryData(figureDataList, issueInfo, category, categoryIssues, request);
         return new ComparisonResult(figureDataList, issueInfo, summaryData);
     }
 
@@ -259,8 +274,37 @@ public class ComparisonService {
         return allDates.size();
     }
 
-    private Map<String, Object> generateSummaryData(List<FigureComparisonData> figureDataList, IssueInfo issueInfo) {
+    /**
+     * 비교 데이터의 요약 정보 생성
+     * @param figureDataList 정치인별 비교 데이터 목록
+     * @param issueInfo 이슈 정보
+     * @param category 카테고리 정보
+     * @param categoryIssues 카테고리에 속한 이슈 목록
+     * @param request 원본 비교 요청 정보
+     * @return 요약 정보
+     */
+    private Map<String, Object> generateSummaryData(List<FigureComparisonData> figureDataList, IssueInfo issueInfo, IssueCategory category,
+                                                    List<IssueDocument> categoryIssues, ComparisonRequest request) {
         Map<String, Object> summary = new HashMap<>();
+
+        if (category != null && categoryIssues != null) {
+            Map<String, Object> categoryInfo = new HashMap<>();
+            categoryInfo.put("code", category.getCode());
+            categoryInfo.put("name", category.getDisplayName());
+            categoryInfo.put("issueCount", categoryIssues.size());
+
+            List<Map<String, String>> topIssues = categoryIssues.stream()
+                    .limit(5)
+                    .map(issue -> Map.of(
+                            "id", issue.getId(),
+                            "name", issue.getName()
+                    ))
+                    .collect(Collectors.toList());
+
+            categoryInfo.put("topIssues", topIssues);
+
+            summary.put("category", categoryInfo);
+        }
 
         if (!figureDataList.isEmpty()) {
             FigureComparisonData mostActive = figureDataList.stream()
@@ -271,6 +315,12 @@ public class ComparisonService {
                 summary.put("mostActiveFigureId", mostActive.figureId());
                 summary.put("mostActiveFigureName", mostActive.figureName());
             }
+
+            LocalDate startDate = request.startDate() != null ? request.startDate() : LocalDate.now().minusYears(1);
+            LocalDate endDate = request.endDate() != null ? request.endDate() : LocalDate.now();
+            summary.put("analysisStartDate", startDate.toString());
+            summary.put("analysisEndDate", endDate.toString());
+            summary.put("analysisPeriodDays", ChronoUnit.DAYS.between(startDate, endDate));
         }
 
         if (figureDataList.stream().anyMatch(f -> f.statements() != null)) {
