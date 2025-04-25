@@ -5,7 +5,6 @@ import com.example.GateStatus.domain.comparison.service.ComparisonService;
 import com.example.GateStatus.domain.comparison.service.request.ComparisonRequest;
 import com.example.GateStatus.domain.comparison.service.response.ComparisonResult;
 import com.example.GateStatus.domain.issue.IssueCategory;
-import com.example.GateStatus.domain.issue.exception.IssueException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;

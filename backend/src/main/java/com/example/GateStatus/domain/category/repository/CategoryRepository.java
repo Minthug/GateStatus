@@ -5,11 +5,12 @@ import com.example.GateStatus.domain.category.CategoryType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
-    List<Category> findAllByOrderByDisplayOrderAsc();
-    List<Category> findByActiveTrue();
-    List<Category> findByType(CategoryType type);
+    List<Category> findByTypeOrderByDisplayOrderAsc(CategoryType type);
+    List<Category> findByActiveIsTrueOrderByDisplayOrderAsc();
+    Optional<Category> findByName(String name);
 
 }
