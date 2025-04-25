@@ -41,7 +41,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.security:spring-security-config'
 	implementation 'org.springframework.security:spring-security-core'
-	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.3'
+	implementation 'com.fasterxml.jackson.core:jackson-core:2.15.3'
+	implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.3'
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	implementation 'org.springframework.session:spring-session-data-redis'
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
@@ -64,7 +66,6 @@ dependencies {
 
 	//RabbitMQ
 	implementation 'org.springframework.boot:spring-boot-starter-amqp'
-	implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.4.2'               // Jackson Databind
 
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'

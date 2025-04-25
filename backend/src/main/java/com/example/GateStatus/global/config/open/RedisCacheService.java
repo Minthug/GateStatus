@@ -1,10 +1,12 @@
 package com.example.GateStatus.global.config.open;
 
+import com.example.GateStatus.domain.issue.service.response.IssueResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -138,5 +140,22 @@ public class RedisCacheService {
             log.error("캐시 getOrSet 실패: {}", key, e);
             return supplier.get();
         }
+    }
+
+    /**
+     * Issue 객체를 캐시에 저장
+     * @param issue
+     */
+    public void cacheIssue(IssueResponse issue) {
+        set("issue:" + issue.id(), issue, 3600); // 1hours
+    }
+
+    /**
+     * 캐시된 Issue 객체 조회
+     * @param issueId
+     * @return
+     */
+    public Optional<IssueResponse> getCacheIssue(String issueId) {
+        return Optional.ofNullable(get("issue:" + issueId));
     }
 }
