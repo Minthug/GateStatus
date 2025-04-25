@@ -7,8 +7,7 @@ import org.springframework.cglib.core.Local;
 import java.time.LocalDateTime;
 
 public record CategoryResponse(Long id, String name, String description, String iconUrl,
-                               int displayOrder, boolean active, CategoryType type,
-                               LocalDateTime createdDate, LocalDateTime modifiedDate) {
+                               int displayOrder, boolean active, CategoryType type) {
 
     public static CategoryResponse from(Category category) {
         return new CategoryResponse(
@@ -18,9 +17,7 @@ public record CategoryResponse(Long id, String name, String description, String 
                 category.getIconUrl(),
                 category.getDisplayOrder(),
                 category.isActive(),
-                category.getType(),
-                category.getCreatedDate(),
-                category.getModifiedDate()
+                category.getType()
         );
     }
 }
