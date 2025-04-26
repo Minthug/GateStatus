@@ -15,7 +15,7 @@ public interface IssueRepository extends MongoRepository<IssueDocument, String> 
 
     List<IssueDocument> findByCategoryCodeAndIsActiveTrue(String categoryCode);
 
-    List<IssueDocument> findByCategoryCodeInAndIsActiveTrue(List<String> categoryCode);
+    Page<IssueDocument> findByCategoryCodeInAndIsActiveTrueOrderByCreatedAtDesc(List<String> categoryCode, Pageable pageable);
 
     Page<IssueDocument> findByIsHotTrueAndIsActiveTrueOrderByPriorityDescViewCountDesc(Pageable pageable);
 

@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -343,14 +344,18 @@ public class IssueService {
         log.info("이슈 {} 에 정치인 {} 연결됨", issueId, figureId);
     }
 
-    public List<IssueDocument> findIssueByParentCategory(Long categoryId) {
+    public Page<IssueResponse> findIssueByParentCategory(Long categoryId, int page, int size) {
         List<IssueCategory> issueCategories = categoryService.getIssueCategoriesByParentCategory(categoryId);
 
         List<String> categoryCodes = issueCategories.stream()
                 .map(IssueCategory::getCode)
                 .collect(Collectors.toList());
 
-        return issueRepository.findByCategoryCodeInAndIsActiveTrue(categoryCodes);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        Page<IssueDocument> issuePage = issueRepository.findByCategoryCodeInAndIsActiveTrueOrderByCreatedAtDesc(categoryCodes, pageable);
+
+        return issuePage.map(IssueResponse::from);
     }
 
 

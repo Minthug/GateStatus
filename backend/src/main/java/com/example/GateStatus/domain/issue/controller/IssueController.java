@@ -1,5 +1,7 @@
 package com.example.GateStatus.domain.issue.controller;
 
+import com.example.GateStatus.domain.category.service.CategoryService;
+import com.example.GateStatus.domain.issue.IssueCategory;
 import com.example.GateStatus.domain.issue.service.IssueService;
 import com.example.GateStatus.domain.issue.service.request.IssueRequest;
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
@@ -13,7 +15,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import retrofit2.http.Path;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/v1/issues")
@@ -22,6 +28,7 @@ import java.util.List;
 public class IssueController {
 
     private final IssueService issueService;
+    private final CategoryService categoryService;
 
     /**
      * 이슈 상세 조회
@@ -242,6 +249,45 @@ public class IssueController {
         log.info("이슈-정치인 연결: {} - {}", issueId, figureId);
         issueService.linkIssuesToFigure(issueId, figureId);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 대분류 카테고리에 속한 이슈 카테고리 조회
+     * @param categoryId
+     * @return
+     */
+    @GetMapping("/categories/parent/{categoryId}")
+    public ResponseEntity<Map<String, Object>> getIssueCategoriesByParent(@PathVariable Long categoryId) {
+        List<IssueCategory> categories = categoryService.getIssueCategoriesByParentCategory(categoryId);
+
+        List<Map<String, String>> categoryList = categories.stream()
+                .map(cat -> Map.of(
+                        "code", cat.getCode(),
+                        "name", cat.getDisplayName()
+                ))
+                .collect(Collectors.toList());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("categoryId", categoryId);
+        response.put("categories", categories);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 대분류 카테고리에 속한 이슈 목록 조회
+     * @param categoryId
+     * @param page
+     * @param size
+     * @return
+     */
+    @GetMapping("/by-parent-category/{categoryId}")
+    public ResponseEntity<Page<IssueResponse>> getIssuesByParentCategory(@PathVariable Long categoryId,
+                                                                         @RequestParam(defaultValue = "0") int page,
+                                                                         @RequestParam(defaultValue = "10") int size) {
+        Page<IssueResponse> issues = issueService.findIssueByParentCategory(categoryId, page, size);
+
+        return ResponseEntity.ok(issues);
     }
 }
 
