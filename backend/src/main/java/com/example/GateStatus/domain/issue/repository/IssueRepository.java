@@ -30,19 +30,17 @@ public interface IssueRepository extends MongoRepository<IssueDocument, String> 
     @Query("{'relatedBillIds': ?0, 'isActive': true}")
     List<IssueDocument> findIssuesByBillId(String billId);
 
-    List<IssueDocument> findIssuesByStatementId(String statementId);
+    List<IssueDocument> findByRelatedStatementIdsContaining(String statementId);
 
-    Page<IssueDocument> findByIsActiveTrueAndOrderByCreatedAtDesc(Pageable pageable);
+    Page<IssueDocument> findByIsActiveTrueOrderByCreatedAtDesc(Pageable pageable);
 
     Optional<IssueDocument> findByIdAndIsActiveTrue(String id);
 
     @Query("{'categoryCode': ?0, 'id': {'$ne': ?1}, 'isActive': true}")
     List<IssueDocument> findRelatedIssuesByCategoryAndNotId(String categoryCode, String currentIssueId, Pageable pageable);
 
+    // 쿼리 관련 및 ID 문제 변수명 문제 질문
     @Query("{'$or': [{'keywords': {'$in': ?0}}, {'tags': {'$in': ?0}}], 'id': {'$ne': ?1}, 'isActive': true}")
     List<IssueDocument> findRelatedIssuesByKeywordsOrTags(List<String> keywords, String currentIssueId, Pageable pageable);
-
-
-    // 쿼리 관련 및 ID 문제 변수명 문제 질문
 }
 

@@ -111,7 +111,7 @@ public class IssueService {
      */
     @Transactional(readOnly = true)
     public List<IssueResponse> getIssuesByStatement(String statementId) {
-        return issueRepository.findIssuesByStatementId(statementId)
+        return issueRepository.findByRelatedStatementIdsContaining(statementId)
                 .stream()
                 .map(IssueResponse::from)
                 .collect(Collectors.toList());
@@ -148,7 +148,7 @@ public class IssueService {
      */
     @Transactional(readOnly = true)
     public Page<IssueResponse> getRecentIssues(Pageable pageable) {
-        return issueRepository.findByIsActiveTrueAndOrderByCreatedAtDesc(pageable)
+        return issueRepository.findByIsActiveTrueOrderByCreatedAtDesc(pageable)
                 .map(IssueResponse::from);
     }
 

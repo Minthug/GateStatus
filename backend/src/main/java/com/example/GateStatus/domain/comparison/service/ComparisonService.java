@@ -168,7 +168,7 @@ public class ComparisonService {
             IssueDocument issue = issueRepository.findById(issueId)
                     .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + issueId));
 
-            votes = voteRepository.findByFigureIdAndBillIdAndVoteDateBetween(
+            votes = voteRepository.findByFigureIdAndBillBillIdInAndVoteDateBetween(
                     figureId, issue.getRelatedBillIds().stream().collect(Collectors.toList()),
                     startDate,
                     endDate

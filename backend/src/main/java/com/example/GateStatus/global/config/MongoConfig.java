@@ -14,7 +14,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 import java.util.Arrays;
 
 @Configuration
-@EnableMongoRepositories(basePackages = { "com.example.GateStatus.domain.statement.repository", "com.example.GateStatus.domain.timeline.repository" })
+@EnableMongoRepositories(basePackages = "com.example.GateStatus.domain")
 @EnableMongoAuditing
 public class MongoConfig {
 

@@ -60,7 +60,7 @@ public class VoteService {
                 .orElseThrow(() -> new EntityNotFoundException("정치인을 찾을 수 없습니다"));
 
         for (BillVoteDTO voteDTO : votes) {
-            if (voteRepository.existsByFigureIdAndBillNo(figureId, voteDTO.billNo())) {
+            if (voteRepository.existsByFigureIdAndBillBillNo(figureId, voteDTO.billNo())) {
                 continue;
             }
 

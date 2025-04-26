@@ -14,7 +14,7 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
 
     List<Vote> findByBillId(Long billId);
 
-    boolean existsByFigureIdAndBillNo(Long figureId, String billNo);
+    boolean existsByFigureIdAndBillBillNo(Long figureId, String billNo);
 
     List<Vote> findByFigureIdAndVoteResult(Long figureId, VoteResultType voteResult);
 
@@ -24,5 +24,5 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
 
     List<Vote> findByFigureIdAndVoteDateBetween(Long figureId, LocalDate startDate, LocalDate endDate);
 
-    List<Vote> findByFigureIdAndBillIdAndVoteDateBetween(Long figureId, List<String> billIds, LocalDate startDate, LocalDate endDate);
+    List<Vote> findByFigureIdAndBillBillIdInAndVoteDateBetween(Long figureId, List<String> billIds, LocalDate startDate, LocalDate endDate);
 }

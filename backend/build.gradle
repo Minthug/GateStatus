@@ -41,9 +41,6 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.security:spring-security-config'
 	implementation 'org.springframework.security:spring-security-core'
-	implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.3'
-	implementation 'com.fasterxml.jackson.core:jackson-core:2.15.3'
-	implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.3'
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	implementation 'org.springframework.session:spring-session-data-redis'
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
@@ -52,8 +49,14 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
 	implementation 'org.springframework.boot:spring-boot-starter-data-rest'
 
+	// 명시적인 Jackson 의존성 제거 (Spring Boot의 의존성 관리 활용)
 
-
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	implementation 'com.fasterxml.jackson.core:jackson-core'
+	implementation 'com.fasterxml.jackson.core:jackson-annotations'
+	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jdk8'
+	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+	implementation 'com.fasterxml.jackson.module:jackson-module-parameter-names'
 	// 쿠버네티스 환경에서 필요한 의존성들
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.cloud:spring-cloud-starter-kubernetes-client'
