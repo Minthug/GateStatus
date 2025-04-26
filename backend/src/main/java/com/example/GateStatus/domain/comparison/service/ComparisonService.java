@@ -74,7 +74,7 @@ public class ComparisonService {
                 category = IssueCategory.fromCode(request.category());
                 categoryIssues = issueRepository.findByCategoryCodeAndIsActiveTrue(request.category());
             } catch (IllegalArgumentException e) {
-                log.warn("유효하지 않은 카테고리 코드: {]", request.category());
+                log.warn("유효하지 않은 카테고리 코드: {}", request.category());
             }
         }
 

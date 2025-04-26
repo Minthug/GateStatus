@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.issue.service;
 
+import com.example.GateStatus.domain.category.service.CategoryService;
 import com.example.GateStatus.domain.issue.IssueCategory;
 import com.example.GateStatus.domain.issue.IssueDocument;
 import com.example.GateStatus.domain.issue.exception.InvalidCategoryException;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 public class IssueService {
 
     private final IssueRepository issueRepository;
+    private final CategoryService categoryService;
     private final EventPublisher eventPublisher;
 
     /**
@@ -339,6 +341,16 @@ public class IssueService {
         issue.addRelatedFigure(figureId);
         issueRepository.save(issue);
         log.info("이슈 {} 에 정치인 {} 연결됨", issueId, figureId);
+    }
+
+    public List<IssueDocument> findIssueByParentCategory(Long categoryId) {
+        List<IssueCategory> issueCategories = categoryService.getIssueCategoriesByParentCategory(categoryId);
+
+        List<String> categoryCodes = issueCategories.stream()
+                .map(IssueCategory::getCode)
+                .collect(Collectors.toList());
+
+        return issueRepository.findByCategoryCodeInAndIsActiveTrue(categoryCodes);
     }
 
 
