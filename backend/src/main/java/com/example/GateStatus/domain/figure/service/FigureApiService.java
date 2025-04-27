@@ -98,6 +98,8 @@ public class FigureApiService {
         try {
             log.info("모든 국회의원 정보 동기화 시작");
             List<FigureInfoDTO> allFigures = fetchAllFiguresFromApi();
+            log.info("가져온 국회의원 수: {}", allFigures.size());
+
             int count = 0;
 
             for (FigureInfoDTO infoDTO : allFigures) {
@@ -113,7 +115,7 @@ public class FigureApiService {
                     figureRepository.save(figure);
                     count++;
                 } catch (Exception e) {
-                    log.error("국회의원 동기화 중 오류 발생: {}", infoDTO.name());
+                    log.error("국회의원 동기화 중 오류 발생: {} - {}", infoDTO.name(), e.getMessage(), e);
                 }
             }
             log.info("국회의원 정보 동기화 완료: {}", count);

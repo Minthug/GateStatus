@@ -71,7 +71,7 @@ public class FigureMapper {
     }
 
     private Career parseCareerText(String text) {
-        if (text != null || text.trim().isEmpty()) {
+        if (text == null || text.trim().isEmpty()) {
             return null;
         }
         return Career.builder()

@@ -6,6 +6,7 @@ import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureService;
 import com.example.GateStatus.domain.figure.service.request.FindFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.RegisterFigureCommand;
+import com.example.GateStatus.domain.figure.service.request.SyncFigureRequest;
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
 import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
 import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
@@ -68,10 +69,10 @@ public class FigureController {
     }
 
 
-    @PostMapping("/sync/{name}")
+    @PostMapping("/sync")
 //    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<FindFigureDetailResponse> syncFigureByName(@PathVariable String name) {
-        Figure figure = figureApiService.syncFigureInfoByName(name);
+    public ResponseEntity<FindFigureDetailResponse> syncFigureByName(@RequestBody SyncFigureRequest request) {
+        Figure figure = figureApiService.syncFigureInfoByName(request.name());
         return ResponseEntity.ok(FindFigureDetailResponse.from(figure));
     }
 
