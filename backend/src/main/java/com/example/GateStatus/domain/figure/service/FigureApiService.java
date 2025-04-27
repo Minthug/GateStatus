@@ -66,7 +66,7 @@ public class FigureApiService {
 
             AssemblyApiResponse<JsonNode> apiResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path("/nwvrqwxyaytdsfvhu")
+                            .path(figureApiPath)
                             .queryParam("KEY", apiKey)
                             .queryParam("HG_NM", figureName)
                             .build())
@@ -74,7 +74,10 @@ public class FigureApiService {
                     .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {})
                     .block();
 
+            log.info("API 응답 데이터:", apiResponse);
             List<FigureInfoDTO> figures = apiMapper.map(apiResponse);
+
+            log.info("전체 국회의원 정보 API 호출 완료: {}명", figures.size());
 
             if (figures.isEmpty()) {
                 return null;

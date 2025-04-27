@@ -69,14 +69,14 @@ public class FigureController {
 
 
     @PostMapping("/sync/{name}")
-    @PreAuthorize("hasRole('ADMIN')")
+//    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<FindFigureDetailResponse> syncFigureByName(@PathVariable String name) {
         Figure figure = figureApiService.syncFigureInfoByName(name);
         return ResponseEntity.ok(FindFigureDetailResponse.from(figure));
     }
 
     @PostMapping("/sync/all")
-    @PreAuthorize("hasRole('ADMIN')")
+//    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Integer>> syncAllFigures() {
         int count = figureApiService.syncAllFigures();
         return ResponseEntity.ok(Map.of("syncCount", count));
