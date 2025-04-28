@@ -13,31 +13,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.parser.Parser;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
-import org.w3c.dom.Node;
-import org.xml.sax.InputSource;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathFactory;
-import java.io.StringReader;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -115,37 +99,6 @@ public class FigureApiService {
      *
      * @return
      */
-//    @Transactional
-//    public int syncAllFigures() {
-//        try {
-//            log.info("모든 국회의원 정보 동기화 시작");
-//            List<FigureInfoDTO> allFigures = fetchAllFiguresFromApi();
-//            log.info("가져온 국회의원 수: {}", allFigures.size());
-//
-//            int count = 0;
-//
-//            for (FigureInfoDTO infoDTO : allFigures) {
-//                try {
-//                    Figure figure = figureRepository.findByName(infoDTO.name())
-//                            .orElseGet(() -> Figure.builder()
-//                                    .name(infoDTO.name())
-//                                    .figureType(FigureType.POLITICIAN)
-//                                    .viewCount(0L)
-//                                    .build());
-//
-//                    figureMapper.updateFigureFromDTO(figure, infoDTO);
-//                    figureRepository.save(figure);
-//                    count++;
-//                } catch (Exception e) {
-//                    log.error("국회의원 동기화 중 오류 발생: {} - {}", infoDTO.name(), e.getMessage(), e);
-//                }
-//            }
-//            log.info("국회의원 정보 동기화 완료: {}", count);
-//            return count;
-//        } catch (Exception e) {
-//            throw new ApiDataRetrievalException("전체 국회의원 정보를 동기화 하는 중 오류 발생");
-//        }
-//    }
     @Transactional
     public int syncAllFigures() {
         try {
@@ -172,13 +125,13 @@ public class FigureApiService {
             int count = 0;
             for (FigureInfoDTO infoDTO : allFigures) {
                 try {
-                    log.info("국회의원 정보 처리 중: {}", infoDTO.name());
+                    log.info("동기화 시도 ID: {}, 이름: {}", infoDTO.figureId(), infoDTO.name());
 
-                    Figure figure = figureRepository.findByName(infoDTO.name())
+                    Figure figure = figureRepository.findByFigureId(infoDTO.figureId())
                             .orElseGet(() -> {
                                 log.info("새 국회의원 생성: {}", infoDTO.name());
-                                log.info("국회의원 ID: {}", infoDTO.figureId());
                                 return Figure.builder()
+                                        .figureId(infoDTO.figureId())
                                         .name(infoDTO.name())
                                         .figureType(FigureType.POLITICIAN)
                                         .viewCount(0L)
@@ -271,24 +224,23 @@ public class FigureApiService {
 
             for (JsonNode row : rowsNode) {
                 try {
-
-                    String figureId = getTextValue(row, "MONA_CD");
-                    String name = getTextValue(row, "HG_NM");
-                    String englishName = getTextValue(row, "ENG_NM");
-                    String birth = getTextValue(row, "BTH_DATE");
-                    String partyNameStr = getTextValue(row, "POLY_NM");
-                    String constituency = getTextValue(row, "ORIG_NM");
-                    String committeeName = getTextValue(row, "CMIT_NM");
-                    String committeePosition = getTextValue(row, "JOB_RES_NM");
-                    String electedCount = getTextValue(row, "REELE_GBN_NM");
-                    String electedDate = getTextValue(row, "UNITS");
-                    String reelection = getTextValue(row, "REELE_GBN_NM");
-                    String email = getTextValue(row, "E_MAIL");
-                    String homepage = getTextValue(row, "HOMEPAGE");
+                    String figureId = apiMapper.getTextValue(row, "MONA_CD");
+                    String name = apiMapper.getTextValue(row, "HG_NM");
+                    String englishName = apiMapper.getTextValue(row, "ENG_NM");
+                    String birth = apiMapper.getTextValue(row, "BTH_DATE");
+                    String partyNameStr = apiMapper.getTextValue(row, "POLY_NM");
+                    String constituency = apiMapper.getTextValue(row, "ORIG_NM");
+                    String committeeName = apiMapper.getTextValue(row, "CMIT_NM");
+                    String committeePosition = apiMapper.getTextValue(row, "JOB_RES_NM");
+                    String electedCount = apiMapper.getTextValue(row, "REELE_GBN_NM");
+                    String electedDate = apiMapper.getTextValue(row, "UNITS");
+                    String reelection = apiMapper.getTextValue(row, "REELE_GBN_NM");
+                    String email = apiMapper.getTextValue(row, "E_MAIL");
+                    String homepage = apiMapper.getTextValue(row, "HOMEPAGE");
 
 
                     // 경력 정보
-                    String careerText = getTextValue(row, "MEM_TITLE");
+                    String careerText = apiMapper.getTextValue(row, "MEM_TITLE");
                     List<String> career = new ArrayList<>();
                     if (careerText != null && !careerText.isEmpty()) {
                         String[] lines = careerText.split("\r\n");
@@ -442,14 +394,4 @@ public class FigureApiService {
         }
     }
 
-    /**
-     * JsonNode에서 특정 필드의 텍스트 값 추출
-     * @param node
-     * @param fieldName
-     * @return
-     */
-    public static String getTextValue(JsonNode node, String fieldName) {
-        JsonNode field = node.get(fieldName);
-        return (field != null && !field.isNull()) ? field.asText() : "";
-    }
 }

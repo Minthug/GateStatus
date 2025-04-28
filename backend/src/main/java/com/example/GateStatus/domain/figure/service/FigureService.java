@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -61,11 +62,24 @@ public class FigureService {
 
     @Transactional(readOnly = true)
     public FindFigureDetailResponse findFigure(FindFigureCommand command) {
+        log.info("조회 시도 figureId: {}", command.figureId());
+
+        List<Figure> allFigures = figureRepository.findAllByFigureIdIsNotNull();
+        log.info("저장된 figure_id 수: {}", allFigures.size());
+        log.info("저장된 figure_id 목록: {}", allFigures.stream()
+                .map(Figure::getFigureId)
+                .collect(Collectors.toList()));
+
+        Optional<Figure> checkFigure = figureRepository.findByFigureId(command.figureId());
+        if (checkFigure.isEmpty()) {
+            log.error("해당 figureId로 조회 실패: {}", command.figureId());
+            log.error("전체 저장된 figureId 목록: {}",
+                    figureRepository.findAll().stream()
+                            .map(Figure::getFigureId)
+                            .collect(Collectors.toList()));
+        }
 
         Figure findFigure = figureCacheService.findFigureById(command.figureId());
-
-//        figureCacheService.incrementViewCount(command.figureId());
-
         return FindFigureDetailResponse.from(findFigure);
     }
 
@@ -139,8 +153,8 @@ public class FigureService {
         return figureApiService.syncFigureInfoByName(name);
     }
 
-    public FindFigureDetailResponse findFigureWithCache(Long id) {
-        Figure figure = figureCacheService.findFigureById(id);
-        return FindFigureDetailResponse.from(figure);
-    }
+//    public FindFigureDetailResponse findFigureWithCache(Long id) {
+//        Figure figure = figureCacheService.findFigureById(id);
+//        return FindFigureDetailResponse.from(figure);
+//    }
 }

@@ -18,6 +18,9 @@ import java.util.Optional;
 public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     Optional<Figure> findByName(String name);
+    Optional<Figure> findByFigureId(String figureId);
+    List<Figure> findAllByFigureIdIsNotNull();
+
 
     Page<Figure> findByNameContaining(String keyword, Pageable pageable);
 

@@ -36,7 +36,7 @@ public class FigureController {
     }
 
     @GetMapping("/{figureId}")
-    public ResponseEntity<FindFigureDetailResponse> findFigure(@PathVariable Long figureId) {
+    public ResponseEntity<FindFigureDetailResponse> findFigure(@PathVariable String figureId) {
         FindFigureDetailResponse response = figureService.findFigure(FindFigureCommand.of(figureId));
         return ResponseEntity.ok(response);
     }

@@ -110,7 +110,7 @@ public class FigureApiMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>>
     /**
      * JsonNode에서 텍스트 값 추출
      */
-    private String getTextValue(JsonNode node, String fieldName) {
+    public String getTextValue(JsonNode node, String fieldName) {
         JsonNode field = node.get(fieldName);
         return (field != null && !field.isNull()) ? field.asText() : "";
     }

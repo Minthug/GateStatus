@@ -28,7 +28,7 @@ public class FigureCacheService {
      * @param figureId
      * @return
      */
-    public Figure findFigureById(Long figureId) {
+    public Figure findFigureById(String figureId) {
         String cacheKey = CACHE_KEY_PREFIX + figureId;
 
         Figure cachedFigure = (Figure) redisTemplate.opsForValue().get(cacheKey);
@@ -39,7 +39,7 @@ public class FigureCacheService {
         }
 
         log.info("Cache miss for figure ID: {}, loading from database", figureId);
-        Figure figure = figureRepository.findById(figureId)
+        Figure figure = figureRepository.findByFigureId(figureId)
                 .orElseThrow(() -> new NotFoundFigureException("Figure not found"));
 
         redisTemplate.opsForValue().set(cacheKey, figure, CACHE_TTL, TimeUnit.SECONDS);

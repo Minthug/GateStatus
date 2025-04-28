@@ -24,6 +24,7 @@ public class Figure extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String figureId;
     private String name;
     private String englishName;
     private String birth; // 출생일
