@@ -12,6 +12,7 @@ public enum FigureParty {
     BASIC_INCOME("기본소득당", "진보"),
     TIME_TRANSITION("시대전환", "진보"),
     INDEPENDENT("무소속", "무소속"),
+    REBUILDING_KOR("조국혁신당", "진보"),
     LEFT("진보", "진보"),
     RIGHT("보수", "보수"),
     OTHER("기타", "기타");

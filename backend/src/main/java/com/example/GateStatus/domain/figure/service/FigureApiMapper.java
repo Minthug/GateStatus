@@ -79,7 +79,7 @@ public class FigureApiMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>>
             case "기본소득당" -> FigureParty.BASIC_INCOME;
             case "시대전환" -> FigureParty.TIME_TRANSITION;
             case "무소속" -> FigureParty.INDEPENDENT;
-                default -> FigureParty.OTHER;
+            default -> FigureParty.OTHER;
         };
     }
 

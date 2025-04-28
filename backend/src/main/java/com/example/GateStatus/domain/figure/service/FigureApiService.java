@@ -9,6 +9,7 @@ import com.example.GateStatus.domain.figure.service.response.FigureMapper;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,7 @@ import javax.xml.xpath.XPathFactory;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -175,6 +177,7 @@ public class FigureApiService {
                     Figure figure = figureRepository.findByName(infoDTO.name())
                             .orElseGet(() -> {
                                 log.info("새 국회의원 생성: {}", infoDTO.name());
+                                log.info("국회의원 ID: {}", infoDTO.figureId());
                                 return Figure.builder()
                                         .name(infoDTO.name())
                                         .figureType(FigureType.POLITICIAN)
@@ -216,48 +219,29 @@ public class FigureApiService {
      *
      * @return
      */
-//    private List<FigureInfoDTO> fetchAllFiguresFromApi() {
-//        try {
-//            log.info("전체 국회의원 정보 API 호출 시작");
-//
-//            AssemblyApiResponse<JsonNode> apiResponse = webClient.get()
-//                    .uri(uriBuilder -> uriBuilder
-//                            .path(figureApiPath)
-//                            .queryParam("key", apiKey)
-//                            .build())
-//                    .retrieve()
-//                    .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {})
-//                    .block();
-//
-//            List<FigureInfoDTO> figures = apiMapper.map(apiResponse);
-//            log.info("전체 국회의원 정보 API 호출 완료: {}명", figures.size());
-//
-//            return figures;
-//        } catch (Exception e) {
-//            throw new ApiDataRetrievalException("전체 국회의원 정보를 가져오는 중 오류 발생");
-//        }
-//    }
     private List<FigureInfoDTO> fetchAllFiguresFromApi() {
         try {
             log.info("전체 국회의원 정보 API 호출 시작");
 
             try {
-                String xmlResponse = webClient.get()
+                String jsonResponse = webClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path(figureApiPath)
                                 .queryParam("key", apiKey)
                                 .build())
-                        .accept(MediaType.APPLICATION_XML, MediaType.TEXT_XML)
                         .retrieve()
                         .bodyToMono(String.class)
                         .block();
 
-                log.info("API XML 응답 수신: {}", xmlResponse != null ? xmlResponse.substring(0, Math.min(1000, xmlResponse.length())) : "null");
+                if (jsonResponse == null || jsonResponse.isEmpty()) {
+                    log.error("API에서 빈 응답을 반환했습니다");
+                    throw new ApiDataRetrievalException("API에서 데이터를 가져오지 못했습니다");
+                }
 
-                List<FigureInfoDTO> figures = parseXmlToFigureInfoList(xmlResponse);
-                log.info("국회의원 정보 파싱 완료: {} 명", figures.size());
+                log.info("API 응답 수신(일부): {}",
+                        jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
 
-                return figures;
+                return parseJsonResponse(jsonResponse);
             } catch (Exception e) {
                 log.error("API 호출 자체에서 오류 발생: {}", e.getMessage(), e);
                 throw new ApiDataRetrievalException("API 호출 실패: " + e.getMessage());
@@ -265,6 +249,85 @@ public class FigureApiService {
         } catch (Exception e) {
             log.error("전체 API 처리 과정에서 오류 발생: {}", e.getMessage(), e);
             throw new ApiDataRetrievalException("전체 국회의원 정보를 가져오는 중 오류 발생");
+        }
+    }
+
+    private List<FigureInfoDTO> parseJsonResponse(String jsonResponse) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode rootNode = mapper.readTree(jsonResponse);
+
+            JsonNode rowsNode = rootNode.path("nwvrqwxyaytdsfvhu")
+                    .path(1)
+                    .path("row");
+
+            if (!rowsNode.isArray()) {
+                log.warn("JSON 응답에서 row 배열을 찾을 수 없습니다: {}",
+                        rootNode.path("nwvrqwxyaytdsfvhu").toString().substring(0, 100));
+                return Collections.emptyList();
+            }
+
+            List<FigureInfoDTO> result = new ArrayList<>();
+
+            for (JsonNode row : rowsNode) {
+                try {
+
+                    String figureId = getTextValue(row, "MONA_CD");
+                    String name = getTextValue(row, "HG_NM");
+                    String englishName = getTextValue(row, "ENG_NM");
+                    String birth = getTextValue(row, "BTH_DATE");
+                    String partyNameStr = getTextValue(row, "POLY_NM");
+                    String constituency = getTextValue(row, "ORIG_NM");
+                    String committeeName = getTextValue(row, "CMIT_NM");
+                    String committeePosition = getTextValue(row, "JOB_RES_NM");
+                    String electedCount = getTextValue(row, "REELE_GBN_NM");
+                    String electedDate = getTextValue(row, "UNITS");
+                    String reelection = getTextValue(row, "REELE_GBN_NM");
+                    String email = getTextValue(row, "E_MAIL");
+                    String homepage = getTextValue(row, "HOMEPAGE");
+
+
+                    // 경력 정보
+                    String careerText = getTextValue(row, "MEM_TITLE");
+                    List<String> career = new ArrayList<>();
+                    if (careerText != null && !careerText.isEmpty()) {
+                        String[] lines = careerText.split("\r\n");
+                        for (String line : lines) {
+                            if (line != null && !line.trim().isEmpty()) {
+                                career.add(line.trim());
+                            }
+                        }
+                    }
+                    // 기타 정보 - 실제 응답에 없는 경우 null 또는 빈 리스트로
+                    List<String> education = new ArrayList<>();
+                    String profileUrl = null;
+                    String blog = null;
+                    String facebook = null;
+
+
+                    // 정당명 변환
+                    FigureParty partyName = convertToFigureParty(partyNameStr);
+
+                    FigureInfoDTO dto = new FigureInfoDTO(
+                            figureId, name, englishName, birth, partyName, constituency,
+                            committeeName, committeePosition, electedCount, electedDate,
+                            reelection, profileUrl, education, career,
+                            email, homepage, blog, facebook
+                    );
+
+                    result.add(dto);
+                    log.debug("의원 정보 파싱 성공: {}", name);
+                } catch (Exception e) {
+                    log.warn("국회의원 정보 파싱 중 오류: {}", e.getMessage());
+                }
+            }
+
+
+            log.info("국회의원 정보 파싱 완료: {} 명", result.size());
+            return result;
+        } catch (Exception e) {
+            log.error("JSON 파싱 중 오류 발생: {}", e.getMessage(), e);
+            throw new ApiDataRetrievalException("JSON 파싱 실패: " + e.getMessage());
         }
     }
 
@@ -342,89 +405,6 @@ public class FigureApiService {
         }
     }
 
-    private List<FigureInfoDTO> parseXmlToFigureInfoList(String xmlResponse) {
-        try {
-
-            Document document = Jsoup.parse(xmlResponse, "", Parser.xmlParser());
-            org.jsoup.select.Elements rows = document.select("row");
-
-            List<FigureInfoDTO> result = new ArrayList<>();
-
-            for (org.jsoup.nodes.Element row : rows) {
-                // 필드 추출
-                String figureId = row.selectFirst("MONA_CD").text();
-                String name = row.selectFirst("HG_NM").text();
-                String englishName = row.selectFirst("ENG_NM").text();
-                String birth = row.selectFirst("BTH_DATE").text();
-                String partyNameStr = row.selectFirst("POLY_NM").text();
-                String constituency = row.selectFirst("ORIG_NM").text();
-                String committeeName = row.selectFirst("CMIT_NM").text();
-                String committeePosition = row.selectFirst("JOB_RES_NM").text();
-                String electedCount = row.selectFirst("REELE_GBN_NM").text();
-                String electedDate = row.selectFirst("UNITS").text();
-                String reelection = row.selectFirst("REELE_GBN_NM").text();
-
-                // 연락처 정보
-                String email = row.selectFirst("E_MAIL") != null ? row.selectFirst("E_MAIL").text() : null;
-                String homepage = row.selectFirst("HOMEPAGE") != null ? row.selectFirst("HOMEPAGE").text() : null;
-
-                String careerText = row.selectFirst("MEM_TITLE") != null ? row.selectFirst("MEM_TITLE").text() : "";
-                List<String> career = Arrays.stream(careerText.split("\n"))
-                        .map(String::trim)
-                        .filter(s -> !s.isEmpty())
-                        .collect(Collectors.toList());
-
-                List<String> education = new ArrayList<>();
-
-                FigureParty partyName = null;
-
-
-                // 프로필 URL 등 기타 정보는 이 XML에 없는 것으로 보입니다
-                String profileUrl = null;
-                String blog = null;
-                String facebook = null;
-
-                // DTO 생성
-                    FigureInfoDTO dto = new FigureInfoDTO(
-                            figureId, name, englishName, birth, partyName, constituency,
-                            committeeName, committeePosition, electedCount, electedDate,
-                            reelection, profileUrl, education, career,
-                            email, homepage, blog, facebook
-                    );
-
-                    result.add(dto);
-                }
-            return result;
-            } catch (Exception e) {
-
-            log.error("XML 파싱 중 오류 발생: {}", e.getMessage(), e);
-            throw new ApiDataRetrievalException("XML 파싱 실패: " + e.getMessage());
-        }
-    }
-
-
-    // XML 요소에서 단일 값 추출 (안전하게 처리)
-    private String getElementValue(Element element, String tagName) {
-        try {
-            NodeList nodeList = element.getElementsByTagName(tagName);
-            if (nodeList != null && nodeList.getLength() > 0) {
-                Node node = nodeList.item(0);
-                if (node != null) {
-                    return node.getTextContent().trim();
-                }
-            }
-        } catch (Exception e) {
-            log.debug("태그 {} 추출 중 오류: {}", tagName, e.getMessage());
-        }
-        return null;
-    }
-
-    // 빈 값이 아닌 경우에만 리스트에 추가
-    private void addNonEmptyValue(List<String> list, String value) {
-        if (value != null && !value.trim().isEmpty()) {
-            list.add(value.trim());
-        }
-    }
 
     // 문자열을 구분자로 분리하여 리스트에 추가
     private void splitAndAddToList(List<String> list, String value) {
@@ -442,19 +422,34 @@ public class FigureApiService {
     // 문자열을 FigureParty 열거형으로 변환
     private FigureParty convertToFigureParty(String partyName) {
         if (partyName == null || partyName.isEmpty()) {
-            return null;
+            return FigureParty.OTHER;
         }
 
-        // 정당명 매핑 (실제 정당 이름과 열거형 값 매핑이 필요)
         try {
-            // 여기에 특정 문자열을 FigureParty 열거형으로 매핑하는 로직 추가
-            // 예시: if(partyName.contains("더불어민주당")) return FigureParty.DEMOCRATIC;
-
-            // 기본적으로 문자열 그대로 변환 시도
-            return FigureParty.valueOf(partyName.toUpperCase().replace(" ", "_"));
+            return switch (partyName.trim()) {
+                case "더불어민주당" -> FigureParty.DEMOCRATIC;
+                case "국민의힘" -> FigureParty.PEOPLE_POWER;
+                case "정의당" -> FigureParty.JUSTICE;
+                case "국민의당" -> FigureParty.PEOPLES;
+                case "기본소득당" -> FigureParty.BASIC_INCOME;
+                case "시대전환" -> FigureParty.TIME_TRANSITION;
+                case "무소속" -> FigureParty.INDEPENDENT;
+                default -> FigureParty.OTHER;
+            };
         } catch (Exception e) {
-            log.warn("정당명 변환 실패: {}", partyName);
-            return null; // 또는 기본값 반환
+        log.warn("정당명 변환 실패: {}", partyName);
+        return null; // 또는 기본값 반환
         }
+    }
+
+    /**
+     * JsonNode에서 특정 필드의 텍스트 값 추출
+     * @param node
+     * @param fieldName
+     * @return
+     */
+    public static String getTextValue(JsonNode node, String fieldName) {
+        JsonNode field = node.get(fieldName);
+        return (field != null && !field.isNull()) ? field.asText() : "";
     }
 }
