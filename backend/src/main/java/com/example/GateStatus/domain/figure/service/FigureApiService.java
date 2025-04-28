@@ -12,13 +12,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.parser.Parser;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Node;
@@ -31,7 +33,9 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -164,7 +168,6 @@ public class FigureApiService {
             }
 
             int count = 0;
-            // 각 국회의원 정보 처리 및 저장
             for (FigureInfoDTO infoDTO : allFigures) {
                 try {
                     log.info("국회의원 정보 처리 중: {}", infoDTO.name());
@@ -341,70 +344,47 @@ public class FigureApiService {
 
     private List<FigureInfoDTO> parseXmlToFigureInfoList(String xmlResponse) {
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document document = builder.parse(new InputSource(new StringReader(xmlResponse)));
 
-            document.getDocumentElement().normalize();
-
-            XPath xpath = XPathFactory.newInstance().newXPath();
-
-            String expression = "//row";
-            NodeList nodeList = (NodeList) xpath.evaluate(expression, document, XPathConstants.NODESET);
+            Document document = Jsoup.parse(xmlResponse, "", Parser.xmlParser());
+            org.jsoup.select.Elements rows = document.select("row");
 
             List<FigureInfoDTO> result = new ArrayList<>();
 
-            for (int i = 0; i < nodeList.getLength(); i++) {
-                Node node = nodeList.item(i);
-                if (node.getNodeType() == Node.ELEMENT_NODE) {
-                    Element element = (Element) node;
+            for (org.jsoup.nodes.Element row : rows) {
+                // 필드 추출
+                String figureId = row.selectFirst("MONA_CD").text();
+                String name = row.selectFirst("HG_NM").text();
+                String englishName = row.selectFirst("ENG_NM").text();
+                String birth = row.selectFirst("BTH_DATE").text();
+                String partyNameStr = row.selectFirst("POLY_NM").text();
+                String constituency = row.selectFirst("ORIG_NM").text();
+                String committeeName = row.selectFirst("CMIT_NM").text();
+                String committeePosition = row.selectFirst("JOB_RES_NM").text();
+                String electedCount = row.selectFirst("REELE_GBN_NM").text();
+                String electedDate = row.selectFirst("UNITS").text();
+                String reelection = row.selectFirst("REELE_GBN_NM").text();
 
-                    // 필수 필드 추출
-                    String figureId = getElementValue(element, "MONA_CD");
-                    String name = getElementValue(element, "HG_NM");
+                // 연락처 정보
+                String email = row.selectFirst("E_MAIL") != null ? row.selectFirst("E_MAIL").text() : null;
+                String homepage = row.selectFirst("HOMEPAGE") != null ? row.selectFirst("HOMEPAGE").text() : null;
 
-                    // 소속 정당 처리 (문자열에서 열거형으로 변환)
-                    String partyNameStr = getElementValue(element, "POLY_NM");
-                    FigureParty partyName = convertToFigureParty(partyNameStr);
+                String careerText = row.selectFirst("MEM_TITLE") != null ? row.selectFirst("MEM_TITLE").text() : "";
+                List<String> career = Arrays.stream(careerText.split("\n"))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toList());
 
-                    // 기본 정보 추출
-                    String englishName = getElementValue(element, "ENG_NM");
-                    String birth = getElementValue(element, "BTH_DATE");
-                    String constituency = getElementValue(element, "ORIG_NM");
-                    String committeeName = getElementValue(element, "CMIT_NM");
-                    String committeePosition = getElementValue(element, "CMITS_NM");
-                    String electedCount = getElementValue(element, "REELE_GBN_NM");
-                    String electedDate = getElementValue(element, "UNITS_NM");
-                    String reelection = getElementValue(element, "REELE_GBN_NM");
-                    String profileUrl = getElementValue(element, "IMAGE_URL"); // 또는 "PROFILE_URL"
+                List<String> education = new ArrayList<>();
 
-                    // 연락처 정보
-                    String email = getElementValue(element, "E_MAIL");
-                    String homepage = getElementValue(element, "HOMEPAGE");
-                    String blog = getElementValue(element, "BLOG");
-                    String facebook = getElementValue(element, "FACEBOOK");
+                FigureParty partyName = null;
 
-                    // 학력 및 경력 정보 (여러 항목이 있을 수 있음)
-                    List<String> education = new ArrayList<>();
-                    List<String> career = new ArrayList<>();
 
-                    // 학력 태그가 여러 개 있을 수 있음 (EDU1, EDU2, EDU3 등)
-                    addNonEmptyValue(education, getElementValue(element, "EDU"));
-                    addNonEmptyValue(education, getElementValue(element, "EDU1"));
-                    addNonEmptyValue(education, getElementValue(element, "EDU2"));
-                    addNonEmptyValue(education, getElementValue(element, "EDU3"));
+                // 프로필 URL 등 기타 정보는 이 XML에 없는 것으로 보입니다
+                String profileUrl = null;
+                String blog = null;
+                String facebook = null;
 
-                    // 경력 태그가 여러 개 있을 수 있음 (CAREER1, CAREER2, CAREER3 등)
-                    addNonEmptyValue(career, getElementValue(element, "CAREER"));
-                    addNonEmptyValue(career, getElementValue(element, "CAREER1"));
-                    addNonEmptyValue(career, getElementValue(element, "CAREER2"));
-                    addNonEmptyValue(career, getElementValue(element, "CAREER3"));
-
-                    // 전체 경력 문자열에서 개별 항목 분리 (세미콜론이나 다른 구분자로 구분되어 있을 수 있음)
-                    splitAndAddToList(education, getElementValue(element, "EDU_CAREERS"));
-                    splitAndAddToList(career, getElementValue(element, "MEM_CAREERS"));
-
-                    // DTO 생성
+                // DTO 생성
                     FigureInfoDTO dto = new FigureInfoDTO(
                             figureId, name, englishName, birth, partyName, constituency,
                             committeeName, committeePosition, electedCount, electedDate,
@@ -414,9 +394,9 @@ public class FigureApiService {
 
                     result.add(dto);
                 }
-            }
             return result;
-        } catch (Exception e) {
+            } catch (Exception e) {
+
             log.error("XML 파싱 중 오류 발생: {}", e.getMessage(), e);
             throw new ApiDataRetrievalException("XML 파싱 실패: " + e.getMessage());
         }
