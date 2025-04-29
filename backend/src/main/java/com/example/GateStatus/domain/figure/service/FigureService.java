@@ -14,6 +14,7 @@ import com.example.GateStatus.global.kubernetes.KubernetesProperties;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -81,8 +82,8 @@ public class FigureService {
         }
 
         Figure findFigure = figureCacheService.findFigureById(command.figureId());
-//        Figure findFigure = figureRepository.findByFigureId(command.figureId())
-//                .orElseThrow(() -> new EntityNotFoundException("해당 국회의원을 찾을 수 없습니다" + command.figureId()));
+
+
 
         return FindFigureDetailResponse.from(findFigure);
     }

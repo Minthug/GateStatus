@@ -5,6 +5,8 @@ import com.example.GateStatus.domain.figure.exception.NotFoundFigureException;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ public class FigureCacheService {
      * @param figureId
      * @return
      */
+    @Cacheable(value = "figures", key = "#figureId")
     public Figure findFigureById(String figureId) {
         String cacheKey = CACHE_KEY_PREFIX + figureId;
 
@@ -51,6 +54,7 @@ public class FigureCacheService {
      * Figure 정보 업데이트 시 캐시 갱신
      * @param figure
      */
+    @CacheEvict(value = "figures", key = "#figure.figureId")
     public void updateFigureCache(Figure figure) {
         String cacheKey = CACHE_KEY_PREFIX + figure.getId();
         redisTemplate.opsForValue().set(cacheKey, figure, CACHE_TTL, TimeUnit.SECONDS);
