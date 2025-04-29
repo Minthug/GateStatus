@@ -10,6 +10,7 @@ import com.example.GateStatus.domain.figure.service.request.SyncFigureRequest;
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
 import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
 import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
+import com.example.GateStatus.domain.figure.service.response.SyncPartyResponse;
 import com.example.GateStatus.domain.figure.service.response.UpdateFigureResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -81,5 +82,11 @@ public class FigureController {
     public ResponseEntity<Map<String, Integer>> syncAllFigures() {
         int count = figureApiService.syncAllFigures();
         return ResponseEntity.ok(Map.of("syncCount", count));
+    }
+
+    @PostMapping("/sync/party")
+    public ResponseEntity<SyncPartyResponse> syncFiguresByParty(@RequestParam String partyName) {
+        int syncedCount = figureApiService.syncFigureByParty(partyName);
+        return ResponseEntity.ok(new SyncPartyResponse(partyName, syncedCount));
     }
 }

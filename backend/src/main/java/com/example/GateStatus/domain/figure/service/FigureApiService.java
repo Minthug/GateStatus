@@ -130,6 +130,7 @@ public class FigureApiService {
                     Figure figure = figureRepository.findByFigureId(infoDTO.figureId())
                             .orElseGet(() -> {
                                 log.info("새 국회의원 생성: {}", infoDTO.name());
+                                log.info("figureId: {}", infoDTO.figureId());
                                 return Figure.builder()
                                         .figureId(infoDTO.figureId())
                                         .name(infoDTO.name())
