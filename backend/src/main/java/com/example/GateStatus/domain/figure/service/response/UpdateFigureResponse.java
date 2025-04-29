@@ -9,6 +9,7 @@ import java.util.List;
 
 public record UpdateFigureResponse(
         Long id,
+        String figureId,
         String name,
         String englishName,
         String birth,
@@ -24,6 +25,7 @@ public record UpdateFigureResponse(
     public static UpdateFigureResponse from(Figure figure) {
         return new UpdateFigureResponse(
                 figure.getId(),
+                figure.getFigureId(),
                 figure.getName(),
                 figure.getEnglishName(),
                 figure.getBirth(),

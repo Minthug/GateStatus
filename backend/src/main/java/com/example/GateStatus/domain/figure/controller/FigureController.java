@@ -64,7 +64,7 @@ public class FigureController {
     }
 
     @DeleteMapping("/{figureId}")
-    public ResponseEntity<Void> deleteFigure(@PathVariable Long figureId) {
+    public ResponseEntity<Void> deleteFigure(@PathVariable String figureId) {
         figureService.deleteFigure(figureId);
         return ResponseEntity.noContent().build();
     }

@@ -3,6 +3,7 @@ package com.example.GateStatus.domain.figure.repository;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
+import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -44,4 +45,6 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
     List<Figure> findByTagName(@Param("tagName") String tagName);
 
     List<Figure> findTop10ByOrderByModifiedDateDesc();
+
+    void delete(String figureId);
 }

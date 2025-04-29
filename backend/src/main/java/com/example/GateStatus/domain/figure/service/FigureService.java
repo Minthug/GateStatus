@@ -7,15 +7,14 @@ import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.request.FindFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.RegisterFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
-import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
-import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
-import com.example.GateStatus.domain.figure.service.response.UpdateFigureResponse;
+import com.example.GateStatus.domain.figure.service.response.*;
 import com.example.GateStatus.global.kubernetes.KubernetesProperties;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -103,9 +102,20 @@ public class FigureService {
         return figures.map(FindFigureDetailResponse::from);
     }
 
-    private Figure findFigureById(Long figureId) {
-        return figureRepository.findById(figureId)
-                .orElseThrow(() -> new NotFoundFigureException("Figure not found"));
+    @Transactional(readOnly = true)
+    public FigureDTO findFigureById(String figureId) {
+        try {
+            Figure figure = figureRepository.findByFigureId(figureId)
+                    .orElseThrow(() -> new EntityNotFoundException("해당 국회의원을 찾을 수 없습니다: " + figureId));
+
+            // 캐시 업데이트
+            figureCacheService.updateFigureCache(figure);
+
+            return FigureDTO.from(figure);
+        } catch (Exception e) {
+            log.error("국회의원 조회 중 오류 발생: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -116,33 +126,38 @@ public class FigureService {
                 .collect(Collectors.toList());
     }
 
-    @Transactional
-    public UpdateFigureResponse updateFigure(Long figureId, UpdateFigureCommand command) {
-        Figure figure = findFigureById(figureId);
-        figure.update(
-                command.name(),
-                command.englishName(),
-                command.birth(),
-                command.place(),
-                command.profileUrl(),
-                command.figureType(),
-                command.figureParty(),
-                command.education(),
-                command.careers(),
-                command.sites(),
-                command.activities(),
-                command.updateSource()
-        );
+//    @Transactional
+//    public UpdateFigureResponse updateFigure(Long figureId, UpdateFigureCommand command) {
+//        Figure figure = findFigureById(figureId);
+//        figure.update(
+//                command.name(),
+//                command.englishName(),
+//                command.birth(),
+//                command.place(),
+//                command.profileUrl(),
+//                command.figureType(),
+//                command.figureParty(),
+//                command.education(),
+//                command.careers(),
+//                command.sites(),
+//                command.activities(),
+//                command.updateSource()
+//        );
+//
+//        figureCacheService.updateFigureCache(figure);
+//
+//        return UpdateFigureResponse.from(figure);
+//    }
 
-        figureCacheService.updateFigureCache(figure);
-
-        return UpdateFigureResponse.from(figure);
+    @CacheEvict(value = {"figures", "figure-dtos"}, key = "#figure.figureId")
+    public void updateCache(Figure figure) {
+        log.info("Cache evicted for figure ID: {}", figure.getFigureId());
     }
 
+
     @Transactional
-    public void deleteFigure(Long figureId) {
-        Figure findFigure = findFigureById(figureId);
-        figureRepository.delete(findFigure);
+    public void deleteFigure(String figureId) {
+        figureRepository.delete(figureId);
 
         figureCacheService.evictFigureCache(figureId);
     }
@@ -158,8 +173,8 @@ public class FigureService {
         return figureApiService.syncFigureInfoByName(name);
     }
 
-//    public FindFigureDetailResponse findFigureWithCache(Long id) {
-//        Figure figure = figureCacheService.findFigureById(id);
-//        return FindFigureDetailResponse.from(figure);
-//    }
+    @CacheEvict(value = {"figures", "figure-dtos"}, allEntries = true)
+    public void clearAllCaches() {
+        log.info("All figure caches cleared");
+    }
 }

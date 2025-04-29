@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.figure.service.response;
 
+import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
 
 import java.util.ArrayList;

@@ -65,7 +65,7 @@ public class FigureCacheService {
      * Figure 삭제 시 캐시 삭제
      * @param figureId
      */
-    public void evictFigureCache(Long figureId) {
+    public void evictFigureCache(String figureId) {
         String cacheKey = CACHE_KEY_PREFIX + figureId;
         redisTemplate.delete(cacheKey);
         log.info("Evicted cache for Figure ID: {}", figureId);
