@@ -3,16 +3,15 @@ package com.example.GateStatus.domain.figure.controller;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
+import com.example.GateStatus.domain.figure.service.FigureCacheService;
 import com.example.GateStatus.domain.figure.service.FigureService;
 import com.example.GateStatus.domain.figure.service.request.FindFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.RegisterFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.SyncFigureRequest;
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
-import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
-import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
-import com.example.GateStatus.domain.figure.service.response.SyncPartyResponse;
-import com.example.GateStatus.domain.figure.service.response.UpdateFigureResponse;
+import com.example.GateStatus.domain.figure.service.response.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
@@ -25,10 +24,12 @@ import java.util.Map;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/v1/figures")
+@Slf4j
 public class FigureController {
 
     private final FigureService figureService;
     private final FigureApiService figureApiService;
+    private final FigureCacheService figureCacheService;
 
     @PostMapping
     public ResponseEntity<RegisterFigureResponse> registerFigure(@RequestBody RegisterFigureCommand command) {
@@ -37,9 +38,11 @@ public class FigureController {
     }
 
     @GetMapping("/{figureId}")
-    public ResponseEntity<FindFigureDetailResponse> findFigure(@PathVariable String figureId) {
-        FindFigureDetailResponse response = figureService.findFigure(FindFigureCommand.of(figureId));
-        return ResponseEntity.ok(response);
+    public ResponseEntity<FigureDTO> findFigure(@PathVariable String figureId) {
+        log.info("국회의원 조회 요청: {}", figureId);
+
+        FigureDTO figure = figureCacheService.findFigureDtoById(figureId);
+        return ResponseEntity.ok(figure);
     }
 
     @GetMapping
@@ -56,18 +59,17 @@ public class FigureController {
         return ResponseEntity.ok(figureService.findFiguresByType(figureType));
     }
 
-    @PatchMapping("/{figureId}")
-    public ResponseEntity<UpdateFigureResponse> updateFigure(@PathVariable Long figureId,
-                                                             @RequestBody UpdateFigureCommand figureCommand) {
-        UpdateFigureResponse response = figureService.updateFigure(figureId, figureCommand);
-        return ResponseEntity.ok(response);
-    }
+//    @PatchMapping("/{figureId}")
+//    public ResponseEntity<UpdateFigureResponse> updateFigure(@PathVariable String figureId) {
+//        UpdateFigureResponse response = figureService.updateCache(figureId);
+//        return ResponseEntity.ok(response);
+//    }
 
-    @DeleteMapping("/{figureId}")
-    public ResponseEntity<Void> deleteFigure(@PathVariable String figureId) {
-        figureService.deleteFigure(figureId);
-        return ResponseEntity.noContent().build();
-    }
+//    @DeleteMapping("/{figureId}")
+//    public ResponseEntity<Void> deleteFigure(@PathVariable String figureId) {
+//        figureService.deleteFigure(figureId);
+//        return ResponseEntity.noContent().build();
+//    }
 
 
     @PostMapping("/sync")

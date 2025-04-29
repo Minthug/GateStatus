@@ -3,6 +3,8 @@ package com.example.GateStatus.domain.figure.service;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.exception.NotFoundFigureException;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.figure.service.response.FigureDTO;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -10,6 +12,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -99,4 +102,14 @@ public class FigureCacheService {
 //            redisTemplate.opsForValue().set(cacheKey, cachedIssue, CACHE_TTL, TimeUnit.SECONDS);
 //        }
 //    }
+
+    @Cacheable(value = "figure-dtos", key = "#figureId", unless = "#result == null")
+    @Transactional(readOnly = true)
+    public FigureDTO findFigureDtoById(String figureId) {
+        log.info("Cache miss for figure DTO ID: {}", figureId);
+        Figure figure = figureRepository.findByFigureId(figureId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 국회의원을 찾을 수 없습니다: " + figureId));
+        return FigureDTO.from(figure);
+    }
+
 }

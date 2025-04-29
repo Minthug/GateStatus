@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.figure.service;
 
+import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
@@ -19,6 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -226,7 +231,17 @@ public class FigureApiService {
             for (JsonNode row : rowsNode) {
                 try {
                     String figureId = apiMapper.getTextValue(row, "MONA_CD");
+
+                    if (figureId == null || figureId.isEmpty()) {
+                        log.warn("유효하지 않은 figureID, 건너뜁니다");
+                    }
+
                     String name = apiMapper.getTextValue(row, "HG_NM");
+
+                    if (name == null || name.isEmpty()) {
+                        log.warn("유효하지 않은 이름, figureID: {}", figureId);
+                        continue;
+                    }
                     String englishName = apiMapper.getTextValue(row, "ENG_NM");
                     String birth = apiMapper.getTextValue(row, "BTH_DATE");
                     String partyNameStr = apiMapper.getTextValue(row, "POLY_NM");
@@ -240,23 +255,13 @@ public class FigureApiService {
                     String homepage = apiMapper.getTextValue(row, "HOMEPAGE");
 
 
-                    // 경력 정보
-                    String careerText = apiMapper.getTextValue(row, "MEM_TITLE");
-                    List<String> career = new ArrayList<>();
-                    if (careerText != null && !careerText.isEmpty()) {
-                        String[] lines = careerText.split("\r\n");
-                        for (String line : lines) {
-                            if (line != null && !line.trim().isEmpty()) {
-                                career.add(line.trim());
-                            }
-                        }
-                    }
+                    List<Career> career = extractCareerList(apiMapper.getTextValue(row, "MEM_TITLE"));
+
                     // 기타 정보 - 실제 응답에 없는 경우 null 또는 빈 리스트로
                     List<String> education = new ArrayList<>();
                     String profileUrl = null;
                     String blog = null;
                     String facebook = null;
-
 
                     // 정당명 변환
                     FigureParty partyName = convertToFigureParty(partyNameStr);
@@ -283,6 +288,79 @@ public class FigureApiService {
             throw new ApiDataRetrievalException("JSON 파싱 실패: " + e.getMessage());
         }
     }
+
+    private List<Career> extractCareerList(String careerText) {
+        List<Career> careers = new ArrayList<>();
+        if (careerText == null || careerText.isEmpty()) {
+            return careers;
+        }
+        String[] lines = careerText.split("\r\n");
+
+        for (String line : lines) {
+            if (line == null || line.trim().isEmpty()) {
+                continue;
+            }
+
+            try {
+                String[] parts = line.trim().split(" / ");
+
+                if (parts.length < 2) {
+                    log.warn("경력 정보 파싱 실패: {}", line);
+                    continue;
+                }
+
+                String[] periodParts = parts[0].split(" ~ ");
+                LocalDate startDate = parseDateOrNull(periodParts[0]);
+                LocalDate endDate = periodParts.length > 1 && !"현재".equals(periodParts[1])
+                        ? parseDateOrNull(periodParts[1])
+                        : null;
+
+                String position = parts.length > 1 ? parts[1] : "";
+                String organization = parts.length > 2 ? parts[2] : "";
+
+                Career career = Career.of(
+                        line,
+                        position,
+                        organization,
+                        startDate,
+                        endDate
+                );
+
+                careers.add(career);
+            } catch (Exception e) {
+                log.warn("경력 정보 파싱 중 오류: {}, 오류: {}", line, e.getMessage());
+            }
+        }
+        return careers;
+    }
+
+    private LocalDate parseDateOrNull(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty() || "현재".equals(dateStr.trim())) {
+            return null;
+        }
+
+        try {
+            DateTimeFormatter[] formatters = {
+                    DateTimeFormatter.ofPattern("yyyy.MM"),
+                    DateTimeFormatter.ofPattern("yyyy-MM"),
+                    DateTimeFormatter.ofPattern("yyyy/MM")
+            };
+
+            for (DateTimeFormatter formatter : formatters) {
+                try {
+                    return LocalDate.parse(dateStr.trim() + "-01", formatter.withResolverStyle(ResolverStyle.STRICT));
+                } catch (DateTimeParseException e) {
+
+                }
+            }
+
+            log.warn("날짜 파싱 실패: {}", dateStr);
+            return null;
+        } catch (Exception e) {
+            log.warn("날짜 파싱 중 오류: {}, 오류: {}", dateStr, e.getMessage());
+            return null;
+        }
+     }
 
     /**
      * 특정 정당 소속 국회의원 정보를 동기화합니다
@@ -390,9 +468,8 @@ public class FigureApiService {
                 default -> FigureParty.OTHER;
             };
         } catch (Exception e) {
-        log.warn("정당명 변환 실패: {}", partyName);
-        return null; // 또는 기본값 반환
+            log.warn("정당명 변환 실패: {}", partyName);
+            return null; // 또는 기본값 반환
         }
     }
-
 }

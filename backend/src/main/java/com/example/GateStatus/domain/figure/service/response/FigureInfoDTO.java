@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.figure.service.response;
 
+import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
 
@@ -40,7 +41,7 @@ public record FigureInfoDTO(String figureId,          // 의원 코드
                             String reelection,        // 재선 여부
                             String profileUrl,        // 프로필 사진 URL
                             List<String> education,   // 학력
-                            List<String> career,      // 경력
+                            List<Career> career,      // 경력
                             String email,             // 이메일
                             String homepage,          // 홈페이지
                             String blog,              // 블로그

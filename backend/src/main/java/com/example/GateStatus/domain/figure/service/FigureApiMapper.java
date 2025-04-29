@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.figure.service;
 
+import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.global.config.exception.ApiMappingException;
@@ -8,8 +9,13 @@ import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -18,6 +24,7 @@ import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class FigureApiMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
 
     private final ObjectMapper objectMapper;
@@ -35,6 +42,7 @@ public class FigureApiMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>>
             if (dataArray.isArray()) {
                 for (JsonNode item : dataArray) {
                     String partyNameStr = getTextValue(item, "POLY_MM");
+                    String careersText = getTextValue(item, "MEM_TITLE");
                     FigureParty partyName = convertToFigureParty(partyNameStr);
 
                     FigureInfoDTO dto = new FigureInfoDTO(
@@ -51,7 +59,7 @@ public class FigureApiMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>>
                             getTextValue(item, "REELE_NM"),
                             getTextValue(item, "IMAGE_URL"),
                             parseEducation(item),
-                            parseCareer(item),
+                            parseCareer(careersText),
                             getTextValue(item, "EMAIL"),
                             getTextValue(item, "HOMEPAGE"),
                             getTextValue(item, "BLOG_URL"),
@@ -95,16 +103,83 @@ public class FigureApiMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>>
                 .collect(Collectors.toList());
     }
 
-    private List<String> parseCareer(JsonNode item) {
-        String career = getTextValue(item, "CAREER");
-        if (career == null || career.isEmpty()) {
-            return Collections.emptyList();
+    private List<Career> parseCareer(String careersText) {
+        List<Career> careers = new ArrayList<>();
+        if (careersText == null || careersText.isEmpty()) {
+            return careers;
         }
 
-        return Arrays.stream(career.split("\\n|\\r\\n|,|;"))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toList());
+        String[] lines = careersText.split("\r\n");
+
+        for (String line : lines) {
+            if (line == null || line.trim().isEmpty()) {
+                continue;
+            }
+
+            try {
+                // 경력 정보 파싱 로직
+                String[] parts = line.trim().split(" / ");
+
+                if (parts.length < 2) {
+                    log.warn("경력 정보 파싱 실패: {}", line);
+                    continue;
+                }
+
+                // 기간 파싱
+                String[] periodParts = parts[0].split(" ~ ");
+                LocalDate startDate = parseDateOrNull(periodParts[0]);
+                LocalDate endDate = periodParts.length > 1 && !"현재".equals(periodParts[1])
+                        ? parseDateOrNull(periodParts[1])
+                        : null;
+
+                // 직위와 소속 결정
+                String position = parts.length > 1 ? parts[1] : "";
+                String organization = parts.length > 2 ? parts[2] : "";
+
+                Career career = Career.of(
+                        line,           // title
+                        position,       // position
+                        organization,   // organization
+                        startDate,      // startDate
+                        endDate         // endDate
+                );
+
+                careers.add(career);
+            } catch (Exception e) {
+                log.warn("경력 정보 파싱 중 오류: {}, 오류: {}", line, e.getMessage());
+            }
+        }
+
+        return careers;
+    }
+    private LocalDate parseDateOrNull(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty() || "현재".equals(dateStr.trim())) {
+            return null;
+        }
+
+        try {
+            // 다양한 날짜 형식 지원
+            DateTimeFormatter[] formatters = {
+                    DateTimeFormatter.ofPattern("yyyy.MM"),
+                    DateTimeFormatter.ofPattern("yyyy-MM"),
+                    DateTimeFormatter.ofPattern("yyyy/MM")
+            };
+
+            for (DateTimeFormatter formatter : formatters) {
+                try {
+                    return LocalDate.parse(dateStr.trim() + "-01",
+                            formatter.withResolverStyle(ResolverStyle.STRICT));
+                } catch (DateTimeParseException e) {
+                    // 현재 포맷터로 파싱 실패하면 다음 포맷터 시도
+                }
+            }
+
+            log.warn("날짜 파싱 실패: {}", dateStr);
+            return null;
+        } catch (Exception e) {
+            log.warn("날짜 파싱 중 오류: {}, 오류: {}", dateStr, e.getMessage());
+            return null;
+        }
     }
 
     /**

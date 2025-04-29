@@ -155,12 +155,12 @@ public class FigureService {
     }
 
 
-    @Transactional
-    public void deleteFigure(String figureId) {
-        figureRepository.delete(figureId);
-
-        figureCacheService.evictFigureCache(figureId);
-    }
+//    @Transactional
+//    public void deleteFigure(String figureId) {
+//        figureRepository.delete(figureId);
+//
+//        figureCacheService.evictFigureCache(figureId);
+//    }
 
     @Transactional(readOnly = true)
     public List<FindFigureDetailResponse> getPopularFigures(int limit) {
