@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.annotations.CollectionId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
@@ -77,7 +78,7 @@ public class FigureApiService {
             String jsonResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(figureApiPath)
-                            .queryParam("KEY", apiKey,)
+                            .queryParam("KEY", apiKey)
                             .queryParam("HG_NM", figureName)
                             .build())
                     .retrieve()
@@ -105,7 +106,7 @@ public class FigureApiService {
     public int syncAllFigureV2() {
         log.info("모든 국회의원 정보를 동기화 합니다");
 
-        List<FigureInfoDTO> allFigures = fetchAllFiguresFromApi();
+        List<FigureInfoDTO> allFigures = fetchAllFiguresFromAPiV2();
         if (allFigures.isEmpty()) {
             log.warn("동기화할 국회의원이 없습니다");
             return 0;
@@ -181,7 +182,16 @@ public class FigureApiService {
      * @return
      */
     private Figure findOrCreateFigure(FigureInfoDTO info) {
-
+        return figureRepository.findByFigureId(info.figureId())
+                .orElseGet(() -> {
+                    log.info("새 국회의원 생성: {}", info.name());
+                    return Figure.builder()
+                            .figureId(info.figureId())
+                            .name(info.name())
+                            .figureType(FigureType.POLITICIAN)
+                            .viewCount(0L)
+                            .build();
+                });
     }
 
     /**
@@ -306,7 +316,34 @@ public class FigureApiService {
         }
     }
 
-    public List<FigureInfoDTO> parseJsonResponse(String jsonResponse) {
+    private List<FigureInfoDTO> fetchAllFiguresFromAPiV2() {
+        log.info("전체 국회의원 정보 API 호출 시작");
+
+        try {
+            String jsonResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(figureApiPath)
+                            .queryParam("KEY", apiKey)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            if (isEmpty(jsonResponse)) {
+                log.error("API에서 빈 응답을 반환");
+                return Collections.emptyList();
+            }
+
+            log.info("API 응답 수신 (일부): {}", jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
+
+            return parseJsonResponse(jsonResponse);
+        } catch (Exception e) {
+            log.error("전체 국회의원 정보 조회 중 오류: {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
+    }
+
+    private List<FigureInfoDTO> parseJsonResponse(String jsonResponse) {
         try {
             JsonNode rootNode = mapper.readTree(jsonResponse);
             JsonNode rowsNode = rootNode.path("nwvrqwxyaytdsfvhu")

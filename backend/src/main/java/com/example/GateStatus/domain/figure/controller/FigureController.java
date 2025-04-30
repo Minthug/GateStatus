@@ -82,7 +82,7 @@ public class FigureController {
     @PostMapping("/sync/all")
 //    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Integer>> syncAllFigures() {
-        int count = figureApiService.syncAllFigures();
+        int count = figureApiService.syncAllFigureV2();
         return ResponseEntity.ok(Map.of("syncCount", count));
     }
 

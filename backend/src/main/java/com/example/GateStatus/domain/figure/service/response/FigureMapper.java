@@ -4,13 +4,17 @@ import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class FigureMapper {
 
     public void updateFigureFromDTO(Figure figure, FigureInfoDTO dto) {
@@ -59,13 +63,9 @@ public class FigureMapper {
                     .build());
         }
 
-        if (dto.career() != null) {
-            for (String careerText : dto.career()) {
-                Career parsedCareer = parseCareerText(careerText);
-                if (parsedCareer != null) {
-                    careers.add(parsedCareer);
-                }
-            }
+        // 기존 경력 정보가 이미 Career 리스트라면 그대로 추가
+        if (dto.career() != null && !dto.career().isEmpty() && dto.career().get(0) instanceof Career) {
+            careers.addAll((List<Career>) dto.career());
         }
         return careers;
     }
