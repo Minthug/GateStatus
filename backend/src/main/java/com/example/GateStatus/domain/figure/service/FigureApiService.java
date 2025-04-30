@@ -69,32 +69,33 @@ public class FigureApiService {
     }
 
     private FigureInfoDTO fetchFigureInfoFromApi(String figureName) {
-        try {
-            log.info("국회의원 정보 API 호출 시작: {}", figureName);
+        log.info("국회의원 정보 API 호출 시작: {}", figureName);
 
-            AssemblyApiResponse<JsonNode> apiResponse = webClient.get()
+        try {
+            String jsonResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(figureApiPath)
-                            .queryParam("KEY", apiKey)
+                            .queryParam("KEY", apiKey,)
                             .queryParam("HG_NM", figureName)
                             .build())
                     .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {
-                    })
+                    .bodyToMono(String.class)
                     .block();
 
-            log.info("API 응답 데이터:", apiResponse);
-            List<FigureInfoDTO> figures = apiMapper.map(apiResponse);
-
-            log.info("전체 국회의원 정보 API 호출 완료: {}명", figures.size());
-
-            if (figures.isEmpty()) {
+            if (isEmpty(jsonResponse)) {
+                log.warn("API에서 빈 응답 또는 null 반환 (이름: {}) ", figureName);
                 return null;
             }
 
-            return figures.get(0);
+            log.debug("API 응답 수신 일부: {}", jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
+
+            List<FigureInfoDTO> figures = parseJsonResponse(jsonResponse);
+            log.info("국회의원 정보 조회 결과: {} 명 ", figures.size());
+
+            return figures.isEmpty() ? null : figures.get(0);
         } catch (Exception e) {
-            throw new ApiDataRetrievalException("국회의원 정보를 가져오는 중 오류 발생");
+            log.error("국회의원 정보 조회 중 오류: {} - {} ", figureName, e.getMessage(), e);
+            throw new ApiDataRetrievalException("국회의원 정보를 가져오는 중 오류 발생: " + e.getMessage());
         }
     }
 
