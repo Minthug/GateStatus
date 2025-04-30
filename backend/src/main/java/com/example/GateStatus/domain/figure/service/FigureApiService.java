@@ -8,6 +8,7 @@ import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.domain.figure.service.response.FigureMapper;
+import com.example.GateStatus.domain.figure.sync.SyncStats;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -36,6 +37,7 @@ public class FigureApiService {
     private final FigureRepository figureRepository;
     private final FigureMapper figureMapper;
     private final CareerParser careerParser;
+    private final SyncStats stats;
 
 
     @Value("${spring.openapi.assembly.url}")
@@ -97,6 +99,99 @@ public class FigureApiService {
             log.error("국회의원 정보 조회 중 오류: {} - {} ", figureName, e.getMessage(), e);
             throw new ApiDataRetrievalException("국회의원 정보를 가져오는 중 오류 발생: " + e.getMessage());
         }
+    }
+
+    @Transactional
+    public int syncAllFigureV2() {
+        log.info("모든 국회의원 정보를 동기화 합니다");
+
+        List<FigureInfoDTO> allFigures = fetchAllFiguresFromApi();
+        if (allFigures.isEmpty()) {
+            log.warn("동기화할 국회의원이 없습니다");
+            return 0;
+        }
+
+        log.info("동기화 대상 국회의원: {} 명 ", allFigures.size());
+        if (!allFigures.isEmpty()) {
+            logSampleFigure(allFigures.get(0));
+        }
+
+        // 각 국회의원 정보 처리 및 저장
+        SyncStats stats = processAndSaveFigures(allFigures);
+
+        log.info("국회의원 정보 동기화 완료: 총 {} 명 중 {} 명 성공, {} 명 실패", allFigures.size(), stats.getSuccessCount(), stats.getFailCount());
+
+        return stats.getSuccessCount();
+    }
+
+    private SyncStats processAndSaveFigures(List<FigureInfoDTO> figures) {
+        SyncStats stats = new SyncStats();
+
+        for (FigureInfoDTO dto : figures) {
+            try {
+                if (processSingleFigure(dto)) {
+                    stats.incrementSuccess();
+                } else {
+                    stats.incrementFail();
+                }
+            } catch (Exception e) {
+                log.error("국회의원 정보 처리 중 예외 발생: {} - {}", dto.name(), e.getMessage());
+                stats.incrementFail();
+            }
+        }
+
+        return stats;
+    }
+
+    private boolean processSingleFigure(FigureInfoDTO dto) {
+        log.debug("국회의원 정보 처리 시작: ID={}, NAME={}", dto.figureId(), dto.name());
+
+        try {
+            Figure figure = findOrCreateFigure(dto);
+
+            try {
+                figureMapper.updateFigureFromDTO(figure, dto);
+            } catch (Exception e) {
+                log.error("국회의원 정보 업데이트 중 오류: {} - {}", dto.name(), e.getMessage());
+                return false;
+            }
+
+            try {
+                Figure savedFigure = figureRepository.saveAndFlush(figure);
+                log.info("국회의원 저장 성공: ID={}, NAME={}", savedFigure.getName(), savedFigure.getFigureId());
+
+                // 저장 확인 (선택적)
+                boolean exists = figureRepository.existsByFiguerId(savedFigure.getFigureId());
+                log.debug("저장 확인: 존재={}, ID={}", exists, savedFigure.getFigureId());
+
+                return true;
+            } catch (Exception e) {
+                log.error("국회의원 저장 중 오류: {} - {}", dto.name(), e.getMessage(), e);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("국회의원 정보 처리 중 예상치 못한 오류 발생: {} - {}", dto.name(), e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * 국회의원 조회 또는 새 객체 생성
+     * @param info
+     * @return
+     */
+    private Figure findOrCreateFigure(FigureInfoDTO info) {
+
+    }
+
+    /**
+     * 국회의원 정보 로깅
+     * @param figure
+     */
+    private void logSampleFigure(FigureInfoDTO figure) {
+        log.info("샘플 국회의원 정보: ID={}, 이름={}, 정당={}", figure.figureId(), figure.name(),
+                figure.partyName() != null ? figure.partyName() : "없음");
+
     }
 
     /**
@@ -439,3 +534,4 @@ public class FigureApiService {
         return (field != null && !field.isNull()) ? field.asText() : "";
     }
 }
+
