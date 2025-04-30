@@ -1,6 +1,7 @@
 package com.example.GateStatus.domain.figure.service;
 
 import com.example.GateStatus.domain.career.Career;
+import com.example.GateStatus.domain.career.CareerParser;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
@@ -20,10 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,8 +32,10 @@ public class FigureApiService {
 
     private final WebClient webClient;
     private final FigureApiMapper apiMapper;
+    private final ObjectMapper mapper;
     private final FigureRepository figureRepository;
     private final FigureMapper figureMapper;
+    private final CareerParser careerParser;
 
 
     @Value("${spring.openapi.assembly.url}")
@@ -211,156 +210,90 @@ public class FigureApiService {
         }
     }
 
-    private List<FigureInfoDTO> parseJsonResponse(String jsonResponse) {
+    public List<FigureInfoDTO> parseJsonResponse(String jsonResponse) {
         try {
-            ObjectMapper mapper = new ObjectMapper();
             JsonNode rootNode = mapper.readTree(jsonResponse);
-
             JsonNode rowsNode = rootNode.path("nwvrqwxyaytdsfvhu")
                     .path(1)
                     .path("row");
 
             if (!rowsNode.isArray()) {
-                log.warn("JSON 응답에서 row 배열을 찾을 수 없습니다: {}",
-                        rootNode.path("nwvrqwxyaytdsfvhu").toString().substring(0, 100));
+                log.warn("JSON 응답에서 row 배열을 찾을 수 없습니다");
                 return Collections.emptyList();
             }
 
-            List<FigureInfoDTO> result = new ArrayList<>();
+            List<FigureInfoDTO> figures = new ArrayList<>();
+            int parsedCount = 0;
+            int skipCount = 0;
 
             for (JsonNode row : rowsNode) {
                 try {
-                    String figureId = apiMapper.getTextValue(row, "MONA_CD");
-
-                    if (figureId == null || figureId.isEmpty()) {
-                        log.warn("유효하지 않은 figureID, 건너뜁니다");
+                    FigureInfoDTO dto = parseFigureFromJsonNode(row);
+                    if (dto != null) {
+                        figures.add(dto);
+                        parsedCount++;
+                    } else {
+                        skipCount++;
                     }
-
-                    String name = apiMapper.getTextValue(row, "HG_NM");
-
-                    if (name == null || name.isEmpty()) {
-                        log.warn("유효하지 않은 이름, figureID: {}", figureId);
-                        continue;
-                    }
-                    String englishName = apiMapper.getTextValue(row, "ENG_NM");
-                    String birth = apiMapper.getTextValue(row, "BTH_DATE");
-                    String partyNameStr = apiMapper.getTextValue(row, "POLY_NM");
-                    String constituency = apiMapper.getTextValue(row, "ORIG_NM");
-                    String committeeName = apiMapper.getTextValue(row, "CMIT_NM");
-                    String committeePosition = apiMapper.getTextValue(row, "JOB_RES_NM");
-                    String electedCount = apiMapper.getTextValue(row, "REELE_GBN_NM");
-                    String electedDate = apiMapper.getTextValue(row, "UNITS");
-                    String reelection = apiMapper.getTextValue(row, "REELE_GBN_NM");
-                    String email = apiMapper.getTextValue(row, "E_MAIL");
-                    String homepage = apiMapper.getTextValue(row, "HOMEPAGE");
-
-
-                    List<Career> career = extractCareerList(apiMapper.getTextValue(row, "MEM_TITLE"));
-
-                    // 기타 정보 - 실제 응답에 없는 경우 null 또는 빈 리스트로
-                    List<String> education = new ArrayList<>();
-                    String profileUrl = null;
-                    String blog = null;
-                    String facebook = null;
-
-                    // 정당명 변환
-                    FigureParty partyName = convertToFigureParty(partyNameStr);
-
-                    FigureInfoDTO dto = new FigureInfoDTO(
-                            figureId, name, englishName, birth, partyName, constituency,
-                            committeeName, committeePosition, electedCount, electedDate,
-                            reelection, profileUrl, education, career,
-                            email, homepage, blog, facebook
-                    );
-
-                    result.add(dto);
-                    log.debug("의원 정보 파싱 성공: {}", name);
                 } catch (Exception e) {
-                    log.warn("국회의원 정보 파싱 중 오류: {}", e.getMessage());
+                    log.warn("국회의원 파싱 중 오류 발생: {}", e.getMessage());
+                    skipCount++;
                 }
             }
 
-
-            log.info("국회의원 정보 파싱 완료: {} 명", result.size());
-            return result;
+            log.info("국회의원 정보 파싱 완료: 성공 {}, 실패 {}", parsedCount, skipCount);
+            return figures;
         } catch (Exception e) {
-            log.error("JSON 파싱 중 오류 발생: {}", e.getMessage(), e);
-            throw new ApiDataRetrievalException("JSON 파싱 실패: " + e.getMessage());
+            log.error("JSON 파싱 중 오류 발생: {}", e.getMessage());
+            throw new ApiDataRetrievalException("JSON 파싱 실패 " + e.getMessage());
         }
     }
 
-    private List<Career> extractCareerList(String careerText) {
-        List<Career> careers = new ArrayList<>();
-        if (careerText == null || careerText.isEmpty()) {
-            return careers;
+    private FigureInfoDTO parseFigureFromJsonNode(JsonNode row) {
+        String figureId = getTextValue(row, "MONA_CD");
+        String name = getTextValue(row, "HG_NM");
+
+        if (isEmpty(figureId)) {
+            log.warn("유효하지 않은 figureId: {}", figureId);
+            return null;
         }
-        String[] lines = careerText.split("\r\n");
 
-        for (String line : lines) {
-            if (line == null || line.trim().isEmpty()) {
-                continue;
-            }
-
-            try {
-                String[] parts = line.trim().split(" / ");
-
-                if (parts.length < 2) {
-                    log.warn("경력 정보 파싱 실패: {}", line);
-                    continue;
-                }
-
-                String[] periodParts = parts[0].split(" ~ ");
-                LocalDate startDate = parseDateOrNull(periodParts[0]);
-                LocalDate endDate = periodParts.length > 1 && !"현재".equals(periodParts[1])
-                        ? parseDateOrNull(periodParts[1])
-                        : null;
-
-                String position = parts.length > 1 ? parts[1] : "";
-                String organization = parts.length > 2 ? parts[2] : "";
-
-                Career career = Career.of(
-                        line,
-                        position,
-                        organization,
-                        startDate,
-                        endDate
-                );
-
-                careers.add(career);
-            } catch (Exception e) {
-                log.warn("경력 정보 파싱 중 오류: {}, 오류: {}", line, e.getMessage());
-            }
+        if (isEmpty(name)) {
+            log.warn("유효하지 않은 name: {}", name);
+            return null;
         }
-        return careers;
+
+        // 기본 정보 추출
+        String englishName = getTextValue(row, "ENG_NM");
+        String birth = getTextValue(row, "BTH_DATE");
+        String partyNameStr = getTextValue(row, "POLY_NM");
+        String constituency = getTextValue(row, "ORIG_NM");
+        String committeeName = getTextValue(row, "CMIT_NM");
+        String committeePosition = getTextValue(row, "JOB_RES_NM");
+        String electedCount = getTextValue(row, "REELE_GBN_NM");
+        String electedDate = getTextValue(row, "UNITS");
+        String reelection = getTextValue(row, "REELE_GBN_NM");
+        String email = getTextValue(row, "E_MAIL");
+        String homepage = getTextValue(row, "HOMEPAGE");
+
+        FigureParty partyName = convertToFigureParty(partyNameStr);
+
+        List<String> education = parseEducation(row);
+        List<Career> careers = parseCareers(row);
+
+        return new FigureInfoDTO(
+                figureId, name, englishName, birth, partyName, constituency,
+                committeeName, committeePosition, electedCount, electedDate,
+                reelection, null,
+                education,
+                careers,
+                email, homepage, null, null);
     }
 
-    private LocalDate parseDateOrNull(String dateStr) {
-        if (dateStr == null || dateStr.trim().isEmpty() || "현재".equals(dateStr.trim())) {
-            return null;
-        }
+    private boolean isEmpty(String str) {
+        return str == null || str.trim().isEmpty();
+    }
 
-        try {
-            DateTimeFormatter[] formatters = {
-                    DateTimeFormatter.ofPattern("yyyy.MM"),
-                    DateTimeFormatter.ofPattern("yyyy-MM"),
-                    DateTimeFormatter.ofPattern("yyyy/MM")
-            };
-
-            for (DateTimeFormatter formatter : formatters) {
-                try {
-                    return LocalDate.parse(dateStr.trim() + "-01", formatter.withResolverStyle(ResolverStyle.STRICT));
-                } catch (DateTimeParseException e) {
-
-                }
-            }
-
-            log.warn("날짜 파싱 실패: {}", dateStr);
-            return null;
-        } catch (Exception e) {
-            log.warn("날짜 파싱 중 오류: {}, 오류: {}", dateStr, e.getMessage());
-            return null;
-        }
-     }
 
     /**
      * 특정 정당 소속 국회의원 정보를 동기화합니다
@@ -471,5 +404,37 @@ public class FigureApiService {
             log.warn("정당명 변환 실패: {}", partyName);
             return null; // 또는 기본값 반환
         }
+    }
+
+    private List<Career> parseCareers(JsonNode row) {
+        String careerText = getTextValue(row, "MEM_TITLE");
+
+        if (isEmpty(careerText)) {
+            return new ArrayList<>();
+        }
+
+        return careerParser.parseCareers(careerText);
+    }
+
+    private List<String> parseEducation(JsonNode row) {
+        List<String> education = new ArrayList<>();
+
+        addNonEmptyValue(education, getTextValue(row, "EDU1"));
+        addNonEmptyValue(education, getTextValue(row, "EDU2"));
+        addNonEmptyValue(education, getTextValue(row, "EDU3"));
+
+        return education;
+    }
+
+    private void addNonEmptyValue(List<String> education, String edu3) {
+    }
+
+
+    /**
+     * JsonNode에서 텍스트 값 추출
+     */
+    public String getTextValue(JsonNode node, String fieldName) {
+        JsonNode field = node.get(fieldName);
+        return (field != null && !field.isNull()) ? field.asText() : "";
     }
 }
