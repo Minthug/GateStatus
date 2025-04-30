@@ -20,6 +20,7 @@ import org.hibernate.annotations.CollectionId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -101,47 +102,85 @@ public class FigureApiService {
         }
     }
 
-    @Transactional
     public int syncAllFigureV2() {
         log.info("모든 국회의원 정보를 동기화 합니다");
 
         List<FigureInfoDTO> allFigures = fetchAllFiguresFromAPiV2();
+
         if (allFigures.isEmpty()) {
-            log.warn("동기화할 국회의원이 없습니다");
+            log.warn("동기화할 국회의원 정보가 없습니다");
             return 0;
         }
 
         log.info("동기화 대상 국회의원: {} 명 ", allFigures.size());
-        if (!allFigures.isEmpty()) {
-            logSampleFigure(allFigures.get(0));
-        }
 
-        // 각 국회의원 정보 처리 및 저장
-        SyncStats stats = processAndSaveFigures(allFigures);
+        int successCount = 0;
+        int failCount = 0;
 
-        log.info("국회의원 정보 동기화 완료: 총 {} 명 중 {} 명 성공, {} 명 실패", allFigures.size(), stats.getSuccessCount(), stats.getFailCount());
-
-        return stats.getSuccessCount();
-    }
-
-    private SyncStats processAndSaveFigures(List<FigureInfoDTO> figures) {
-        SyncStats stats = new SyncStats();
-
-        for (FigureInfoDTO dto : figures) {
+        for (FigureInfoDTO figure : allFigures) {
             try {
-                if (processSingleFigure(dto)) {
-                    stats.incrementSuccess();
+                boolean success = saveOrUpdateFigure(figure);
+                if (success) {
+                    successCount++;
                 } else {
-                    stats.incrementFail();
+                    failCount++;
                 }
             } catch (Exception e) {
-                log.error("국회의원 정보 처리 중 예외 발생: {} - {}", dto.name(), e.getMessage());
-                stats.incrementFail();
+                log.error("국회의원 처리 실패: {} - {}", figure.name(), e.getMessage(), e);
+                failCount++;
             }
         }
 
-        return stats;
+        log.info("국회의원 정보 동기화 완료: 총 {} 명 중 {} 명 성공, {} 명 실패", allFigures.size(), successCount, failCount);
+
+        return successCount;
     }
+
+    /**
+     * 단일 국회의원 정보 저장 또는 업데이트 (별도 트랜잭션)
+     * @param info
+     * @return
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean saveOrUpdateFigure(FigureInfoDTO info) {
+        try {
+            Figure figure = figureRepository.findByFigureId(info.figureId())
+                    .orElseGet(() -> Figure.builder()
+                            .figureId(info.figureId())
+                            .name(info.name())
+                            .figureType(FigureType.POLITICIAN)
+                            .viewCount(0L)
+                            .build());
+
+            figureMapper.updateFigureFromDTO(figure, info);
+            figureRepository.saveAndFlush(figure);
+
+            log.info("국회의원 저장 성공: {}", info.name());
+            return true;
+        } catch (Exception e) {
+            log.error("국회의원 저장 실패: {} - {}",info.name(), e.getMessage(), e);
+            return false;
+        }
+    }
+//
+//    private SyncStats processAndSaveFigures(List<FigureInfoDTO> figures) {
+//        SyncStats stats = new SyncStats();
+//
+//        for (FigureInfoDTO dto : figures) {
+//            try {
+//                if (processSingleFigure(dto)) {
+//                    stats.incrementSuccess();
+//                } else {
+//                    stats.incrementFail();
+//                }
+//            } catch (Exception e) {
+//                log.error("국회의원 정보 처리 중 예외 발생: {} - {}", dto.name(), e.getMessage());
+//                stats.incrementFail();
+//            }
+//        }
+//
+//        return stats;
+//    }
 
     private boolean processSingleFigure(FigureInfoDTO dto) {
         log.debug("국회의원 정보 처리 시작: ID={}, NAME={}", dto.figureId(), dto.name());
@@ -208,74 +247,74 @@ public class FigureApiService {
      *
      * @return
      */
-    @Transactional
-    public int syncAllFigures() {
-        try {
-            log.info("모든 국회의원 정보 동기화 시작");
-
-            // API 호출 부분 시도
-            List<FigureInfoDTO> allFigures;
-            try {
-                allFigures = fetchAllFiguresFromApi();
-                log.info("API에서 가져온 국회의원 수: {}", allFigures.size());
-            } catch (Exception e) {
-                log.error("API 호출 중 오류 발생: {}", e.getMessage(), e);
-                throw new ApiDataRetrievalException("API에서 국회의원 정보를 가져오는 중 오류 발생: " + e.getMessage());
-            }
-
-            // 확인을 위해 첫 번째 DTO 로깅
-            if (!allFigures.isEmpty()) {
-                log.info("첫 번째 국회의원 정보: {}", allFigures.get(0));
-            } else {
-                log.warn("API에서 가져온 국회의원 정보가 없습니다");
-                return 0;
-            }
-
-            int count = 0;
-            for (FigureInfoDTO infoDTO : allFigures) {
-                try {
-                    log.info("동기화 시도 ID: {}, 이름: {}", infoDTO.figureId(), infoDTO.name());
-
-                    Figure figure = figureRepository.findByFigureId(infoDTO.figureId())
-                            .orElseGet(() -> {
-                                log.info("새 국회의원 생성: {}", infoDTO.name());
-                                log.info("figureId: {}", infoDTO.figureId());
-                                return Figure.builder()
-                                        .figureId(infoDTO.figureId())
-                                        .name(infoDTO.name())
-                                        .figureType(FigureType.POLITICIAN)
-                                        .viewCount(0L)
-                                        .build();
-                            });
-
-                    // 매퍼 호출 부분 try-catch로 감싸기
-                    try {
-                        figureMapper.updateFigureFromDTO(figure, infoDTO);
-                    } catch (Exception e) {
-                        log.error("매퍼 처리 중 오류 발생: {} - {}", infoDTO.name(), e.getMessage(), e);
-                        continue; // 이 국회의원은 건너뛰고 다음으로 진행
-                    }
-
-                    // 저장 시도 부분
-                    try {
-                        figureRepository.save(figure);
-                        count++;
-                        log.info("국회의원 저장 성공: {}", infoDTO.name());
-                    } catch (Exception e) {
-                        log.error("국회의원 저장 중 오류 발생: {} - {}", infoDTO.name(), e.getMessage(), e);
-                    }
-                } catch (Exception e) {
-                    log.error("국회의원 처리 중 전체 오류: {} - {}", infoDTO.name(), e.getMessage(), e);
-                }
-            }
-
-            log.info("국회의원 정보 동기화 완료: {}명 중 {}명 성공", allFigures.size(), count);
-            return count;
-        } catch (Exception e) {
-            log.error("전체 국회의원 동기화 중 오류 발생: {}", e.getMessage(), e);
-            throw new ApiDataRetrievalException("전체 국회의원 정보를 동기화 하는 중 오류 발생");
-        }
-    }
+//    @Transactional
+//    public int syncAllFigures() {
+//        try {
+//            log.info("모든 국회의원 정보 동기화 시작");
+//
+//            // API 호출 부분 시도
+//            List<FigureInfoDTO> allFigures;
+//            try {
+//                allFigures = fetchAllFiguresFromApi();
+//                log.info("API에서 가져온 국회의원 수: {}", allFigures.size());
+//            } catch (Exception e) {
+//                log.error("API 호출 중 오류 발생: {}", e.getMessage(), e);
+//                throw new ApiDataRetrievalException("API에서 국회의원 정보를 가져오는 중 오류 발생: " + e.getMessage());
+//            }
+//
+//            // 확인을 위해 첫 번째 DTO 로깅
+//            if (!allFigures.isEmpty()) {
+//                log.info("첫 번째 국회의원 정보: {}", allFigures.get(0));
+//            } else {
+//                log.warn("API에서 가져온 국회의원 정보가 없습니다");
+//                return 0;
+//            }
+//
+//            int count = 0;
+//            for (FigureInfoDTO infoDTO : allFigures) {
+//                try {
+//                    log.info("동기화 시도 ID: {}, 이름: {}", infoDTO.figureId(), infoDTO.name());
+//
+//                    Figure figure = figureRepository.findByFigureId(infoDTO.figureId())
+//                            .orElseGet(() -> {
+//                                log.info("새 국회의원 생성: {}", infoDTO.name());
+//                                log.info("figureId: {}", infoDTO.figureId());
+//                                return Figure.builder()
+//                                        .figureId(infoDTO.figureId())
+//                                        .name(infoDTO.name())
+//                                        .figureType(FigureType.POLITICIAN)
+//                                        .viewCount(0L)
+//                                        .build();
+//                            });
+//
+//                    // 매퍼 호출 부분 try-catch로 감싸기
+//                    try {
+//                        figureMapper.updateFigureFromDTO(figure, infoDTO);
+//                    } catch (Exception e) {
+//                        log.error("매퍼 처리 중 오류 발생: {} - {}", infoDTO.name(), e.getMessage(), e);
+//                        continue; // 이 국회의원은 건너뛰고 다음으로 진행
+//                    }
+//
+//                    // 저장 시도 부분
+//                    try {
+//                        figureRepository.save(figure);
+//                        count++;
+//                        log.info("국회의원 저장 성공: {}", infoDTO.name());
+//                    } catch (Exception e) {
+//                        log.error("국회의원 저장 중 오류 발생: {} - {}", infoDTO.name(), e.getMessage(), e);
+//                    }
+//                } catch (Exception e) {
+//                    log.error("국회의원 처리 중 전체 오류: {} - {}", infoDTO.name(), e.getMessage(), e);
+//                }
+//            }
+//
+//            log.info("국회의원 정보 동기화 완료: {}명 중 {}명 성공", allFigures.size(), count);
+//            return count;
+//        } catch (Exception e) {
+//            log.error("전체 국회의원 동기화 중 오류 발생: {}", e.getMessage(), e);
+//            throw new ApiDataRetrievalException("전체 국회의원 정보를 동기화 하는 중 오류 발생");
+//        }
+//    }
 
     /**
      * 모든 국회의원 정보를 API에서 가져옵니다
