@@ -7,20 +7,18 @@ import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
-import com.example.GateStatus.domain.figure.service.response.FigureMapper;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.annotations.CollectionId;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -40,6 +38,9 @@ public class FigureApiService {
     private final FigureMapper figureMapper;
     private final CareerParser careerParser;
 
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
 
     @Value("${spring.openapi.assembly.url}")
     private String baseUrl;
@@ -49,6 +50,8 @@ public class FigureApiService {
 
     @Value("${spring.openapi.assembly.figure-api-path}")
     private String figureApiPath;
+    @Autowired
+    private FigureTransactionService figureTransactionService;
 
 
     @Transactional
@@ -102,6 +105,11 @@ public class FigureApiService {
         }
     }
 
+    /**
+     * 모든 국회의원 정보를 동기화 합니다
+     *
+     * @return
+     */
     public int syncAllFigureV2() {
         log.info("모든 국회의원 정보를 동기화 합니다");
 
@@ -119,7 +127,7 @@ public class FigureApiService {
 
         for (FigureInfoDTO figure : allFigures) {
             try {
-                boolean success = saveOrUpdateFigure(figure);
+                boolean success = figureTransactionService.saveOrUpdateFigure(figure);
                 if (success) {
                     successCount++;
                 } else {
@@ -136,50 +144,26 @@ public class FigureApiService {
         return successCount;
     }
 
-    /**
-     * 단일 국회의원 정보 저장 또는 업데이트 (별도 트랜잭션)
-     * @param info
-     * @return
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean saveOrUpdateFigure(FigureInfoDTO info) {
-        try {
-            Figure figure = figureRepository.findByFigureId(info.figureId())
-                    .orElseGet(() -> Figure.builder()
-                            .figureId(info.figureId())
-                            .name(info.name())
-                            .figureType(FigureType.POLITICIAN)
-                            .viewCount(0L)
-                            .build());
-
-            figureMapper.updateFigureFromDTO(figure, info);
-            figureRepository.saveAndFlush(figure);
-
-            log.info("국회의원 저장 성공: {}", info.name());
-            return true;
-        } catch (Exception e) {
-            log.error("국회의원 저장 실패: {} - {}",info.name(), e.getMessage(), e);
-            return false;
-        }
-    }
+//    @Transactional
+//    public boolean saveOrUpdateFigure(FigureInfoDTO info) {
+//        try {
+//            Figure figure = figureRepository.findByFigureId(info.figureId())
+//                    .orElseGet(() -> Figure.builder()
+//                            .figureId(info.figureId())
+//                            .name(info.name())
+//                            .figureType(FigureType.POLITICIAN)
+//                            .viewCount(0L)
+//                            .build());
 //
-//    private SyncStats processAndSaveFigures(List<FigureInfoDTO> figures) {
-//        SyncStats stats = new SyncStats();
+//            figureMapper.updateFigureFromDTO(figure, info);
+//            figureRepository.saveAndFlush(figure);
 //
-//        for (FigureInfoDTO dto : figures) {
-//            try {
-//                if (processSingleFigure(dto)) {
-//                    stats.incrementSuccess();
-//                } else {
-//                    stats.incrementFail();
-//                }
-//            } catch (Exception e) {
-//                log.error("국회의원 정보 처리 중 예외 발생: {} - {}", dto.name(), e.getMessage());
-//                stats.incrementFail();
-//            }
+//            log.info("국회의원 저장 성공: {}", info.name());
+//            return true;
+//        } catch (Exception e) {
+//            log.error("국회의원 저장 실패: {} - {}",info.name(), e.getMessage(), e);
+//            return false;
 //        }
-//
-//        return stats;
 //    }
 
     private boolean processSingleFigure(FigureInfoDTO dto) {
@@ -241,80 +225,6 @@ public class FigureApiService {
                 figure.partyName() != null ? figure.partyName() : "없음");
 
     }
-
-    /**
-     * 모든 국회의원 정보를 동기화 합니다
-     *
-     * @return
-     */
-//    @Transactional
-//    public int syncAllFigures() {
-//        try {
-//            log.info("모든 국회의원 정보 동기화 시작");
-//
-//            // API 호출 부분 시도
-//            List<FigureInfoDTO> allFigures;
-//            try {
-//                allFigures = fetchAllFiguresFromApi();
-//                log.info("API에서 가져온 국회의원 수: {}", allFigures.size());
-//            } catch (Exception e) {
-//                log.error("API 호출 중 오류 발생: {}", e.getMessage(), e);
-//                throw new ApiDataRetrievalException("API에서 국회의원 정보를 가져오는 중 오류 발생: " + e.getMessage());
-//            }
-//
-//            // 확인을 위해 첫 번째 DTO 로깅
-//            if (!allFigures.isEmpty()) {
-//                log.info("첫 번째 국회의원 정보: {}", allFigures.get(0));
-//            } else {
-//                log.warn("API에서 가져온 국회의원 정보가 없습니다");
-//                return 0;
-//            }
-//
-//            int count = 0;
-//            for (FigureInfoDTO infoDTO : allFigures) {
-//                try {
-//                    log.info("동기화 시도 ID: {}, 이름: {}", infoDTO.figureId(), infoDTO.name());
-//
-//                    Figure figure = figureRepository.findByFigureId(infoDTO.figureId())
-//                            .orElseGet(() -> {
-//                                log.info("새 국회의원 생성: {}", infoDTO.name());
-//                                log.info("figureId: {}", infoDTO.figureId());
-//                                return Figure.builder()
-//                                        .figureId(infoDTO.figureId())
-//                                        .name(infoDTO.name())
-//                                        .figureType(FigureType.POLITICIAN)
-//                                        .viewCount(0L)
-//                                        .build();
-//                            });
-//
-//                    // 매퍼 호출 부분 try-catch로 감싸기
-//                    try {
-//                        figureMapper.updateFigureFromDTO(figure, infoDTO);
-//                    } catch (Exception e) {
-//                        log.error("매퍼 처리 중 오류 발생: {} - {}", infoDTO.name(), e.getMessage(), e);
-//                        continue; // 이 국회의원은 건너뛰고 다음으로 진행
-//                    }
-//
-//                    // 저장 시도 부분
-//                    try {
-//                        figureRepository.save(figure);
-//                        count++;
-//                        log.info("국회의원 저장 성공: {}", infoDTO.name());
-//                    } catch (Exception e) {
-//                        log.error("국회의원 저장 중 오류 발생: {} - {}", infoDTO.name(), e.getMessage(), e);
-//                    }
-//                } catch (Exception e) {
-//                    log.error("국회의원 처리 중 전체 오류: {} - {}", infoDTO.name(), e.getMessage(), e);
-//                }
-//            }
-//
-//            log.info("국회의원 정보 동기화 완료: {}명 중 {}명 성공", allFigures.size(), count);
-//            return count;
-//        } catch (Exception e) {
-//            log.error("전체 국회의원 동기화 중 오류 발생: {}", e.getMessage(), e);
-//            throw new ApiDataRetrievalException("전체 국회의원 정보를 동기화 하는 중 오류 발생");
-//        }
-//    }
 
     /**
      * 모든 국회의원 정보를 API에서 가져옵니다
@@ -461,10 +371,6 @@ public class FigureApiService {
                 email, homepage, null, null);
     }
 
-    private boolean isEmpty(String str) {
-        return str == null || str.trim().isEmpty();
-    }
-
 
     /**
      * 특정 정당 소속 국회의원 정보를 동기화합니다
@@ -518,18 +424,23 @@ public class FigureApiService {
         try {
             log.info("{}당 소속 국회의원 정보 API 호출 시작", partyName);
 
-            AssemblyApiResponse<JsonNode> apiResponse = webClient.get()
+            String jsonResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(figureApiPath)
                             .queryParam("KEY", apiKey)
                             .queryParam("POLY_NM", partyName)
                             .build())
                     .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {
-                    })
+                    .bodyToMono(String.class)
                     .block();
 
-            List<FigureInfoDTO> figures = apiMapper.map(apiResponse);
+            // JsonNode로 변환
+            JsonNode rootNode = mapper.readTree(jsonResponse);
+            JsonNode dataArray = rootNode.path("nwvrqwxyaytdsfvhu")
+                    .path(1)
+                    .path("row");
+
+            List<FigureInfoDTO> figures = figureMapper.mapFromJsonNode(dataArray);
             log.info("{}당 소속 국회의원 정보 API 호출 완료: {}명", partyName, figures.size());
 
             return figures;
@@ -537,20 +448,6 @@ public class FigureApiService {
 
             log.error("정당별 국회의원 정보 조회 중 오류 발생: {}", partyName, e);
             throw new ApiDataRetrievalException("정당별 국회의원 정보를 가져오는 중 오류 발생");
-        }
-    }
-
-
-    // 문자열을 구분자로 분리하여 리스트에 추가
-    private void splitAndAddToList(List<String> list, String value) {
-        if (value != null && !value.trim().isEmpty()) {
-            // 여러 가능한 구분자로 시도 (세미콜론, 쉼표, 줄바꿈 등)
-            String[] items = value.split("[;,\n]+");
-            for (String item : items) {
-                if (item != null && !item.trim().isEmpty()) {
-                    list.add(item.trim());
-                }
-            }
         }
     }
 
@@ -568,6 +465,7 @@ public class FigureApiService {
                 case "국민의당" -> FigureParty.PEOPLES;
                 case "기본소득당" -> FigureParty.BASIC_INCOME;
                 case "시대전환" -> FigureParty.TIME_TRANSITION;
+                case "조국혁신당" -> FigureParty.REBUILDING_KOR;
                 case "무소속" -> FigureParty.INDEPENDENT;
                 default -> FigureParty.OTHER;
             };
@@ -586,6 +484,11 @@ public class FigureApiService {
 
         return careerParser.parseCareers(careerText);
     }
+
+    private boolean isEmpty(String str) {
+        return str == null || str.trim().isEmpty();
+    }
+
 
     private List<String> parseEducation(JsonNode row) {
         List<String> education = new ArrayList<>();
@@ -607,21 +510,6 @@ public class FigureApiService {
     public String getTextValue(JsonNode node, String fieldName) {
         JsonNode field = node.get(fieldName);
         return (field != null && !field.isNull()) ? field.asText() : "";
-    }
-
-    @Getter
-    private static class SyncStats {
-
-        private int successCount = 0;
-        private int failCount = 0;
-
-        public void incrementSuccess() {
-            successCount++;
-        }
-
-        public void incrementFail() {
-            failCount++;
-        }
     }
 }
 
