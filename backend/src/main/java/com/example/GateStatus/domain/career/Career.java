@@ -32,13 +32,4 @@ public class Career {
                 .endDate(endDate)
                 .build();
     }
-
-    public static String formatPeriod(LocalDate startDate, LocalDate endDate) {
-        if (startDate == null) return "";
-
-        String start = startDate.format(DateTimeFormatter.ofPattern("yyyy.MM"));
-        String end = endDate == null ? "현재" : endDate.format(DateTimeFormatter.ofPattern("yyyy.MM"));
-
-        return start + " ~ " + end;
-    }
 }

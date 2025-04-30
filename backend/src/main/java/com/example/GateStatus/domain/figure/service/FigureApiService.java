@@ -8,12 +8,12 @@ import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.domain.figure.service.response.FigureMapper;
-import com.example.GateStatus.domain.figure.sync.SyncStats;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.annotations.CollectionId;
@@ -38,7 +38,6 @@ public class FigureApiService {
     private final FigureRepository figureRepository;
     private final FigureMapper figureMapper;
     private final CareerParser careerParser;
-    private final SyncStats stats;
 
 
     @Value("${spring.openapi.assembly.url}")
@@ -162,7 +161,7 @@ public class FigureApiService {
                 log.info("국회의원 저장 성공: ID={}, NAME={}", savedFigure.getName(), savedFigure.getFigureId());
 
                 // 저장 확인 (선택적)
-                boolean exists = figureRepository.existsByFiguerId(savedFigure.getFigureId());
+                boolean exists = figureRepository.existsByFigureId(savedFigure.getFigureId());
                 log.debug("저장 확인: 존재={}, ID={}", exists, savedFigure.getFigureId());
 
                 return true;
@@ -569,6 +568,21 @@ public class FigureApiService {
     public String getTextValue(JsonNode node, String fieldName) {
         JsonNode field = node.get(fieldName);
         return (field != null && !field.isNull()) ? field.asText() : "";
+    }
+
+    @Getter
+    private static class SyncStats {
+
+        private int successCount = 0;
+        private int failCount = 0;
+
+        public void incrementSuccess() {
+            successCount++;
+        }
+
+        public void incrementFail() {
+            failCount++;
+        }
     }
 }
 

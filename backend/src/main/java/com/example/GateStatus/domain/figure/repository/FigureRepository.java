@@ -46,5 +46,5 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     List<Figure> findTop10ByOrderByModifiedDateDesc();
 
-    boolean existsByFiguerId(String figureId);
+    boolean existsByFigureId(String figureId);
 }
