@@ -186,7 +186,7 @@ public class FigureApiService {
         return successCount;
     }
 
-    @Transactional
+//    @Transactional
     public int syncAllFiguresV3() {
         log.info("모든 국회의원 정보 동기화 시작");
         List<FigureInfoDTO> allFigures = fetchAllFiguresFromAPiV2();
@@ -214,11 +214,27 @@ public class FigureApiService {
                             return false;
                         }
 
-                        // 2단계: 컬렉션 정보 개별 저장
-                        updateEducation(figure);
-                        updateCareers(figure);
-                        updateSites(figure);
-                        updateActivities(figure);
+                        // 2단계: 교육 정보 및 사이트 정보 업데이트
+                        try {
+                            updateEducation(figure);
+                            updateSites(figure);
+                        } catch (Exception e) {
+                            log.warn("교육/사이트 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage());
+                        }
+
+                        // 3단계: 경력 정보 업데이트 (예외 처리 강화)
+                        try {
+                            updateCareers(figure);
+                        } catch (Exception e) {
+                            log.error("경력 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage(), e);
+                        }
+
+                        // 4단계: 활동 정보 업데이트 (예외 처리 강화)
+                        try {
+                            updateActivities(figure);
+                        } catch (Exception e) {
+                            log.error("활동 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage(), e);
+                        }
 
                         return true;
                     } catch (Exception e) {
@@ -281,40 +297,6 @@ public class FigureApiService {
             throw e; // 트랜잭션 롤백을 위해 예외 다시 던지기
         }
     }
-//
-//    @Transactional(propagation = Propagation.REQUIRES_NEW)
-//    public void updateFigureCollections(FigureInfoDTO infoDTO) {
-//        try {
-//            log.info("국회의원 컬렉션 정보 업데이트 시작: {}", infoDTO.name());
-//
-//            Figure figure = figureRepository.findByFigureId(infoDTO.figureId())
-//                    .orElseThrow(() -> new EntityNotFoundException("국회의원을 찾을 수 없습니다 " + infoDTO.figureId()));
-//
-//            // 1. 교육 정보 업데이트
-//            updateEducation(figure, infoDTO);
-//            figureRepository.save(figure);
-//            figureRepository.flush();
-//
-//            // 2. 경력 정보 업데이트
-//            updateCareers(figure, infoDTO);
-//            figureRepository.save(figure);
-//            figureRepository.flush();
-//
-//            // 3. 사이트 정보 업데이트
-//            updateSites(figure, infoDTO);
-//            figureRepository.save(figure);
-//            figureRepository.flush();
-//
-//            // 4. 활동 정보 업데이트
-//            updateActivities(figure, infoDTO);
-//            figureRepository.save(figure);
-//            figureRepository.flush();
-//
-//            log.info("국회의원 컬렉션 정보 업데이트: {}", infoDTO.name());
-//        } catch (Exception e) {
-//            throw e;
-//        }
-//    }
 
     /**
      * 모든 국회의원 정보를 API에서 가져옵니다
@@ -617,10 +599,27 @@ public class FigureApiService {
             // 기존 경력 정보 비우기
             entity.getCareers().clear();
 
-            // 기존 경력 정보 추가
+            // 새 경력 정보 목록 생성
+            List<Career> newCareers = new ArrayList<>();
+
+            // DTO의 경력 정보 추가 (타입 안전하게 처리)
             if (figure.career() != null && !figure.career().isEmpty()) {
-                if (figure.career().get(0) instanceof Career) {
-                    entity.getCareers().addAll((List<Career>)figure.career());
+                try {
+                    // Object 타입이므로 안전하게 변환
+                    for (Object careerObj : figure.career()) {
+                        if (careerObj instanceof Career) {
+                            Career career = (Career) careerObj;
+                            newCareers.add(Career.builder()
+                                    .title(career.getTitle())
+                                    .position(career.getPosition())
+                                    .organization(career.getOrganization())
+                                    .period(career.getPeriod())
+                                    .build());
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("경력 정보 변환 중 오류: {}", e.getMessage());
+                    // 변환 오류가 있어도 계속 진행
                 }
             }
 
@@ -644,8 +643,10 @@ public class FigureApiService {
                         .organization(figure.committeeName())
                         .period("현재")
                         .build();
-                entity.getCareers().add(career);
+                newCareers.add(career);
             }
+
+            entity.getCareers().addAll(newCareers);
 
             figureRepository.save(entity);
             log.debug("경력 정보 업데이트 완료: {}", figure.name());
@@ -692,17 +693,26 @@ public class FigureApiService {
             // 기존 활동 정보 비우기
             entity.getActivities().clear();
 
-            // 새 활동 정보 추가
+            // 새 활동 정보 목록 생성
+            List<String> newActivities = new ArrayList<>();
+
+            // 당선 정보 추가
             if (figure.electedCount() != null && !figure.electedCount().isEmpty()) {
-                entity.getActivities().add(figure.electedCount() + "대 국회의원");
+                newActivities.add(figure.electedCount() + "대 국회의원");
             }
 
+            // 위원회 정보 추가
             if (figure.committeeName() != null && !figure.committeeName().isEmpty()) {
                 String position = figure.committeePosition() != null ? figure.committeePosition() : "위원";
-                entity.getActivities().add(figure.committeeName() + " " + position);
+                newActivities.add(figure.committeeName() + " " + position);
             }
 
+            // 컬렉션에 추가
+            entity.getActivities().addAll(newActivities);
+
+            // 저장
             figureRepository.save(entity);
+
             log.debug("활동 정보 업데이트 완료: {}", figure.name());
         } catch (Exception e) {
             log.warn("활동 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage());
