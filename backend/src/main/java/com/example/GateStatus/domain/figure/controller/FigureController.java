@@ -6,15 +6,15 @@ import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureCacheService;
 import com.example.GateStatus.domain.figure.service.FigureService;
 import com.example.GateStatus.domain.figure.service.request.RegisterFigureCommand;
-import com.example.GateStatus.domain.figure.service.request.SyncFigureRequest;
-import com.example.GateStatus.domain.figure.service.response.FigureDTO;
-import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
-import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
-import com.example.GateStatus.domain.figure.service.response.SyncPartyResponse;
+import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
+import com.example.GateStatus.domain.figure.service.request.UpdateFigureRequest;
+import com.example.GateStatus.domain.figure.service.response.*;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -59,25 +59,65 @@ public class FigureController {
         return ResponseEntity.ok(figureService.findFiguresByType(figureType));
     }
 
-//    @PatchMapping("/{figureId}")
-//    public ResponseEntity<UpdateFigureResponse> updateFigure(@PathVariable String figureId) {
-//        UpdateFigureResponse response = figureService.updateCache(figureId);
-//        return ResponseEntity.ok(response);
-//    }
+    @PatchMapping("/{figureId}")
+    public ResponseEntity<UpdateFigureResponse> updateFigure(@PathVariable String figureId,
+                                                             @RequestBody UpdateFigureRequest request) {
+        try {
+            UpdateFigureCommand command = UpdateFigureCommand.from(request);
+            // 서비스 메서드 호출하여 업데이트 수행
+            UpdateFigureResponse response = figureService.updateFigure(figureId, command);
 
-//    @DeleteMapping("/{figureId}")
-//    public ResponseEntity<Void> deleteFigure(@PathVariable String figureId) {
-//        figureService.deleteFigure(figureId);
-//        return ResponseEntity.noContent().build();
-//    }
-
-
-    @PostMapping("/sync")
-//    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<FindFigureDetailResponse> syncFigureByName(@RequestBody SyncFigureRequest request) {
-        Figure figure = figureApiService.syncFigureInfoByName(request.name());
-        return ResponseEntity.ok(FindFigureDetailResponse.from(figure));
+            return ResponseEntity.ok(response);
+        } catch (EntityNotFoundException e) {
+            log.warn("국회의원 정보 업데이트 실패: {} - {}", figureId, e.getMessage());
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            log.warn("국회의원 정보 업데이트 유효성 검사 실패: {} - {}", figureId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("국회의원 정보 업데이트 중 예상치 못한 오류: {} - {}", figureId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
+
+    /**
+     * 국회의원 정보 업데이트 폼 데이터 조회
+     * 기존 정보를 수정 폼에 표시하기 위한 API
+     * @param figureId 국회의원 ID
+     * @return 국회의원 정보가 담긴 업데이트 요청 객체
+     */
+    @GetMapping("/{figureId}/edit")
+    public ResponseEntity<UpdateFigureRequest> getUpdateForm(@PathVariable String figureId) {
+        try {
+            // 국회의원 정보 조회
+            FigureDTO figureDTO = figureService.findFigureById(figureId);
+
+            // DTO를 UpdateFigureRequest로 변환
+            UpdateFigureRequest formData = UpdateFigureRequest.fromDto(figureDTO);
+
+            return ResponseEntity.ok(formData);
+        } catch (EntityNotFoundException e) {
+            log.warn("국회의원 정보 폼 조회 실패: {} - {}", figureId, e.getMessage());
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("국회의원 정보 폼 조회 중 오류: {} - {}", figureId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @DeleteMapping("/{figureId}")
+    public ResponseEntity<Void> deleteFigure(@PathVariable String figureId) {
+        figureService.deleteFigure(figureId);
+        return ResponseEntity.noContent().build();
+    }
+
+
+//    @PostMapping("/sync")
+////    @PreAuthorize("hasRole('ADMIN')")
+//    public ResponseEntity<FindFigureDetailResponse> syncFigureByName(@RequestBody SyncFigureRequest request) {
+//        Figure figure = figureApiService.syncFigureInfoByName(request.name());
+//        return ResponseEntity.ok(FindFigureDetailResponse.from(figure));
+//    }
 
     @PostMapping("/sync/all")
 //    @PreAuthorize("hasRole('ADMIN')")
