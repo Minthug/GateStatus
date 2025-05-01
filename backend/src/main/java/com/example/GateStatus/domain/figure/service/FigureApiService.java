@@ -13,10 +13,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -35,6 +38,7 @@ public class FigureApiService {
     private final FigureRepository figureRepository;
     private final FigureMapper figureMapper;
     private final CareerParser careerParser;
+    private final FigureCacheService figureCacheService;
 
     @Autowired
     private PlatformTransactionManager transactionManager;
@@ -47,8 +51,6 @@ public class FigureApiService {
 
     @Value("${spring.openapi.assembly.figure-api-path}")
     private String figureApiPath;
-    @Autowired
-    private FigureTransactionService figureTransactionService;
 
 
     @Transactional
@@ -107,6 +109,7 @@ public class FigureApiService {
      *
      * @return
      */
+    @Transactional
     public int syncAllFigureV2() {
         log.info("모든 국회의원 정보를 동기화 합니다");
 
@@ -120,6 +123,8 @@ public class FigureApiService {
         log.info("동기화 대상 국회의원: {} 명 ", allFigures.size());
 
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
         int successCount = 0;
         int failCount = 0;
 
@@ -136,8 +141,29 @@ public class FigureApiService {
                                         .build());
 
                         figureMapper.updateFigureFromDTO(figureEntity, figure);
-                        figureRepository.save(figureEntity);
-                        log.info("국회의원 저장 성공: {}", figure.name());
+
+                        Figure savedFigure = figureRepository.saveAndFlush(figureEntity);
+
+                        // 저장 확인
+                        if (savedFigure.getId() == null) {
+                            log.error("국회의원 저장 실패 (ID 없음): {}", figure.name());
+                            return false;
+                        }
+
+                        // 캐시 업데이트
+                        figureCacheService.updateFigureCache(savedFigure);
+
+                        log.info("국회의원 저장 성공: {}, ID={}, Entity ID={}",
+                                figure.name(), figure.figureId(), savedFigure.getId());
+
+                        // 저장 후 검증
+                        Figure verifyFigure = figureRepository.findByFigureId(figure.figureId()).orElse(null);
+                        if (verifyFigure == null) {
+                            log.error("국회의원 저장 검증 실패: {}, ID={}", figure.name(), figure.figureId());
+                            return false;
+                        }
+
+                        log.debug("저장 검증 성공: {}, ID={}", figure.name(), figure.figureId());
                         return true;
                     } catch (Exception e) {
                         status.setRollbackOnly();
@@ -151,7 +177,7 @@ public class FigureApiService {
                 } else {
                     failCount++;
                 }
-        } catch (Exception e) {
+            } catch (Exception e) {
                 log.error("트랜잭션 오류: {} - {}", figure.name(), e.getMessage(), e);
                 failCount++;
             }
@@ -160,104 +186,127 @@ public class FigureApiService {
         return successCount;
     }
 
-//    private boolean processSingleFigure(FigureInfoDTO dto) {
-//        log.debug("국회의원 정보 처리 시작: ID={}, NAME={}", dto.figureId(), dto.name());
-//
-//        try {
-//            Figure figure = findOrCreateFigure(dto);
-//
-//            try {
-//                figureMapper.updateFigureFromDTO(figure, dto);
-//            } catch (Exception e) {
-//                log.error("국회의원 정보 업데이트 중 오류: {} - {}", dto.name(), e.getMessage());
-//                return false;
-//            }
-//
-//            try {
-//                Figure savedFigure = figureRepository.saveAndFlush(figure);
-//                log.info("국회의원 저장 성공: ID={}, NAME={}", savedFigure.getName(), savedFigure.getFigureId());
-//
-//                // 저장 확인 (선택적)
-//                boolean exists = figureRepository.existsByFigureId(savedFigure.getFigureId());
-//                log.debug("저장 확인: 존재={}, ID={}", exists, savedFigure.getFigureId());
-//
-//                return true;
-//            } catch (Exception e) {
-//                log.error("국회의원 저장 중 오류: {} - {}", dto.name(), e.getMessage(), e);
-//                return false;
-//            }
-//        } catch (Exception e) {
-//            log.error("국회의원 정보 처리 중 예상치 못한 오류 발생: {} - {}", dto.name(), e.getMessage(), e);
-//            return false;
-//        }
-//    }
+    @Transactional
+    public int syncAllFiguresV3() {
+        log.info("모든 국회의원 정보 동기화 시작");
+        List<FigureInfoDTO> allFigures = fetchAllFiguresFromAPiV2();
 
-//    /**
-//     * 국회의원 조회 또는 새 객체 생성
-//     * @param info
-//     * @return
-//     */
-//    private Figure findOrCreateFigure(FigureInfoDTO info) {
-//        return figureRepository.findByFigureId(info.figureId())
-//                .orElseGet(() -> {
-//                    log.info("새 국회의원 생성: {}", info.name());
-//                    return Figure.builder()
-//                            .figureId(info.figureId())
-//                            .name(info.name())
-//                            .figureType(FigureType.POLITICIAN)
-//                            .viewCount(0L)
-//                            .build();
-//                });
-//    }
-//
-//    /**
-//     * 국회의원 정보 로깅
-//     * @param figure
-//     */
-//    private void logSampleFigure(FigureInfoDTO figure) {
-//        log.info("샘플 국회의원 정보: ID={}, 이름={}, 정당={}", figure.figureId(), figure.name(),
-//                figure.partyName() != null ? figure.partyName() : "없음");
-//
-//    }
-//
-//    /**
-//     * 모든 국회의원 정보를 API에서 가져옵니다
-//     *
-//     * @return
-//     */
-//    private List<FigureInfoDTO> fetchAllFiguresFromApi() {
-//        try {
-//            log.info("전체 국회의원 정보 API 호출 시작");
-//
-//            try {
-//                String jsonResponse = webClient.get()
-//                        .uri(uriBuilder -> uriBuilder
-//                                .path(figureApiPath)
-//                                .queryParam("key", apiKey)
-//                                .build())
-//                        .retrieve()
-//                        .bodyToMono(String.class)
-//                        .block();
-//
-//                if (jsonResponse == null || jsonResponse.isEmpty()) {
-//                    log.error("API에서 빈 응답을 반환했습니다");
-//                    throw new ApiDataRetrievalException("API에서 데이터를 가져오지 못했습니다");
-//                }
-//
-//                log.info("API 응답 수신(일부): {}",
-//                        jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
-//
-//                return parseJsonResponse(jsonResponse);
-//            } catch (Exception e) {
-//                log.error("API 호출 자체에서 오류 발생: {}", e.getMessage(), e);
-//                throw new ApiDataRetrievalException("API 호출 실패: " + e.getMessage());
-//            }
-//        } catch (Exception e) {
-//            log.error("전체 API 처리 과정에서 오류 발생: {}", e.getMessage(), e);
-//            throw new ApiDataRetrievalException("전체 국회의원 정보를 가져오는 중 오류 발생");
-//        }
-//    }
+        if (allFigures.isEmpty()) {
+            log.warn("동기화할 국회의원 정보가 없습니다");
+            return 0;
+        }
 
+        log.info("동기화 대상 국회의원: {}명", allFigures.size());
+
+
+        int successCount = 0;
+        int failCount = 0;
+
+        for (FigureInfoDTO figure : allFigures) {
+            try {
+                // processFigure 메서드 호출을 추가 - 이전에는 누락되었음
+                boolean basicSaveResult = saveBasicFigureInfo(figure);
+
+                if (basicSaveResult) {
+                    updateFigureCollections(figure);
+                    successCount++;
+                    log.debug("국회의원 처리 성공: {}, ID={}", figure.name(), figure.figureId());
+                } else {
+                    failCount++;
+                    log.warn("국회의원 처리 실패: {}, ID={}", figure.name(), figure.figureId());
+                }
+            } catch (Exception e) {
+                log.error("국회의원 처리 중 예외 발생: {} - {}", figure.name(), e.getMessage(), e);
+                failCount++;
+            }
+        }
+
+        log.info("국회의원 정보 동기화 완료: 총 {}명 중 {}명 성공, {}명 실패", allFigures.size(), successCount, failCount);
+        return successCount;
+    }
+
+    /**
+     * 단일 국회의원 저장 메서드 (별도 트랜잭션으로 분리)
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean saveBasicFigureInfo(FigureInfoDTO figureDTO) {
+        try {
+            log.info("국회의원 저장 시작: {}", figureDTO.name());
+
+            // 1. 기존 엔티티 조회 또는 새로 생성
+            Figure figure = figureRepository.findByFigureId(figureDTO.figureId())
+                    .orElseGet(() ->
+                            Figure.builder()
+                            .figureId(figureDTO.figureId())
+                            .name(figureDTO.name())
+                            .figureType(FigureType.POLITICIAN)
+                            .viewCount(0L)
+                            .build());
+
+            // 기본 정보만 업데이트
+            figure.setName(figureDTO.name());
+            figure.setEnglishName(figureDTO.englishName());
+            figure.setBirth(figureDTO.birth());
+            figure.setConstituency(figureDTO.constituency());
+            figure.setFigureParty(figureDTO.partyName());
+            figure.setUpdateSource("국회 Open API");
+
+            // 저장
+            Figure savedFigure = figureRepository.save(figure);
+            figureRepository.flush();
+
+            if (savedFigure.getId() == null) {
+                log.error("국회의원 기본 정보 저장 실패 (ID없음): {}", figureDTO.name());
+                return false;
+            }
+
+            log.info("국회의원 저장 성공: {}, ID={}", figureDTO.name(), figureDTO.figureId());
+            return true;
+        } catch (Exception e) {
+            log.error("국회의원 저장 실패: {} - {}", figureDTO.name(), e.getMessage(), e);
+            throw e; // 트랜잭션 롤백을 위해 예외 다시 던지기
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateFigureCollections(FigureInfoDTO infoDTO) {
+        try {
+            log.info("국회의원 컬렉션 정보 업데이트 시작: {}", infoDTO.name());
+
+            Figure figure = figureRepository.findByFigureId(infoDTO.figureId())
+                    .orElseThrow(() -> new EntityNotFoundException("국회의원을 찾을 수 없습니다 " + infoDTO.figureId()));
+
+            // 1. 교육 정보 업데이트
+            updateEducation(figure, infoDTO);
+            figureRepository.save(figure);
+            figureRepository.flush();
+
+            // 2. 경력 정보 업데이트
+            updateCareers(figure, infoDTO);
+            figureRepository.save(figure);
+            figureRepository.flush();
+
+            // 3. 사이트 정보 업데이트
+            updateSites(figure, infoDTO);
+            figureRepository.save(figure);
+            figureRepository.flush();
+
+            // 4. 활동 정보 업데이트
+            updateActivities(figure, infoDTO);
+            figureRepository.save(figure);
+            figureRepository.flush();
+
+            log.info("국회의원 컬렉션 정보 업데이트: {}", infoDTO.name());
+        } catch (Exception e) {
+            throw e;
+        }
+    }
+
+    /**
+     * 모든 국회의원 정보를 API에서 가져옵니다
+     *
+     * @return
+     */
     private List<FigureInfoDTO> fetchAllFiguresFromAPiV2() {
         log.info("전체 국회의원 정보 API 호출 시작");
 
@@ -278,7 +327,21 @@ public class FigureApiService {
 
             log.info("API 응답 수신 (일부): {}", jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
 
-            return parseJsonResponse(jsonResponse);
+            JsonNode rootNode = mapper.readTree(jsonResponse);
+            JsonNode rowsNode = rootNode.path("nwvrqwxyaytdsfvhu")
+                    .path(1)
+                    .path("row");
+
+            if (!rowsNode.isArray()) {
+                log.warn("JSON 응답에서 row 배열을 찾을 수 없습니다");
+                return Collections.emptyList();
+            }
+
+            // 매퍼를 사용하여 DTO로 변환
+            List<FigureInfoDTO> figures = figureMapper.mapFromJsonNode(rowsNode);
+            log.info("국회의원 정보 파싱 완료: {}명", figures.size());
+
+            return figures;
         } catch (Exception e) {
             log.error("전체 국회의원 정보 조회 중 오류: {}", e.getMessage(), e);
             return Collections.emptyList();
@@ -364,7 +427,6 @@ public class FigureApiService {
                 careers,
                 email, homepage, null, null);
     }
-
 
     /**
      * 특정 정당 소속 국회의원 정보를 동기화합니다
@@ -504,6 +566,108 @@ public class FigureApiService {
     public String getTextValue(JsonNode node, String fieldName) {
         JsonNode field = node.get(fieldName);
         return (field != null && !field.isNull()) ? field.asText() : "";
+    }
+
+    /**
+     * 교육 정보 업데이트
+     */
+    private void updateEducation(Figure figure, FigureInfoDTO dto) {
+        try {
+            log.debug("교육 정보 업데이트: {}", figure.getName());
+            figure.getEducation().clear();
+            if (dto.education() != null && !dto.education().isEmpty()) {
+                figure.getEducation().addAll(dto.education());
+            }
+        } catch (Exception e) {
+            log.warn("교육 정보 업데이트 중 오류: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 경력 정보 업데이트
+     */
+    private void updateCareers(Figure figure, FigureInfoDTO dto) {
+        try {
+            log.debug("경력 정보 업데이트: {}", figure.getName());
+            figure.getCareers().clear();
+
+            // 기존 경력 정보 추가
+            if (dto.career() != null && !dto.career().isEmpty()) {
+                if (dto.career().get(0) instanceof Career) {
+                    figure.getCareers().addAll((List<Career>)dto.career());
+                }
+            }
+
+            // 국회의원 기본 경력 정보 추가
+            if (dto.electedCount() != null && !dto.electedCount().isEmpty()) {
+                Career career = Career.builder()
+                        .title(dto.electedCount() + "대 국회의원")
+                        .position("국회의원")
+                        .organization("대한민국 국회")
+                        .period(dto.electedDate() != null ? dto.electedDate() + " ~ 현재" : "")
+                        .build();
+                figure.getCareers().add(career);
+            }
+
+            // 위원회 경력 정보 추가
+            if (dto.committeeName() != null && !dto.committeeName().isEmpty()) {
+                String position = dto.committeePosition() != null ? dto.committeePosition() : "위원";
+                Career career = Career.builder()
+                        .title("국회 " + dto.committeeName())
+                        .position(position)
+                        .organization(dto.committeeName())
+                        .period("현재")
+                        .build();
+                figure.getCareers().add(career);
+            }
+        } catch (Exception e) {
+            log.warn("경력 정보 업데이트 중 오류: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 사이트 정보 업데이트
+     */
+    private void updateSites(Figure figure, FigureInfoDTO dto) {
+        try {
+            log.debug("사이트 정보 업데이트: {}", figure.getName());
+            figure.getSites().clear();
+
+            if (dto.homepage() != null && !dto.homepage().trim().isEmpty()) {
+                figure.getSites().add(dto.homepage().trim());
+            }
+
+            if (dto.email() != null && !dto.email().trim().isEmpty()) {
+                figure.getSites().add("mailto:" + dto.email().trim());
+            }
+
+            // 추가 사이트 정보가 있으면 여기에 추가
+        } catch (Exception e) {
+            log.warn("사이트 정보 업데이트 중 오류: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 활동 정보 업데이트
+     */
+    private void updateActivities(Figure figure, FigureInfoDTO dto) {
+        try {
+            log.debug("활동 정보 업데이트: {}", figure.getName());
+            figure.getActivities().clear();
+
+            if (dto.electedCount() != null && !dto.electedCount().isEmpty()) {
+                figure.getActivities().add(dto.electedCount() + "대 국회의원");
+            }
+
+            if (dto.committeeName() != null && !dto.committeeName().isEmpty()) {
+                String position = dto.committeePosition() != null ? dto.committeePosition() : "위원";
+                figure.getActivities().add(dto.committeeName() + " " + position);
+            }
+
+            // 추가 활동 정보가 있으면 여기에 추가
+        } catch (Exception e) {
+            log.warn("활동 정보 업데이트 중 오류: {}", e.getMessage());
+        }
     }
 }
 

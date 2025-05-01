@@ -9,6 +9,7 @@ import com.example.GateStatus.domain.figure.service.request.RegisterFigureComman
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureRequest;
 import com.example.GateStatus.domain.figure.service.response.*;
+import com.example.GateStatus.global.config.open.ApiResponse;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -121,9 +122,16 @@ public class FigureController {
 
     @PostMapping("/sync/all")
 //    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Integer>> syncAllFigures() {
-        int count = figureApiService.syncAllFigureV2();
-        return ResponseEntity.ok(Map.of("syncCount", count));
+    public ResponseEntity<ApiResponse<Integer>> syncAllFigures() {
+        log.info("모든 국회의원 정보 동기화 요청");
+
+        try {
+            int count = figureApiService.syncAllFiguresV3();
+
+            return ResponseEntity.ok(ApiResponse.success("국회의원 정보 동기화 완료", count));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("국회의원 정보 동기화 실패: " + e.getMessage()));
+        }
     }
 
     @PostMapping("/sync/party")

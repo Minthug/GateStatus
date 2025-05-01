@@ -7,6 +7,7 @@ import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -19,13 +20,15 @@ import java.util.Optional;
 public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     Optional<Figure> findByName(String name);
+
+    @EntityGraph(attributePaths = {"education", "careers", "sites", "activities"})
     Optional<Figure> findByFigureId(String figureId);
     List<Figure> findAllByFigureIdIsNotNull();
 
 
-    Page<Figure> findByNameContaining(String keyword, Pageable pageable);
+    Page<Figure> findByNameContaining(String name, Pageable pageable);
 
-    Page<Figure> findByConstituencyContaining(String keyword, Pageable pageable);
+    Page<Figure> findByConstituencyContaining(String place, Pageable pageable);
 
     List<Figure> findByFigureType(FigureType figureType);
 

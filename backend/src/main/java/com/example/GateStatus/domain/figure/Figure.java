@@ -5,16 +5,14 @@ import com.example.GateStatus.domain.category.Category;
 import com.example.GateStatus.domain.tag.Tag;
 import com.example.GateStatus.global.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Getter
+@Setter
 @NoArgsConstructor
 @Builder
 @AllArgsConstructor
@@ -107,17 +105,10 @@ public class Figure extends BaseTimeEntity {
         this.viewCount++;
     }
 
-    public void addCareer(Career career) {
-        if (this.careers == null) {
-            this.careers = new ArrayList<>();
-        }
-        this.careers.add(career);
-    }
-
-    public void updateCareer(List<Career> careers) {
-        this.careers.clear();
-        if (careers != null) {
-            this.careers.addAll(careers);
-        }
+    public void clearAllCollections() {
+        if (this.education != null) this.education.clear();
+        if (this.careers != null) this.careers.clear();
+        if (this.sites != null) this.sites.clear();
+        if (this.activities != null) this.activities.clear();
     }
 }
