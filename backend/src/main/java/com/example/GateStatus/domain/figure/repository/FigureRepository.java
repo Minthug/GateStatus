@@ -12,19 +12,20 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
+@Repository
 public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     Optional<Figure> findByName(String name);
 
-    @EntityGraph(attributePaths = {"education", "careers", "sites", "activities"})
-    Optional<Figure> findByFigureId(String figureId);
+    @Query("SELECT f FROM Figure f WHERE f.figureId = :figureId")
+    Optional<Figure> findByFigureId(@Param("figureId") String figureId);
     List<Figure> findAllByFigureIdIsNotNull();
-
 
     Page<Figure> findByNameContaining(String name, Pageable pageable);
 
@@ -49,5 +50,27 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     List<Figure> findTop10ByOrderByModifiedDateDesc();
 
+    // 기본 정보만 로딩 (컬렉션 없이)
+    @Query("SELECT f FROM Figure f WHERE f.figureId = :figureId")
+    Optional<Figure> findByFigureIdWithoutCollections(@Param("figureId") String figureId);
+
+    // 교육 정보만 함께 로딩
+    @Query("SELECT f FROM Figure f LEFT JOIN FETCH f.education WHERE f.figureId = :figureId")
+    Optional<Figure> findByFigureIdWithEducation(@Param("figureId") String figureId);
+
+    // 경력 정보만 함께 로딩
+    @Query("SELECT f FROM Figure f LEFT JOIN FETCH f.careers WHERE f.figureId = :figureId")
+    Optional<Figure> findByFigureIdWithCareers(@Param("figureId") String figureId);
+
+    // 사이트 정보만 함께 로딩
+    @Query("SELECT f FROM Figure f LEFT JOIN FETCH f.sites WHERE f.figureId = :figureId")
+    Optional<Figure> findByFigureIdWithSites(@Param("figureId") String figureId);
+
+    // 활동 정보만 함께 로딩
+    @Query("SELECT f FROM Figure f LEFT JOIN FETCH f.activities WHERE f.figureId = :figureId")
+    Optional<Figure> findByFigureIdWithActivities(@Param("figureId") String figureId);
+
     boolean existsByFigureId(String figureId);
+
+
 }

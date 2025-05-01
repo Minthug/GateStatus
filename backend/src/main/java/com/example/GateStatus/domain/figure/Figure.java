@@ -36,17 +36,35 @@ public class Figure extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     private FigureParty figureParty;
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "figure_education",
+            joinColumns = @JoinColumn(name = "figure_id")
+    )
+    @Column(name = "education")
     private List<String> education;
 
-    @ElementCollection
-    @CollectionTable(name = "figure_careers", joinColumns = @JoinColumn(name = "figure_id"))
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "figure_career",
+            joinColumns = @JoinColumn(name = "figure_id")
+    )
     private List<Career> careers;
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "figure_site",
+            joinColumns = @JoinColumn(name = "figure_id")
+    )
+    @Column(name = "site")
     private List<String> sites;
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "figure_activity",
+            joinColumns = @JoinColumn(name = "figure_id")
+    )
+    @Column(name = "activity")
     private List<String> activities;
 
     private String updateSource;
