@@ -11,7 +11,7 @@ import com.example.GateStatus.global.config.exception.ApiClientException;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.example.GateStatus.global.config.exception.ApiServerException;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
-import com.example.GateStatus.global.config.open.RedisCacheService;
+import com.example.GateStatus.global.config.redis.RedisCacheService;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;

@@ -1,8 +1,9 @@
-package com.example.GateStatus.global.config.open;
+package com.example.GateStatus.global.config.redis;
 
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,8 @@ import java.util.function.Supplier;
 public class RedisCacheService {
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final CacheManager cacheManager;
+
 
     /**
      * 캐시에 값 저장

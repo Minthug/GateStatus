@@ -8,7 +8,6 @@ import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
-import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
@@ -16,10 +15,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.ArrayList;
@@ -32,7 +31,6 @@ import java.util.List;
 public class FigureApiService {
 
     private final WebClient webClient;
-    private final FigureApiMapper apiMapper;
     private final ObjectMapper mapper;
     private final FigureRepository figureRepository;
     private final FigureMapper figureMapper;
@@ -40,7 +38,6 @@ public class FigureApiService {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
-
 
     @Value("${spring.openapi.assembly.url}")
     private String baseUrl;
@@ -122,147 +119,144 @@ public class FigureApiService {
 
         log.info("동기화 대상 국회의원: {} 명 ", allFigures.size());
 
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         int successCount = 0;
         int failCount = 0;
 
         for (FigureInfoDTO figure : allFigures) {
             try {
-                boolean success = figureTransactionService.saveOrUpdateFigure(figure);
-                if (success) {
+                Boolean result = transactionTemplate.execute(status -> {
+                    try {
+                        Figure figureEntity = figureRepository.findByFigureId(figure.figureId())
+                                .orElseGet(() -> Figure.builder()
+                                        .figureId(figure.figureId())
+                                        .name(figure.name())
+                                        .figureType(FigureType.POLITICIAN)
+                                        .viewCount(0L)
+                                        .build());
+
+                        figureMapper.updateFigureFromDTO(figureEntity, figure);
+                        figureRepository.save(figureEntity);
+                        log.info("국회의원 저장 성공: {}", figure.name());
+                        return true;
+                    } catch (Exception e) {
+                        status.setRollbackOnly();
+                        log.error("국회의원 저장 오류: {} - {}", figure.name(), e.getMessage(), e);
+                        return false;
+                    }
+                });
+
+                if (Boolean.TRUE.equals(result)) {
                     successCount++;
                 } else {
                     failCount++;
                 }
-            } catch (Exception e) {
-                log.error("국회의원 처리 실패: {} - {}", figure.name(), e.getMessage(), e);
+        } catch (Exception e) {
+                log.error("트랜잭션 오류: {} - {}", figure.name(), e.getMessage(), e);
                 failCount++;
             }
         }
-
         log.info("국회의원 정보 동기화 완료: 총 {} 명 중 {} 명 성공, {} 명 실패", allFigures.size(), successCount, failCount);
-
         return successCount;
     }
 
-//    @Transactional
-//    public boolean saveOrUpdateFigure(FigureInfoDTO info) {
+//    private boolean processSingleFigure(FigureInfoDTO dto) {
+//        log.debug("국회의원 정보 처리 시작: ID={}, NAME={}", dto.figureId(), dto.name());
+//
 //        try {
-//            Figure figure = figureRepository.findByFigureId(info.figureId())
-//                    .orElseGet(() -> Figure.builder()
-//                            .figureId(info.figureId())
-//                            .name(info.name())
-//                            .figureType(FigureType.POLITICIAN)
-//                            .viewCount(0L)
-//                            .build());
+//            Figure figure = findOrCreateFigure(dto);
 //
-//            figureMapper.updateFigureFromDTO(figure, info);
-//            figureRepository.saveAndFlush(figure);
+//            try {
+//                figureMapper.updateFigureFromDTO(figure, dto);
+//            } catch (Exception e) {
+//                log.error("국회의원 정보 업데이트 중 오류: {} - {}", dto.name(), e.getMessage());
+//                return false;
+//            }
 //
-//            log.info("국회의원 저장 성공: {}", info.name());
-//            return true;
+//            try {
+//                Figure savedFigure = figureRepository.saveAndFlush(figure);
+//                log.info("국회의원 저장 성공: ID={}, NAME={}", savedFigure.getName(), savedFigure.getFigureId());
+//
+//                // 저장 확인 (선택적)
+//                boolean exists = figureRepository.existsByFigureId(savedFigure.getFigureId());
+//                log.debug("저장 확인: 존재={}, ID={}", exists, savedFigure.getFigureId());
+//
+//                return true;
+//            } catch (Exception e) {
+//                log.error("국회의원 저장 중 오류: {} - {}", dto.name(), e.getMessage(), e);
+//                return false;
+//            }
 //        } catch (Exception e) {
-//            log.error("국회의원 저장 실패: {} - {}",info.name(), e.getMessage(), e);
+//            log.error("국회의원 정보 처리 중 예상치 못한 오류 발생: {} - {}", dto.name(), e.getMessage(), e);
 //            return false;
 //        }
 //    }
 
-    private boolean processSingleFigure(FigureInfoDTO dto) {
-        log.debug("국회의원 정보 처리 시작: ID={}, NAME={}", dto.figureId(), dto.name());
-
-        try {
-            Figure figure = findOrCreateFigure(dto);
-
-            try {
-                figureMapper.updateFigureFromDTO(figure, dto);
-            } catch (Exception e) {
-                log.error("국회의원 정보 업데이트 중 오류: {} - {}", dto.name(), e.getMessage());
-                return false;
-            }
-
-            try {
-                Figure savedFigure = figureRepository.saveAndFlush(figure);
-                log.info("국회의원 저장 성공: ID={}, NAME={}", savedFigure.getName(), savedFigure.getFigureId());
-
-                // 저장 확인 (선택적)
-                boolean exists = figureRepository.existsByFigureId(savedFigure.getFigureId());
-                log.debug("저장 확인: 존재={}, ID={}", exists, savedFigure.getFigureId());
-
-                return true;
-            } catch (Exception e) {
-                log.error("국회의원 저장 중 오류: {} - {}", dto.name(), e.getMessage(), e);
-                return false;
-            }
-        } catch (Exception e) {
-            log.error("국회의원 정보 처리 중 예상치 못한 오류 발생: {} - {}", dto.name(), e.getMessage(), e);
-            return false;
-        }
-    }
-
-    /**
-     * 국회의원 조회 또는 새 객체 생성
-     * @param info
-     * @return
-     */
-    private Figure findOrCreateFigure(FigureInfoDTO info) {
-        return figureRepository.findByFigureId(info.figureId())
-                .orElseGet(() -> {
-                    log.info("새 국회의원 생성: {}", info.name());
-                    return Figure.builder()
-                            .figureId(info.figureId())
-                            .name(info.name())
-                            .figureType(FigureType.POLITICIAN)
-                            .viewCount(0L)
-                            .build();
-                });
-    }
-
-    /**
-     * 국회의원 정보 로깅
-     * @param figure
-     */
-    private void logSampleFigure(FigureInfoDTO figure) {
-        log.info("샘플 국회의원 정보: ID={}, 이름={}, 정당={}", figure.figureId(), figure.name(),
-                figure.partyName() != null ? figure.partyName() : "없음");
-
-    }
-
-    /**
-     * 모든 국회의원 정보를 API에서 가져옵니다
-     *
-     * @return
-     */
-    private List<FigureInfoDTO> fetchAllFiguresFromApi() {
-        try {
-            log.info("전체 국회의원 정보 API 호출 시작");
-
-            try {
-                String jsonResponse = webClient.get()
-                        .uri(uriBuilder -> uriBuilder
-                                .path(figureApiPath)
-                                .queryParam("key", apiKey)
-                                .build())
-                        .retrieve()
-                        .bodyToMono(String.class)
-                        .block();
-
-                if (jsonResponse == null || jsonResponse.isEmpty()) {
-                    log.error("API에서 빈 응답을 반환했습니다");
-                    throw new ApiDataRetrievalException("API에서 데이터를 가져오지 못했습니다");
-                }
-
-                log.info("API 응답 수신(일부): {}",
-                        jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
-
-                return parseJsonResponse(jsonResponse);
-            } catch (Exception e) {
-                log.error("API 호출 자체에서 오류 발생: {}", e.getMessage(), e);
-                throw new ApiDataRetrievalException("API 호출 실패: " + e.getMessage());
-            }
-        } catch (Exception e) {
-            log.error("전체 API 처리 과정에서 오류 발생: {}", e.getMessage(), e);
-            throw new ApiDataRetrievalException("전체 국회의원 정보를 가져오는 중 오류 발생");
-        }
-    }
+//    /**
+//     * 국회의원 조회 또는 새 객체 생성
+//     * @param info
+//     * @return
+//     */
+//    private Figure findOrCreateFigure(FigureInfoDTO info) {
+//        return figureRepository.findByFigureId(info.figureId())
+//                .orElseGet(() -> {
+//                    log.info("새 국회의원 생성: {}", info.name());
+//                    return Figure.builder()
+//                            .figureId(info.figureId())
+//                            .name(info.name())
+//                            .figureType(FigureType.POLITICIAN)
+//                            .viewCount(0L)
+//                            .build();
+//                });
+//    }
+//
+//    /**
+//     * 국회의원 정보 로깅
+//     * @param figure
+//     */
+//    private void logSampleFigure(FigureInfoDTO figure) {
+//        log.info("샘플 국회의원 정보: ID={}, 이름={}, 정당={}", figure.figureId(), figure.name(),
+//                figure.partyName() != null ? figure.partyName() : "없음");
+//
+//    }
+//
+//    /**
+//     * 모든 국회의원 정보를 API에서 가져옵니다
+//     *
+//     * @return
+//     */
+//    private List<FigureInfoDTO> fetchAllFiguresFromApi() {
+//        try {
+//            log.info("전체 국회의원 정보 API 호출 시작");
+//
+//            try {
+//                String jsonResponse = webClient.get()
+//                        .uri(uriBuilder -> uriBuilder
+//                                .path(figureApiPath)
+//                                .queryParam("key", apiKey)
+//                                .build())
+//                        .retrieve()
+//                        .bodyToMono(String.class)
+//                        .block();
+//
+//                if (jsonResponse == null || jsonResponse.isEmpty()) {
+//                    log.error("API에서 빈 응답을 반환했습니다");
+//                    throw new ApiDataRetrievalException("API에서 데이터를 가져오지 못했습니다");
+//                }
+//
+//                log.info("API 응답 수신(일부): {}",
+//                        jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
+//
+//                return parseJsonResponse(jsonResponse);
+//            } catch (Exception e) {
+//                log.error("API 호출 자체에서 오류 발생: {}", e.getMessage(), e);
+//                throw new ApiDataRetrievalException("API 호출 실패: " + e.getMessage());
+//            }
+//        } catch (Exception e) {
+//            log.error("전체 API 처리 과정에서 오류 발생: {}", e.getMessage(), e);
+//            throw new ApiDataRetrievalException("전체 국회의원 정보를 가져오는 중 오류 발생");
+//        }
+//    }
 
     private List<FigureInfoDTO> fetchAllFiguresFromAPiV2() {
         log.info("전체 국회의원 정보 API 호출 시작");

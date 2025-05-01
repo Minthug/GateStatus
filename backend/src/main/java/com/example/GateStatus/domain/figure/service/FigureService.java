@@ -2,21 +2,21 @@ package com.example.GateStatus.domain.figure.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
-import com.example.GateStatus.domain.figure.exception.NotFoundFigureException;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.request.FindFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.RegisterFigureCommand;
-import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
-import com.example.GateStatus.domain.figure.service.response.*;
-import com.example.GateStatus.global.kubernetes.KubernetesProperties;
+import com.example.GateStatus.domain.figure.service.response.FigureDTO;
+import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
+import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.Hibernate;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,13 +32,18 @@ public class FigureService {
     private final FigureRepository figureRepository;
     private final FigureApiService figureApiService;
     private final FigureCacheService figureCacheService;
+    private final CacheManager cacheManager;
 
-
+    /**
+     * 국회의원 등록 또는 조회
+     * @param command
+     * @return
+     */
     @Transactional
     public RegisterFigureResponse getRegisterFigure(final RegisterFigureCommand command) {
-
         Figure findFigure = figureRepository.findByName(command.name())
                 .orElseGet(() -> {
+                    log.info("신규 국회의원 등록: {}", command.name());
                     Figure figure = Figure.builder()
                             .name(command.name())
                             .englishName(command.englishName())
@@ -53,38 +58,48 @@ public class FigureService {
                             .updateSource(command.updateSource())
                             .build();
                     Figure savedFigure = figureRepository.save(figure);
-
-                    figureCacheService.updateFigureCache(savedFigure);
+                    if (savedFigure.getFigureId() != null) {
+                        figureCacheService.updateFigureCache(savedFigure);
+                    }
 
                     return savedFigure;
                 });
         return RegisterFigureResponse.from(findFigure);
     }
 
+    /**
+     * 국회의원 상세 정보 조회
+     * @param command
+     * @return
+     */
     @Transactional(readOnly = true)
     public FindFigureDetailResponse findFigure(FindFigureCommand command) {
-        log.info("조회 시도 figureId: {}", command.figureId());
-
-        List<Figure> allFigures = figureRepository.findAllByFigureIdIsNotNull();
-        log.info("저장된 figure_id 수: {}", allFigures.size());
-        log.info("저장된 figure_id 목록: {}", allFigures.stream()
-                .map(Figure::getFigureId)
-                .collect(Collectors.toList()));
-
-        Optional<Figure> checkFigure = figureRepository.findByFigureId(command.figureId());
-        if (checkFigure.isEmpty()) {
-            log.error("해당 figureId로 조회 실패: {}", command.figureId());
-            log.error("전체 저장된 figureId 목록: {}",
-                    figureRepository.findAll().stream()
-                            .map(Figure::getFigureId)
-                            .collect(Collectors.toList()));
+        if (command.figureId() != null || command.figureId().isEmpty()) {
+            throw new IllegalArgumentException("국회의원 ID는 필수 값입니다");
         }
 
-        Figure findFigure = figureCacheService.findFigureById(command.figureId());
+        log.debug("조회 시도 figureId: {}", command.figureId());
 
+        try {
+            Figure findFigure = figureCacheService.findFigureById(command.figureId());
+            return FindFigureDetailResponse.from(findFigure);
+        } catch (EntityNotFoundException e) {
+            log.warn("국회의원 정보 조회 실패: {}", command.figureId());
+            throw e;
+        }
+    }
 
+    public boolean checkCacheStatus(String figureId) {
+        String cacheKey = "figure:" + figureId;
+        Object redisValue = redisTemplate.opsForValue().get(cacheKey);
 
-        return FindFigureDetailResponse.from(findFigure);
+        Cache cache = cacheManager.getCache("figures");
+        Cache.ValueWrapper springCacheValue = cache != null ? cache.get(figureId) : null;
+
+        log.info("Redis 캐시 상태: {}", redisValue != null);
+        log.info("Spring Cache 상태: {}", springCacheValue != null);
+
+        return redisValue != null || springCacheValue != null;
     }
 
     @Transactional(readOnly = true)
