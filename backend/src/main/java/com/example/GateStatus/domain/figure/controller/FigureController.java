@@ -1,8 +1,7 @@
 package com.example.GateStatus.domain.figure.controller;
 
-import com.example.GateStatus.domain.figure.Figure;
-import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
+import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureCacheService;
 import com.example.GateStatus.domain.figure.service.FigureService;
@@ -11,9 +10,14 @@ import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureRequest;
 import com.example.GateStatus.domain.figure.service.response.*;
 import com.example.GateStatus.global.config.open.ApiResponse;
+import com.example.GateStatus.global.config.redis.CacheConfig;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -21,7 +25,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -31,7 +34,8 @@ public class FigureController {
 
     private final FigureService figureService;
     private final FigureApiService figureApiService;
-    private final FigureCacheService figureCacheService;
+    @Autowired
+    private final CacheManager cacheManager;
 
     @PostMapping
     public ResponseEntity<RegisterFigureResponse> registerFigure(@RequestBody RegisterFigureCommand command) {
@@ -43,7 +47,17 @@ public class FigureController {
     public ResponseEntity<FigureDTO> findFigure(@PathVariable String figureId) {
         log.info("국회의원 조회 요청: {}", figureId);
 
-        FigureDTO figure = figureCacheService.findFigureDtoById(figureId);
+        // 캐시 상태 확인
+        try {
+            Cache cache = cacheManager.getCache("figure-dtos");
+            Cache.ValueWrapper value = cache != null ? cache.get(figureId) : null;
+            log.info("캐시 상태: {}", value != null ? "hit" : "miss");
+        } catch (Exception e) {
+            log.warn("캐시 확인 중 오류: {}", e.getMessage());
+        }
+
+
+        FigureDTO figure = figureService.findFigureById(figureId);
         return ResponseEntity.ok(figure);
     }
 
@@ -139,70 +153,5 @@ public class FigureController {
     public ResponseEntity<SyncPartyResponse> syncFiguresByParty(@RequestParam String partyName) {
         int syncedCount = figureApiService.syncFigureByParty(partyName);
         return ResponseEntity.ok(new SyncPartyResponse(partyName, syncedCount));
-    }
-
-    // FigureController 클래스에 추가
-    @PostMapping("/test/simple-save")
-    public ResponseEntity<String> testSimpleSave() {
-        try {
-            Figure saved = figureApiService.testSimpleSave();
-            return ResponseEntity.ok("저장 성공: " + saved.getId() + ", figureId: " + saved.getFigureId());
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("저장 실패: " + e.getMessage());
-        }
-    }
-
-    @PostMapping("/test/explicit-transaction")
-    public ResponseEntity<String> testExplicitTransaction() {
-        FigureInfoDTO figure = new FigureInfoDTO(
-                "TEST-ID2",
-                "테스트 의원",
-                "Test Member",
-                "1980-01-01",
-                FigureParty.INDEPENDENT,
-                "서울",
-                "국회위원회",
-                "위원",
-                "21대",
-                "2020-04-01",
-                "초선",
-                null,
-                List.of("서울대학교"),
-                List.of(),
-                "test@assembly.go.kr",
-                "https://test.com",
-                null,
-                null
-        );
-        boolean success = figureApiService.saveWithExplicitTransaction(figure);
-        return ResponseEntity.ok("저장 결과: " + success);
-    }
-    @PostMapping("/test/save-and-verify")
-    public ResponseEntity<String> testSaveAndVerify() {
-        // 기본값으로 테스트할 DTO 생성
-        FigureInfoDTO figure = new FigureInfoDTO(
-                "TEST-ID3",
-                "검증 의원",
-                "Verify Member",
-                "1985-01-01",
-                FigureParty.INDEPENDENT,
-                "부산",
-                "국회위원회",
-                "위원",
-                "21대",
-                "2020-04-01",
-                "초선",
-                null,
-                List.of("부산대학교"),
-                List.of(),
-                "verify@assembly.go.kr",
-                "https://verify.com",
-                null,
-                null
-        );
-
-        boolean success = figureApiService.saveAndVerify(figure);
-        return ResponseEntity.ok("저장 및 확인 결과: " + success);
     }
 }

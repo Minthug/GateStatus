@@ -189,10 +189,27 @@ public class FigureApiService {
             figure.setUpdateSource("국회 Open API");
 
             // 저장
-            figureRepository.save(figure);
+            Figure savedFigure = figureRepository.save(figure);
 
-            log.info("국회의원 저장 성공: {}, ID={}", figureDTO.name(), figureDTO.figureId());
-            return true;
+// EntityManager로 직접 조회
+            boolean exists = false;
+            try {
+                Figure found = entityManager.createQuery(
+                                "SELECT f FROM Figure f WHERE f.figureId = :id", Figure.class)
+                        .setParameter("id", figureDTO.figureId())
+                        .getSingleResult();
+                exists = (found != null);
+            } catch (Exception e) {
+                log.warn("엔티티 조회 실패: {}", e.getMessage());
+            }
+
+            if (exists) {
+                log.info("국회의원 저장 성공: {}, ID={}", figureDTO.name(), figureDTO.figureId());
+                return true;
+            } else {
+                log.warn("국회의원 저장 실패 (직접 조회 불가): {}", figureDTO.name());
+                return false;
+            }
         } catch (Exception e) {
             log.error("국회의원 저장 실패: {} - {}", figureDTO.name(), e.getMessage(), e);
             throw e; // 트랜잭션 롤백을 위해 예외 다시 던지기
@@ -822,74 +839,6 @@ public class FigureApiService {
             log.debug("활동 정보 업데이트 완료: {}", figure.name());
         } catch (Exception e) {
             log.warn("활동 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage());
-        }
-    }
-
-
-
-    // 1. 단순화된 테스트 저장 메서드
-    public Figure testSimpleSave() {
-        Figure figure = Figure.builder()
-                .figureId("TEST-ID")
-                .name("테스트 국회의원")
-                .figureType(FigureType.POLITICIAN)
-                .viewCount(0L)
-                .build();
-
-        try {
-            Figure saved = figureRepository.save(figure);
-            log.info("단순 저장 성공: {}, ID={}", saved.getName(), saved.getFigureId());
-            return saved;
-        } catch (Exception e) {
-            log.error("단순 저장 실패: {}", e.getMessage(), e);
-            throw e;
-        }
-    }
-
-    // 2. 명시적 트랜잭션 사용 메서드
-    public boolean saveWithExplicitTransaction(FigureInfoDTO figure) {
-        TransactionTemplate template = new TransactionTemplate(transactionManager);
-        return template.execute(status -> {
-            try {
-                Figure entity = new Figure();
-                entity.setFigureId(figure.figureId());
-                entity.setName(figure.name());
-                entity.setFigureType(FigureType.POLITICIAN);
-                entity.setViewCount(0L);
-
-                Figure saved = figureRepository.save(entity);
-                log.info("명시적 트랜잭션으로 저장 성공: {}, ID={}", saved.getName(), saved.getFigureId());
-                return true;
-            } catch (Exception e) {
-                log.error("명시적 트랜잭션으로 저장 실패: {}", e.getMessage(), e);
-                status.setRollbackOnly();
-                return false;
-            }
-        });
-    }
-
-    // 3. 저장 후 즉시 확인 메서드
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean saveAndVerify(FigureInfoDTO figure) {
-        try {
-            Figure entity = Figure.builder()
-                    .figureId(figure.figureId())
-                    .name(figure.name())
-                    .figureType(FigureType.POLITICIAN)
-                    .viewCount(0L)
-                    .build();
-
-            Figure saved = figureRepository.save(entity);
-            figureRepository.flush(); // 즉시 DB에 반영
-
-            // 저장 후 즉시 확인
-            boolean exists = figureRepository.existsByFigureId(figure.figureId());
-            log.info("저장 후 확인: {}, 존재여부: {}", figure.name(), exists);
-
-            return exists;
-        } catch (Exception e) {
-            log.error("저장 및 확인 중 오류: {}", e.getMessage(), e);
-            throw e;
         }
     }
 }

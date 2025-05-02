@@ -102,10 +102,12 @@ public class FigureCacheService {
 //        }
 //    }
 
-    @Cacheable(value = "figure-dtos", key = "#figureId", unless = "#result == null")
+//    @Cacheable(value = "figure-dtos", key = "#figureId", unless = "#result == null")
     @Transactional(readOnly = true)
     public FigureDTO findFigureDtoById(String figureId) {
-        log.info("Cache miss for figure DTO ID: {}", figureId);
+
+        log.info("항상 실행되는 로그: {}", figureId); // 항상 출력되는 로그 추가
+
         try {
             Figure figure = figureRepository.findByFigureId(figureId)
                 .orElseThrow(() -> new EntityNotFoundException("해당 국회의원을 찾을 수 없습니다: " + figureId));
@@ -116,6 +118,5 @@ public class FigureCacheService {
             throw e;
         }
     }
-
 }
 
