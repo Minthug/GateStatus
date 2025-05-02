@@ -112,8 +112,6 @@ public class CareerParser {
                     .title(line)
                     .position(position)
                     .organization(organization)
-                    .startDate(startDate)
-                    .endDate(endDate)
                     .period(periodStr)
                     .build();
         } catch (Exception e) {
