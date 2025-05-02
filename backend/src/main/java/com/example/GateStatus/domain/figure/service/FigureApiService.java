@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -130,57 +131,32 @@ public class FigureApiService {
 
         for (FigureInfoDTO figure : allFigures) {
             try {
-                // 각 국회의원을 별도 트랜잭션으로 처리
-                Boolean result = transactionTemplate.execute(status -> {
+                // 기본 정보만 저장 (트랜잭션 내에서)
+                boolean basicSaved = saveBasicFigureInfo(figure);
+
+                if (basicSaved) {
+                    // 트랜잭션 내에서 기본 정보가 저장된 후에 컬렉션 업데이트 수행
                     try {
-                        // 1단계: 기본 정보 저장
-                        boolean basicSaved = saveBasicFigureInfo(figure);
-                        if (!basicSaved) {
-                            return false;
-                        }
+                        updateEducation(figure);
+                        updateCareers(figure);
+                        updateSites(figure);
+                        updateActivities(figure);
 
-                        // 2단계: 교육 정보 및 사이트 정보 업데이트
-                        try {
-                            updateEducation(figure);
-                            updateSites(figure);
-                        } catch (Exception e) {
-                            log.warn("교육/사이트 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage());
-                        }
-
-                        // 3단계: 경력 정보 업데이트 (예외 처리 강화)
-                        try {
-                            updateCareers(figure);
-                        } catch (Exception e) {
-                            log.error("경력 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage(), e);
-                        }
-
-                        // 4단계: 활동 정보 업데이트 (예외 처리 강화)
-                        try {
-                            updateActivities(figure);
-                        } catch (Exception e) {
-                            log.error("활동 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage(), e);
-                        }
-
-                        return true;
+                        successCount++;
+                        log.info("국회의원 정보 동기화 성공: {}", figure.name());
                     } catch (Exception e) {
-                        log.error("국회의원 저장 중 오류: {} - {}", figure.name(), e.getMessage());
-                        status.setRollbackOnly();
-                        return false;
+                        log.error("컬렉션 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage(), e);
+                        failCount++;
                     }
-                });
-
-                if (Boolean.TRUE.equals(result)) {
-                    successCount++;
-                    log.info("국회의원 정보 동기화 성공: {}", figure.name());
                 } else {
                     failCount++;
-                    log.warn("국회의원 정보 동기화 실패: {}", figure.name());
+                    log.warn("국회의원 기본 정보 저장 실패: {}", figure.name());
                 }
             } catch (Exception e) {
                 log.error("국회의원 처리 중 예외 발생: {} - {}", figure.name(), e.getMessage(), e);
                 failCount++;
             }
-        }
+            }
 
         log.info("국회의원 정보 동기화 완료: 총 {}명 중 {}명 성공, {}명 실패", allFigures.size(), successCount, failCount);
         return successCount;
@@ -344,7 +320,7 @@ public class FigureApiService {
                 for (String education : figure.education()) {
                     if (education != null && !education.trim().isEmpty()) {
                         entityManager.createNativeQuery(
-                                "INSERT INTO figure_education (figure_id, education) VALUES (?, ?)")
+                                        "INSERT INTO figure_education (figure_id, education) VALUES (?, ?)")
                                 .setParameter(1, figureId)
                                 .setParameter(2, education.trim())
                                 .executeUpdate();
@@ -356,7 +332,7 @@ public class FigureApiService {
             // 국회의원 기본 경력
             if (figure.electedCount() != null && !figure.electedCount().isEmpty()) {
                 entityManager.createNativeQuery(
-                        "INSERT INTO figure_career (figure_id, title, position, organization, period) VALUES (?, ?, ?, ?, ?)")
+                                "INSERT INTO figure_career (figure_id, title, position, organization, period) VALUES (?, ?, ?, ?, ?)")
                         .setParameter(1, figureId)
                         .setParameter(2, figure.electedCount() + "대 국회의원")
                         .setParameter(3, "국회의원")
@@ -369,7 +345,7 @@ public class FigureApiService {
             if (figure.committeeName() != null && !figure.committeeName().isEmpty()) {
                 String position = figure.committeePosition() != null ? figure.committeePosition() : "위원";
                 entityManager.createNativeQuery(
-                        "INSERT INTO figure_career (figure_id, title, position, organization, period) VALUES (?, ?, ?, ?, ?)")
+                                "INSERT INTO figure_career (figure_id, title, position, organization, period) VALUES (?, ?, ?, ?, ?)")
                         .setParameter(1, figureId)
                         .setParameter(2, "국회 " + figure.committeeName())
                         .setParameter(3, position)
@@ -381,13 +357,41 @@ public class FigureApiService {
             // 사이트 정보 삽입
             if (figure.homepage() != null && !figure.homepage().trim().isEmpty()) {
                 entityManager.createNativeQuery(
-                        "INSERT INTO figure_site (figure_id, site) VALUES (?, ?)")
+                                "INSERT INTO figure_site (figure_id, site) VALUES (?, ?)")
                         .setParameter(1, figureId)
                         .setParameter(2, figure.homepage().trim())
                         .executeUpdate();
             }
 
-            if ()
+            if (figure.email() != null && !figure.email().trim().isEmpty()) {
+                entityManager.createNativeQuery(
+                                "INSERT INTO figure_site (figure_id, site) VALUES (?, ?)")
+                        .setParameter(1, figureId)
+                        .setParameter(2, "mailto:" + figure.email().trim())
+                        .executeUpdate();
+            }
+
+            if (figure.electedCount() != null && !figure.electedCount().isEmpty()) {
+                entityManager.createNativeQuery(
+                                "INSERT INTO figure_activity (figure_id, activity) VALUES (?, ?)")
+                        .setParameter(1, figureId)
+                        .setParameter(2, figure.electedCount() + "대 국회의원")
+                        .executeUpdate();
+            }
+
+            if (figure.committeeName() != null && !figure.committeeName().isEmpty()) {
+                String position = figure.committeePosition() != null ? figure.committeePosition() : "위원";
+                entityManager.createNativeQuery(
+                                "INSERT INTO figure_activity (figure_id, activity) VALUES (?, ?)")
+                        .setParameter(1, figureId)
+                        .setParameter(2, figure.committeeName() + " " + position)
+                        .executeUpdate();
+            }
+
+            log.debug("컬렉션 정보 업데이트 완료: {}", figure.name());
+        } catch (Exception e) {
+            log.error("컬렉션 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage(), e);
+            throw e;
         }
     }
 
@@ -689,8 +693,12 @@ public class FigureApiService {
             Figure entity = figureRepository.findByFigureIdWithCareers(figure.figureId())
                     .orElseThrow(() -> new EntityNotFoundException("국회의원을 찾을 수 없습니다: " + figure.figureId()));
 
-            // 기존 경력 정보 비우기
-            entity.getCareers().clear();
+            // 컬렉션이 null인 경우 대비
+            if (entity.getCareers() == null) {
+                entity.setCareers(new ArrayList<>());
+            } else {
+                entity.getCareers().clear();
+            }
 
             // 새 경력 정보 목록 생성
             List<Career> newCareers = new ArrayList<>();
@@ -783,8 +791,13 @@ public class FigureApiService {
             Figure entity = figureRepository.findByFigureIdWithActivities(figure.figureId())
                     .orElseThrow(() -> new EntityNotFoundException("국회의원을 찾을 수 없습니다: " + figure.figureId()));
 
-            // 기존 활동 정보 비우기
-            entity.getActivities().clear();
+
+            // 컬렉션이 null인 경우 대비
+            if (entity.getSites() == null) {
+                entity.setSites(new ArrayList<>());
+            } else {
+                entity.getSites().clear();
+            }
 
             // 새 활동 정보 목록 생성
             List<String> newActivities = new ArrayList<>();
@@ -809,6 +822,74 @@ public class FigureApiService {
             log.debug("활동 정보 업데이트 완료: {}", figure.name());
         } catch (Exception e) {
             log.warn("활동 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage());
+        }
+    }
+
+
+
+    // 1. 단순화된 테스트 저장 메서드
+    public Figure testSimpleSave() {
+        Figure figure = Figure.builder()
+                .figureId("TEST-ID")
+                .name("테스트 국회의원")
+                .figureType(FigureType.POLITICIAN)
+                .viewCount(0L)
+                .build();
+
+        try {
+            Figure saved = figureRepository.save(figure);
+            log.info("단순 저장 성공: {}, ID={}", saved.getName(), saved.getFigureId());
+            return saved;
+        } catch (Exception e) {
+            log.error("단순 저장 실패: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    // 2. 명시적 트랜잭션 사용 메서드
+    public boolean saveWithExplicitTransaction(FigureInfoDTO figure) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        return template.execute(status -> {
+            try {
+                Figure entity = new Figure();
+                entity.setFigureId(figure.figureId());
+                entity.setName(figure.name());
+                entity.setFigureType(FigureType.POLITICIAN);
+                entity.setViewCount(0L);
+
+                Figure saved = figureRepository.save(entity);
+                log.info("명시적 트랜잭션으로 저장 성공: {}, ID={}", saved.getName(), saved.getFigureId());
+                return true;
+            } catch (Exception e) {
+                log.error("명시적 트랜잭션으로 저장 실패: {}", e.getMessage(), e);
+                status.setRollbackOnly();
+                return false;
+            }
+        });
+    }
+
+    // 3. 저장 후 즉시 확인 메서드
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean saveAndVerify(FigureInfoDTO figure) {
+        try {
+            Figure entity = Figure.builder()
+                    .figureId(figure.figureId())
+                    .name(figure.name())
+                    .figureType(FigureType.POLITICIAN)
+                    .viewCount(0L)
+                    .build();
+
+            Figure saved = figureRepository.save(entity);
+            figureRepository.flush(); // 즉시 DB에 반영
+
+            // 저장 후 즉시 확인
+            boolean exists = figureRepository.existsByFigureId(figure.figureId());
+            log.info("저장 후 확인: {}, 존재여부: {}", figure.name(), exists);
+
+            return exists;
+        } catch (Exception e) {
+            log.error("저장 및 확인 중 오류: {}", e.getMessage(), e);
+            throw e;
         }
     }
 }

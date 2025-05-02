@@ -1,6 +1,7 @@
 package com.example.GateStatus.domain.figure.controller;
 
 import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureCacheService;
@@ -138,5 +139,70 @@ public class FigureController {
     public ResponseEntity<SyncPartyResponse> syncFiguresByParty(@RequestParam String partyName) {
         int syncedCount = figureApiService.syncFigureByParty(partyName);
         return ResponseEntity.ok(new SyncPartyResponse(partyName, syncedCount));
+    }
+
+    // FigureController 클래스에 추가
+    @PostMapping("/test/simple-save")
+    public ResponseEntity<String> testSimpleSave() {
+        try {
+            Figure saved = figureApiService.testSimpleSave();
+            return ResponseEntity.ok("저장 성공: " + saved.getId() + ", figureId: " + saved.getFigureId());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("저장 실패: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/test/explicit-transaction")
+    public ResponseEntity<String> testExplicitTransaction() {
+        FigureInfoDTO figure = new FigureInfoDTO(
+                "TEST-ID2",
+                "테스트 의원",
+                "Test Member",
+                "1980-01-01",
+                FigureParty.INDEPENDENT,
+                "서울",
+                "국회위원회",
+                "위원",
+                "21대",
+                "2020-04-01",
+                "초선",
+                null,
+                List.of("서울대학교"),
+                List.of(),
+                "test@assembly.go.kr",
+                "https://test.com",
+                null,
+                null
+        );
+        boolean success = figureApiService.saveWithExplicitTransaction(figure);
+        return ResponseEntity.ok("저장 결과: " + success);
+    }
+    @PostMapping("/test/save-and-verify")
+    public ResponseEntity<String> testSaveAndVerify() {
+        // 기본값으로 테스트할 DTO 생성
+        FigureInfoDTO figure = new FigureInfoDTO(
+                "TEST-ID3",
+                "검증 의원",
+                "Verify Member",
+                "1985-01-01",
+                FigureParty.INDEPENDENT,
+                "부산",
+                "국회위원회",
+                "위원",
+                "21대",
+                "2020-04-01",
+                "초선",
+                null,
+                List.of("부산대학교"),
+                List.of(),
+                "verify@assembly.go.kr",
+                "https://verify.com",
+                null,
+                null
+        );
+
+        boolean success = figureApiService.saveAndVerify(figure);
+        return ResponseEntity.ok("저장 및 확인 결과: " + success);
     }
 }

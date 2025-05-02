@@ -106,9 +106,15 @@ public class FigureCacheService {
     @Transactional(readOnly = true)
     public FigureDTO findFigureDtoById(String figureId) {
         log.info("Cache miss for figure DTO ID: {}", figureId);
-        Figure figure = figureRepository.findByFigureId(figureId)
+        try {
+            Figure figure = figureRepository.findByFigureId(figureId)
                 .orElseThrow(() -> new EntityNotFoundException("해당 국회의원을 찾을 수 없습니다: " + figureId));
-        return FigureDTO.from(figure);
+            log.info("국회의원 정보 조회 성공: {}, ID={}", figure.getName(), figureId);
+            return FigureDTO.from(figure);
+        } catch (Exception e) {
+            log.error("국회의원 정보 조회 실패: {} - {}", figureId, e.getMessage());
+            throw e;
+        }
     }
 
 }

@@ -39,6 +39,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/v1/figures/sync/all").permitAll()
                         .requestMatchers("/v1/figures/sync").permitAll()
+                        .requestMatchers("/v1/figures/test/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/figures/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/v1/figures/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/v1/figures/**").hasRole("ADMIN")

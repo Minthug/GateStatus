@@ -77,7 +77,7 @@ public class FigureService {
      */
     @Transactional(readOnly = true)
     public FindFigureDetailResponse findFigure(FindFigureCommand command) {
-        if (command.figureId() != null || command.figureId().isEmpty()) {
+        if (command.figureId() == null || command.figureId().isEmpty()) {
             throw new IllegalArgumentException("국회의원 ID는 필수 값입니다");
         }
 
