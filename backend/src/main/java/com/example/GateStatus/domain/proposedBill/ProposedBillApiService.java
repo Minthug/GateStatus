@@ -2,23 +2,25 @@ package com.example.GateStatus.domain.proposedBill;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillApiDTO;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillApiMapper;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
-import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -28,6 +30,7 @@ public class ProposedBillApiService {
 
     private final WebClient webClient;
     private final ProposedBillApiMapper apiMapper;
+    private final ObjectMapper mapper;
     private final ProposedBillRepository billRepository;
     private final FigureRepository figureRepository;
 
@@ -88,17 +91,24 @@ public class ProposedBillApiService {
         try {
             log.info("{}의 발의 법안 API 호출", proposedName);
 
-            AssemblyApiResponse<JsonNode> apiResponse = webClient.get()
+            String jsonResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(proposedBillPath)
                             .queryParam("KEY", apiKey)
                             .queryParam("PROPOSER", proposedName)
                             .build())
                     .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {})
+                    .bodyToMono(String.class)
                     .block();
 
-            List<ProposedBillApiDTO> bills = apiMapper.map(apiResponse);
+            if (isEmpty(jsonResponse)) {
+                log.warn("API에서 빈 응답 또는 null 반환 (이름: {}) ", proposedName);
+                return Collections.emptyList();
+            }
+
+            log.debug("API 응답 수신 일부: {}", jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
+
+            List<ProposedBillApiDTO> bills =
             log.info("{}의 발의 법안 조회 결과: {}건", proposedName, bills.size());
 
             return bills;
@@ -171,6 +181,49 @@ public class ProposedBillApiService {
         } catch (Exception e) {
             log.warn("날짜 형식 변환 오류: {}", dateStr, e);
             return null;
+        }
+    }
+
+    private boolean isEmpty(String str) {
+        return str == null || str.trim().isEmpty();
+    }
+
+    private List<FigureInfoDTO> parseJsonResponse(String jsonResponse) {
+        try {
+            JsonNode rootNode = mapper.readTree(jsonResponse);
+            JsonNode rowsNode = rootNode.path("nzmimeepazxkubdpn")
+                    .path(1)
+                    .path("row");
+
+            if (!rowsNode.isArray()) {
+                log.warn("JSON 응답에서 row 배열을 찾을 수 없습니다");
+                return Collections.emptyList();
+            }
+
+            List<ProposedBillApiDTO> bills = new ArrayList<>();
+            int parsedCount = 0;
+            int skipCount = 0;
+
+            for (JsonNode row : rowsNode) {
+                try {
+                    ProposedBillApiDTO dto = parseFigureFromJsonNode(row);
+                    if (dto != null) {
+                        bills.add(dto);
+                        parsedCount++;
+                    } else {
+                        skipCount++;
+                    }
+                } catch (Exception e) {
+                    log.warn("법안 파싱 중 오류 발생: {}", e.getMessage());
+                    skipCount++;
+                }
+            }
+
+            log.info("법안 정보 파싱 완료: 성공 {}, 실패 {}", parsedCount, skipCount);
+            return bills;
+        } catch (Exception e) {
+            log.error("JSON 파싱 중 오류 발생: {}", e.getMessage());
+            throw new ApiDataRetrievalException("JSON 파싱 실패 " + e.getMessage());
         }
     }
 }
