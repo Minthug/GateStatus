@@ -9,6 +9,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -26,6 +28,7 @@ public class ProposedBill extends BaseTimeEntity {
     @JoinColumn(name = "figure_id")
     private Figure proposer;
 
+    @Column(unique = true)
     private String billId;
     private String billNo;
     private String billName;
@@ -39,38 +42,33 @@ public class ProposedBill extends BaseTimeEntity {
 
     private LocalDate processDate;
     private String processResult;
+    private String processResultCode;
 
     @ElementCollection
-    @CollectionTable(name = "bill_coproposers", joinColumns = @JoinColumn(name = "bill_no"))
-    private List<String> coProposers;
+    @CollectionTable(name = "bill_coproposers", joinColumns = @JoinColumn(name = "bill_id"))
+    @Column(name = "coproposer")
+    private List<String> coProposers = new ArrayList<>();
     private String committee;
 
     private Integer viewCount = 0;
 
-    public void update(
-            String billNo,
-            String billName,
-            LocalDate proposeDate,
-            String summary,
-            String billUrl,
-            BillStatus billStatus,
-            LocalDate processDate,
-            String processResult,
-            String committee,
-            List<String> coProposers) {
-        this.billNo = billNo;
-        this.billName = billName;
-        this.proposeDate = proposeDate;
-        this.summary = summary;
-        this.billUrl = billUrl;
-        this.billStatus = billStatus;
-        this.processDate = processDate;
-        this.processResult = processResult;
-        this.committee = committee;
-        this.coProposers = coProposers;
-    }
-
     public void incrementViewCount() {
         this.viewCount++;
+    }
+
+    // 아주 기본적인 상태 변경 메서드만 유지
+    public void setBillStatus(BillStatus status) {
+        this.billStatus = status;
+    }
+
+    public void setProposer(Figure proposer) {
+        this.proposer = proposer;
+    }
+
+    public void setCoProposers(List<String> coProposers) {
+        this.coProposers.clear();
+        if (coProposers != null) {
+            this.coProposers.addAll(coProposers);
+        }
     }
 }

@@ -1,19 +1,19 @@
 package com.example.GateStatus.domain.proposedBill;
 
 import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillApiDTO;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillApiMapper;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -43,44 +43,128 @@ public class ProposedBillApiService {
     @Value("${spring.openapi.assembly.proposed-bill-path}")
     private String proposedBillPath;
 
+    @Transactional
+    public int syncAllBills() {
+        log.info("모든 국회의원의 발의 법안 정보 동기화 시작");
+
+        List<Figure> allFigures = figureRepository.findByFigureType(FigureType.POLITICIAN);
+
+        if (allFigures.isEmpty()) {
+            log.warn("동기화할 국회의원 정보가 없습니다");
+            return 0;
+        }
+
+        log.info("동기화 대상 국회의원: {}명", allFigures.size());
+
+        int totalSuccess = 0;
+        int totalFail = 0;
+
+        for (Figure figure : allFigures) {
+            try {
+                String name = figure.getName();
+                log.info("국회의원 {}의 발의 법안 동기화 시작", name);
+
+                int success = syncBillByProposer(name);
+                totalSuccess += success;
+
+                log.info("국회의원 {}의 발의 법안 동기화 완료: {}건", name, success);
+            } catch (Exception e) {
+                totalFail++;
+                log.error("국회의원 {}의 발의 법안 동기화 중 오류: {}", figure.getName(), e.getMessage(), e);
+            }
+        }
+
+
+        log.info("모든 국회의원 발의 법안 동기화 완료: 총 {}명 중 성공 {}건, 실패 {}건",
+                allFigures.size(), totalSuccess, totalFail);
+        return totalSuccess;
+    }
+
     /**
      * 특정 국회의원이 대표 발의한 법안 정보 동기화
-     * @param proposedName
      * @return
      */
     @Transactional
-    public int syncBillByProposer(String proposedName) {
+    public int syncBillByProposer(String proposerName) {
         try {
-            log.info("{}의 발의 법안 동기화 시작", proposedName);
+            log.info("{}의 발의 법안 동기화 시작", proposerName);
 
-            Figure figure = figureRepository.findByName(proposedName)
-                    .orElseThrow(() -> new EntityNotFoundException("해당 국회의원 정보가 없습니다" + proposedName));
+            List<ProposedBillApiDTO> bills = fetchBillsByProposerFromApi(proposerName);
 
-            List<ProposedBillApiDTO> bills = fetchBillsByProposerFromApi(proposedName);
+            if (bills.isEmpty()) {
+                log.warn("동기화할 발의 법안 정보가 없습니다: {}", proposerName);
+                return 0;
+            }
 
-            int count = 0;
-            for (ProposedBillApiDTO dto : bills) {
+            log.info("동기화 대상 법안: {}건", bills.size());
+
+
+            int successCount = 0;
+            int failCount = 0;
+
+
+            for (ProposedBillApiDTO bill : bills) {
                 try {
-                    ProposedBill bill = billRepository.findByBillId(dto.billId())
-                            .orElseGet(() -> ProposedBill.builder()
-                                    .billId(dto.billId())
-                                    .proposer(figure)
-                                    .viewCount(0)
-                                    .build());
-
-                    updateBillFromDto(bill, dto);
-
-                    billRepository.save(bill);
-                    count++;
+                    boolean success = saveBill(bill, proposerName);
+                    if (success) {
+                        successCount++;
+                        log.debug("법안 저장 성공: {}, ID={}", bill.billName(), bill.billId());
+                    } else {
+                        failCount++;
+                        log.warn("법안 저장 실패: {}", bill.billName());
+                    }
                 } catch (Exception e) {
-                    log.error("법안 동기화 중 오류 발생: {}", dto.billId());
+                    failCount++;
+                    log.error("법안 저장 중 오류: {} - {}", bill.billName(), e.getMessage(), e);
                 }
             }
 
-            log.info("{}의 발의 법안 동기화 완료: {}건", proposedName, count);
-            return count;
+            log.info("{}의 발의 법안 동기화 완료: 총 {}건 중 {}건 성공, {}건 실패",
+                    proposerName, bills.size(), successCount, failCount);
+            return successCount;
         } catch (Exception e) {
             throw new ApiDataRetrievalException("발의 법안 정보를 동기화 중 오류 발생");
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean saveBill(ProposedBillApiDTO bill, String proposerName) {
+        try {
+            ProposedBill existingBill = billRepository.findByBillId(bill.billId())
+                    .orElseGet(() -> ProposedBill.builder()
+                            .billId(bill.billId())
+                            .billNo(bill.billNo())
+                            .billName(bill.billName())
+                            .build());
+
+            Figure proposer = figureRepository.findByName(proposerName).orElse(null);
+
+            if (proposer == null) {
+                log.warn("발의자 정보를 찾을 수 없습니다: {}", proposerName);
+            }
+
+            existingBill.update(
+                    bill.billName(),
+                    bill.billNo(),
+                    bill.proposedDate(),
+                    bill.summary(),
+                    bill.billUrl(),
+                    bill.processResultCode(),
+                    bill.processDate(),
+                    bill.committee(),
+                    proposer
+            );
+
+            if (bill.coProposers() != null && !bill.coProposers().isEmpty()) {
+                existingBill.updateCoProposer(bill.coProposers());
+            }
+
+            ProposedBill savedBill = billRepository.save(existingBill);
+
+            return savedBill.getId() != null;
+        } catch (Exception e) {
+            log.error("법안 저장 중 오류: {} - {}", bill.billName(), e.getMessage(), e);
+            throw e;
         }
     }
 
@@ -119,25 +203,25 @@ public class ProposedBillApiService {
         }
     }
 
-    /**
-     * DTO 데이터로 법안 엔티티 업데이트
-     * @param bill
-     * @param dto
-     */
-    private void updateBillFromDto(ProposedBill bill, ProposedBillApiDTO dto) {
-        bill.update(
-                dto.billNo(),
-                dto.billName(),
-                parseDate(dto.proposedDate()),
-                dto.summary(),
-                dto.billUrl(),
-                parsebillStatus(dto.billStatus(), dto.processResult()),
-                parseDate(dto.processDate()),
-                dto.processResult(),
-                dto.committee(),
-                dto.coProposers()
-        );
-    }
+//    /**
+//     * DTO 데이터로 법안 엔티티 업데이트
+//     * @param bill
+//     * @param dto
+//     */
+//    private void updateBillFromDto(ProposedBill bill, ProposedBillApiDTO dto) {
+//        bill.update(
+//                dto.billNo(),
+//                dto.billName(),
+//                parseDate(dto.proposedDate()),
+//                dto.summary(),
+//                dto.billUrl(),
+//                parsebillStatus(dto.billStatus(), dto.processResult()),
+//                parseDate(dto.processDate()),
+//                dto.processResult(),
+//                dto.committee(),
+//                dto.coProposers()
+//        );
+//    }
 
     /**
      * 법안 상태 코드 변환

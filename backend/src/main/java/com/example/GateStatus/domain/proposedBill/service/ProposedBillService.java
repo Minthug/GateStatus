@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -118,5 +119,72 @@ public class ProposedBillService {
     @Transactional
     public int syncBillsByProposer(String proposerName) {
         return proposedBillApiService.syncBillByProposer(proposerName);
+    }
+
+    @Transactional
+    public ProposedBill updateFromApiData(String billId, ProposedBillApiDTO apiData) {
+        ProposedBill bill = billRepository.findByBillId(billId)
+                .orElseGet(() -> ProposedBill.builder()
+                        .billId(billId)
+                        .billName(apiData.billName())
+                        .billNo(apiData.billNo())
+                        .build());
+
+        if (apiData.proposer() != null && !apiData.proposer().isEmpty()) {
+            Figure proposer = figureRepository.findByName(apiData.proposer()).orElse(null);
+            bill.setProposer(proposer);
+        }
+
+        LocalDate proposeDate = parseDate(apiData.proposedDate());
+        LocalDate processDate = parseDate(apiData.processDate());
+
+        ProposedBill updateBill = ProposedBill.builder()
+                .billId(billId)
+                .billNo(apiData.billNo())
+                .billName(apiData.billName())
+                .proposeDate(proposeDate)
+                .summary(apiData.summary())
+                .billUrl(apiData.linkUrl())
+                .processDate(processDate)
+                .processResult(apiData.processResult())
+                .processResultCode(apiData.processResultCode())
+                .committee(apiData.committeeName())
+                .billStatus(determineBillStatus(apiData.processResult()))
+                .build();
+
+        updateBill.setCoProposers(apiData.coProposers());
+        return billRepository.save(updateBill);
+    }
+
+    private BillStatus determineBillStatus(String processResult) {
+        if (processResult == null || processResult.isEmpty()) {
+            return BillStatus.PROPOSED;
+        } else if (processResult.contains("원안가결") || processResult.contains("수정가결")) {
+            return BillStatus.PASSED;
+        } else if (processResult.contains("폐기") || processResult.contains("부결")) {
+            return BillStatus.REJECTED;
+        } else if (processResult.contains("대안반영")) {
+            return BillStatus.ALTERNATIVE;
+        } else if (processResult.contains("철회")) {
+            return BillStatus.WITHDRAWN;
+        } else {
+            return BillStatus.PROCESSING;
+        }
+    }
+
+    /**
+     * 날짜 문자열 파싱
+     */
+    private LocalDate parseDate(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        } catch (Exception e) {
+            log.warn("날짜 변환 실패: {}", dateStr);
+            return null;
+        }
     }
 }

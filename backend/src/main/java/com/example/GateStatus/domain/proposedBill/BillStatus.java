@@ -8,7 +8,9 @@ public enum BillStatus {
     PASSED("가결"),
     REJECTED("부결"),
     WITHDRAWN("철회"),
-    EXPIRED("임기만료 폐기");
+    ALTERNATIVE("대안 반영"),
+    EXPIRED("임기만료 폐기"),
+    PROCESSING("");
 
     private final String displayName;
 
