@@ -20,8 +20,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -108,7 +110,7 @@ public class ProposedBillApiService {
 
             log.debug("API 응답 수신 일부: {}", jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
 
-            List<ProposedBillApiDTO> bills =
+            List<ProposedBillApiDTO> bills = parseJsonResponse(jsonResponse);
             log.info("{}의 발의 법안 조회 결과: {}건", proposedName, bills.size());
 
             return bills;
@@ -184,11 +186,8 @@ public class ProposedBillApiService {
         }
     }
 
-    private boolean isEmpty(String str) {
-        return str == null || str.trim().isEmpty();
-    }
 
-    private List<FigureInfoDTO> parseJsonResponse(String jsonResponse) {
+    private List<ProposedBillApiDTO> parseJsonResponse(String jsonResponse) {
         try {
             JsonNode rootNode = mapper.readTree(jsonResponse);
             JsonNode rowsNode = rootNode.path("nzmimeepazxkubdpn")
@@ -206,13 +205,37 @@ public class ProposedBillApiService {
 
             for (JsonNode row : rowsNode) {
                 try {
-                    ProposedBillApiDTO dto = parseFigureFromJsonNode(row);
-                    if (dto != null) {
-                        bills.add(dto);
-                        parsedCount++;
-                    } else {
+                    String billId = getTextValue(row, "BILL_ID");
+                    String billNo = getTextValue(row, "BILL_NO");
+                    String billName = getTextValue(row, "BILL_NAME");
+                    String proposer = getTextValue(row, "PROPOSER");
+
+                    if (isEmpty(billId) || isEmpty(billName)) {
+                        log.warn("유효하지 않은 법안 정보: ID={}, 이름={}", billId, billName);
                         skipCount++;
+                        continue;
                     }
+
+                    List<String> coProposers = parseCoProposers(row);
+
+                    ProposedBillApiDTO dto = new ProposedBillApiDTO(
+                            billId,
+                            billNo,
+                            billName,
+                            proposer,
+                            getTextValue(row, "PROPOSE_DT"),
+                            getTextValue(row, "SUMMARY"),
+                            getTextValue(row, "LINK_URL"),
+                            getTextValue(row, "PROC_RESULT_CD"),
+                            getTextValue(row, "PROC_DT"),
+                            getTextValue(row, "PROC_RESULT"),
+                            getTextValue(row, "COMMITTEE_NAME"),
+                            coProposers
+                    );
+
+                    bills.add(dto);
+                    parsedCount++;
+
                 } catch (Exception e) {
                     log.warn("법안 파싱 중 오류 발생: {}", e.getMessage());
                     skipCount++;
@@ -225,5 +248,27 @@ public class ProposedBillApiService {
             log.error("JSON 파싱 중 오류 발생: {}", e.getMessage());
             throw new ApiDataRetrievalException("JSON 파싱 실패 " + e.getMessage());
         }
+    }
+
+    private List<String> parseCoProposers(JsonNode row) {
+        String coProposerText = getTextValue(row, "COPROPOSER");
+        if (coProposerText == null || coProposerText.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return Arrays.stream(coProposerText.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    // 유틸리티 메서드
+    private String getTextValue(JsonNode node, String fieldName) {
+        JsonNode field = node.get(fieldName);
+        return (field != null && !field.isNull()) ? field.asText() : "";
+    }
+
+    private boolean isEmpty(String str) {
+        return str == null || str.trim().isEmpty();
     }
 }
