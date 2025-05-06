@@ -144,7 +144,7 @@ public class TimelineService {
      * @return
      */
     @Transactional
-    public TimelineEventResponse addBillToTimeline(Long billId, Long figureId) {
+    public TimelineEventResponse addBillToTimeline(String billId, Long figureId) {
         ProposedBillResponse billResponse = billService.findBillById(billId);
 
         Figure figure = figureRepository.findById(figureId)

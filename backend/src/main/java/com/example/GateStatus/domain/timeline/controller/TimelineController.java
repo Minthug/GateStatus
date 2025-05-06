@@ -104,7 +104,7 @@ public class TimelineController {
                 response = timelineService.addStatementToTimeline(request.sourceId());
                 break;
             case "BILL":
-                response = timelineService.addBillToTimeline(Long.parseLong(request.sourceId()), request.figureId());
+                response = timelineService.addBillToTimeline(request.sourceId(), request.figureId());
                 break;
             case "CUSTOM":
                 response = timelineService.addCustomEvent(

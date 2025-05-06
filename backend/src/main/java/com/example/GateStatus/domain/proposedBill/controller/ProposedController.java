@@ -31,13 +31,12 @@ public class ProposedController {
 
     /**
      * 법안 ID로 법안 상세 정보 조회
-     * @param proposedId
      * @return
      */
-    @GetMapping("/{proposedId}")
-    public ResponseEntity<ProposedBillResponse> getProposedId(@PathVariable Long proposedId) {
-        log.info("법안 상세 정보 조회 요청: {}", proposedId);
-        return ResponseEntity.ok(proposedBillService.findBillById(proposedId));
+    @GetMapping("/{billId}")
+    public ResponseEntity<ProposedBillResponse> getProposedId(@PathVariable String billId) {
+        log.info("법안 상세 정보 조회 요청: {}", billId);
+        return ResponseEntity.ok(proposedBillService.findBillById(billId));
     }
 
     /**

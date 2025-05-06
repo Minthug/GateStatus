@@ -36,11 +36,10 @@ public class ProposedBillService {
      * @return
      */
     @Transactional
-    public ProposedBillResponse findBillById(Long id) {
-        ProposedBill bill = billRepository.findById(id)
+    public ProposedBillResponse findBillById(String id) {
+        ProposedBill bill = billRepository.findByBillId(id)
                 .orElseThrow(() -> new EntityNotFoundException("해당 법안이 존재하지 않습니다: " + id));
-
-        bill.incrementViewCount();
+//        bill.incrementViewCount();
 
         return ProposedBillResponse.from(bill);
     }
