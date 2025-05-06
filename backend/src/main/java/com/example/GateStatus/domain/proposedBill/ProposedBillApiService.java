@@ -6,7 +6,6 @@ import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillApiDTO;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillApiMapper;
-import com.example.GateStatus.domain.proposedBill.service.ProposedBillService;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,15 +13,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,7 +29,6 @@ public class ProposedBillApiService {
 
     private final WebClient webClient;
     private final ProposedBillApiMapper apiMapper;
-    private final ProposedBillService billService;
     private final ObjectMapper mapper;
     private final ProposedBillRepository billRepository;
     private final FigureRepository figureRepository;
@@ -106,7 +102,7 @@ public class ProposedBillApiService {
 
             for (ProposedBillApiDTO bill : bills) {
                 try {
-                    boolean success = billService.saveBill(bill, proposerName);
+                    boolean success = saveBill(bill, proposerName);
                     if (success) {
                         successCount++;
                         log.debug("법안 저장 성공: {}, ID={}", bill.billName(), bill.billId());
@@ -137,11 +133,14 @@ public class ProposedBillApiService {
         try {
             log.info("{}의 발의 법안 API 호출", proposedName);
 
+            String currentAge = "22";
+
             String jsonResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(proposedBillPath)
                             .queryParam("KEY", apiKey)
                             .queryParam("PROPOSER", proposedName)
+                            .queryParam("AGE", currentAge)
                             .build())
                     .retrieve()
                     .bodyToMono(String.class)
@@ -306,6 +305,112 @@ public class ProposedBillApiService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean saveBill(ProposedBillApiDTO bill, String proposerName) {
+        try {
+
+            log.info("법안 저장 시작: {}, 발의자: {}", bill.billName(), proposerName);
+
+            Optional<ProposedBill> existingBill = billRepository.findByBillId(bill.billId());
+
+            ProposedBill bills;
+
+            if (existingBill.isPresent()) {
+                bills = existingBill.get();
+                updateBillInfo(bills, bill, proposerName);
+            } else {
+                bills = createNewBill(bill, proposerName);
+            }
+
+            ProposedBill savedBill = billRepository.save(bills);
+            log.info("법안 저장 성공: {}, ID: {}", bill.billName(), bill.billId());
+
+            return savedBill.getId() != null;
+        } catch (Exception e) {
+            log.error("법안 저장 중 오류: {} - {}", bill.billName(), e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    private ProposedBill createNewBill(ProposedBillApiDTO dto, String proposerName) {
+        Figure proposer = null;
+        if (proposerName != null && !proposerName.isEmpty()) {
+            proposer = figureRepository.findByName(proposerName).orElse(null);
+        }
+
+        // 날짜 변환
+        LocalDate proposeDate = parseDate(dto.proposedDate());
+        LocalDate processDate = parseDate(dto.processDate());
+
+        // 법안 상태 결정
+        BillStatus billStatus = determineBillStatus(dto.processResult());
+
+        // 새 엔티티 생성 (빌더 사용)
+        return ProposedBill.builder()
+                .billId(dto.billId())
+                .billNo(dto.billNo())
+                .billName(dto.billName())
+                .proposer(proposer)
+                .proposeDate(proposeDate)
+                .summary(dto.summary())
+                .billUrl(dto.linkUrl())
+                .billStatus(billStatus)
+                .processDate(processDate)
+                .processResult(dto.processResult())
+                .processResultCode(dto.processResultCode())
+                .committee(dto.committeeName())
+                .coProposers(dto.coProposers())
+                .build();
+    }
+
+    private void updateBillInfo(ProposedBill bill, ProposedBillApiDTO dto, String proposerName) {
+        Figure proposer = null;
+
+        if (proposerName != null && !proposerName.isEmpty()) {
+            proposer = figureRepository.findByName(proposerName).orElse(null);
+        }
+
+        LocalDate proposeDate = parseDate(dto.proposedDate());
+        LocalDate processDate = parseDate(dto.processDate());
+
+        // 법안 상태 결정
+        BillStatus billStatus = determineBillStatus(dto.processResult());
+
+        // 엔티티 필드 업데이트 (setter 메서드 사용)
+        bill.setBillNo(dto.billNo());
+        bill.setBillName(dto.billName());
+        bill.setProposer(proposer);
+        bill.setProposeDate(proposeDate);
+        bill.setSummary(dto.summary());
+        bill.setBillUrl(dto.linkUrl());
+        bill.setBillStatus(billStatus);
+        bill.setProcessDate(processDate);
+        bill.setProcessResult(dto.processResult());
+        bill.setProcessResultCode(dto.processResultCode());
+        bill.setCommittee(dto.committeeName());
+
+        // 공동발의자 업데이트
+        bill.setCoProposers(dto.coProposers());
+    }
+
+
+    private BillStatus determineBillStatus(String processResult) {
+        if (processResult == null || processResult.isEmpty()) {
+            return BillStatus.PROPOSED;
+        } else if (processResult.contains("원안가결") || processResult.contains("수정가결")) {
+            return BillStatus.PASSED;
+        } else if (processResult.contains("폐기") || processResult.contains("부결")) {
+            return BillStatus.REJECTED;
+        } else if (processResult.contains("대안반영")) {
+            return BillStatus.ALTERNATIVE;
+        } else if (processResult.contains("철회")) {
+            return BillStatus.WITHDRAWN;
+        } else {
+            return BillStatus.PROCESSING;
+        }
+    }
+
+
     // 유틸리티 메서드
     private String getTextValue(JsonNode node, String fieldName) {
         JsonNode field = node.get(fieldName);
@@ -315,4 +420,6 @@ public class ProposedBillApiService {
     private boolean isEmpty(String str) {
         return str == null || str.trim().isEmpty();
     }
+
+
 }

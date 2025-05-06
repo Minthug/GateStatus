@@ -3,13 +3,9 @@ package com.example.GateStatus.domain.proposedBill;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.global.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -71,4 +67,42 @@ public class ProposedBill extends BaseTimeEntity {
             this.coProposers.addAll(coProposers);
         }
     }
+
+    // 세터 메서드 추가
+    public void setBillNo(String billNo) {
+        this.billNo = billNo;
+    }
+
+    public void setBillName(String billName) {
+        this.billName = billName;
+    }
+
+    public void setProposeDate(LocalDate proposeDate) {
+        this.proposeDate = proposeDate;
+    }
+
+    public void setSummary(String summary) {
+        this.summary = summary;
+    }
+
+    public void setBillUrl(String billUrl) {
+        this.billUrl = billUrl;
+    }
+
+    public void setProcessDate(LocalDate processDate) {
+        this.processDate = processDate;
+    }
+
+    public void setProcessResult(String processResult) {
+        this.processResult = processResult;
+    }
+
+    public void setProcessResultCode(String processResultCode) {
+        this.processResultCode = processResultCode;
+    }
+
+    public void setCommittee(String committee) {
+        this.committee = committee;
+    }
+
 }
