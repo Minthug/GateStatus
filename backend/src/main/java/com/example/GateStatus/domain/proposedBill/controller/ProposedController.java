@@ -4,6 +4,7 @@ import com.example.GateStatus.domain.proposedBill.BillStatus;
 import com.example.GateStatus.domain.proposedBill.ProposedBillApiService;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillResponse;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillService;
+import com.example.GateStatus.global.config.open.ApiResponse;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -113,9 +115,16 @@ public class ProposedController {
      * @return
      */
     @PostMapping("/sync")
-    public ResponseEntity<Integer> syncBills(@RequestParam String proposerName) {
+    public ResponseEntity<ApiResponse<Integer>> syncBills(@RequestParam String proposerName) {
         log.info("법안 데이터 동기화 요청: 발의자 = {}", proposerName);
-        int syncCount = proposedBillService.syncBillsByProposer(proposerName);
-        return ResponseEntity.ok(syncCount);
+
+        try {
+            int syncCount = proposedBillService.syncBillsByProposer(proposerName);
+            return ResponseEntity.ok(ApiResponse.success("법안 동기화 완료", syncCount));
+        } catch (Exception e) {
+            log.error("법안 동기화 중 오류 발생: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("법안 동기화 실패: " + e.getMessage()));
+        }
+
     }
 }

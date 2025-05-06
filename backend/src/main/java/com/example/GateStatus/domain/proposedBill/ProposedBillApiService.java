@@ -6,6 +6,7 @@ import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillApiDTO;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillApiMapper;
+import com.example.GateStatus.domain.proposedBill.service.ProposedBillService;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -32,6 +32,7 @@ public class ProposedBillApiService {
 
     private final WebClient webClient;
     private final ProposedBillApiMapper apiMapper;
+    private final ProposedBillService billService;
     private final ObjectMapper mapper;
     private final ProposedBillRepository billRepository;
     private final FigureRepository figureRepository;
@@ -105,7 +106,7 @@ public class ProposedBillApiService {
 
             for (ProposedBillApiDTO bill : bills) {
                 try {
-                    boolean success = saveBill(bill, proposerName);
+                    boolean success = billService.saveBill(bill, proposerName);
                     if (success) {
                         successCount++;
                         log.debug("법안 저장 성공: {}, ID={}", bill.billName(), bill.billId());
@@ -124,47 +125,6 @@ public class ProposedBillApiService {
             return successCount;
         } catch (Exception e) {
             throw new ApiDataRetrievalException("발의 법안 정보를 동기화 중 오류 발생");
-        }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean saveBill(ProposedBillApiDTO bill, String proposerName) {
-        try {
-            ProposedBill existingBill = billRepository.findByBillId(bill.billId())
-                    .orElseGet(() -> ProposedBill.builder()
-                            .billId(bill.billId())
-                            .billNo(bill.billNo())
-                            .billName(bill.billName())
-                            .build());
-
-            Figure proposer = figureRepository.findByName(proposerName).orElse(null);
-
-            if (proposer == null) {
-                log.warn("발의자 정보를 찾을 수 없습니다: {}", proposerName);
-            }
-
-            existingBill.update(
-                    bill.billName(),
-                    bill.billNo(),
-                    bill.proposedDate(),
-                    bill.summary(),
-                    bill.billUrl(),
-                    bill.processResultCode(),
-                    bill.processDate(),
-                    bill.committee(),
-                    proposer
-            );
-
-            if (bill.coProposers() != null && !bill.coProposers().isEmpty()) {
-                existingBill.updateCoProposer(bill.coProposers());
-            }
-
-            ProposedBill savedBill = billRepository.save(existingBill);
-
-            return savedBill.getId() != null;
-        } catch (Exception e) {
-            log.error("법안 저장 중 오류: {} - {}", bill.billName(), e.getMessage(), e);
-            throw e;
         }
     }
 

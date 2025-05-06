@@ -13,6 +13,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -118,7 +119,64 @@ public class ProposedBillService {
      */
     @Transactional
     public int syncBillsByProposer(String proposerName) {
-        return proposedBillApiService.syncBillByProposer(proposerName);
+
+        log.info("발의자 {}의 법안 동기화 시작", proposerName);
+
+        int syncCount = proposedBillApiService.syncBillByProposer(proposerName);
+        log.info("발의자 {}의 법안 동기화 완료: {}건", proposerName, syncCount);
+        return syncCount;
+    }
+
+
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean saveBill(ProposedBillApiDTO bill, String proposerName) {
+        try {
+            ProposedBill existingBill = billRepository.findByBillId(bill.billId())
+                    .orElseGet(() -> ProposedBill.builder()
+                            .billId(bill.billId())
+                            .billNo(bill.billNo())
+                            .billName(bill.billName())
+                            .build());
+
+            Figure proposer = null;
+            if (proposerName != null && !proposerName.isEmpty()) {
+                proposer = figureRepository.findByName(proposerName).orElse(null);
+                if (proposer == null) {
+                    log.warn("발의자 정보를 찾을 수 없습니다: {}", proposerName);
+
+                }
+            }
+
+            LocalDate proposeDate = parseDate(bill.proposedDate());
+            LocalDate processDate = parseDate(bill.processDate());
+
+            BillStatus billStatus = determineBillStatus(bill.processResult());
+
+            ProposedBill updateBill = ProposedBill.builder()
+                    .billId(bill.billId())
+                    .billNo(bill.billNo())
+                    .billName(bill.billName())
+                    .proposer(proposer)
+                    .proposeDate(proposeDate)
+                    .summary(bill.summary())
+                    .billUrl(bill.linkUrl())
+                    .billStatus(billStatus)
+                    .processDate(processDate)
+                    .processResult(bill.processResult())
+                    .processResultCode(bill.processResultCode())
+                    .committee(bill.committeeName())
+                    .coProposers(bill.coProposers())
+                    .build();
+
+            ProposedBill savedBill = billRepository.save(updateBill);
+            log.info("법안 저장 성공: {}, ID: {}", bill.billName(), bill.billId());
+
+            return savedBill.getId() != null;
+        } catch (Exception e) {
+            log.error("법안 저장 중 오류: {} - {}", bill.billName(), e.getMessage(), e);
+            throw e;
+        }
     }
 
     @Transactional
