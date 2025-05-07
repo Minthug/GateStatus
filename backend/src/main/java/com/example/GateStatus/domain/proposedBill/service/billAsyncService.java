@@ -60,4 +60,21 @@ public class billAsyncService {
                         .sum());
     }
 
+
+    public CompletableFuture<Integer> syncBillsByFiguresAsync(List<Figure> figures) {
+        List<CompletableFuture<Integer>> futures = new ArrayList<>();
+
+        for (Figure figure : figures) {
+            CompletableFuture<Integer> future = syncBillsByProposerAsync(figure.getName());
+            futures.add(future);
+        }
+
+        CompletableFuture<Void> allFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+
+        return allFutures.thenApply(v ->
+                futures.stream()
+                        .map(CompletableFuture::join)
+                        .mapToInt(Integer::intValue)
+                        .sum());
+    }
 }
