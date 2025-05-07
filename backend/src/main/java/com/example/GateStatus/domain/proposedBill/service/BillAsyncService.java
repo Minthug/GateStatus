@@ -12,12 +12,12 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Service
-public class billAsyncService {
+public class BillAsyncService {
 
     private final ProposedBillApiService proposedBillApiService;
     private final FigureRepository figureRepository;
 
-    public billAsyncService(ProposedBillApiService proposedBillApiService, FigureRepository figureRepository) {
+    public BillAsyncService(ProposedBillApiService proposedBillApiService, FigureRepository figureRepository) {
         this.proposedBillApiService = proposedBillApiService;
         this.figureRepository = figureRepository;
     }

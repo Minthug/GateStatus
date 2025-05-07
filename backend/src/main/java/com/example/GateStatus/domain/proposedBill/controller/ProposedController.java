@@ -2,14 +2,13 @@ package com.example.GateStatus.domain.proposedBill.controller;
 
 import com.example.GateStatus.domain.proposedBill.BillStatus;
 import com.example.GateStatus.domain.proposedBill.ProposedBillApiService;
+import com.example.GateStatus.domain.proposedBill.service.ProposedBillQueueService;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillResponse;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillService;
 import com.example.GateStatus.global.config.open.ApiResponse;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -19,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/v1/proposed")
@@ -28,6 +28,7 @@ public class ProposedController {
 
     private final ProposedBillService proposedBillService;
     private final ProposedBillApiService apiService;
+    private final ProposedBillQueueService proposedBillQueueService;
 
     /**
      * 법안 ID로 법안 상세 정보 조회
@@ -123,6 +124,5 @@ public class ProposedController {
             log.error("법안 동기화 중 오류 발생: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("법안 동기화 실패: " + e.getMessage()));
         }
-
     }
 }

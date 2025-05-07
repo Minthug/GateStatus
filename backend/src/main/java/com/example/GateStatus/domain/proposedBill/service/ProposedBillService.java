@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,6 +31,8 @@ public class ProposedBillService {
     private final FigureRepository figureRepository;
     private final ProposedBillRepository billRepository;
     private final ProposedBillApiService proposedBillApiService;
+    private final ProposedBillQueueService proposedBillQueueService;
+    private final BillAsyncService billAsyncService;
 
     /**
      * 법안 ID로 법안 상세 정보 조회
@@ -126,6 +130,54 @@ public class ProposedBillService {
         return syncCount;
     }
 
+    /**
+     * 비동기 법안 동기화 메서드(@Async 활용)
+     * @param proposerName
+     * @return
+     */
+    public CompletableFuture<Integer> syncBillsByProposerAsync(String proposerName) {
+        log.info("발의자 {}의 법안 비동기(@Async) 동기화 시작", proposerName);
+        return billAsyncService.syncBillsByProposerAsync(proposerName);
+    }
+
+    /**
+     * 모든 국회의원 법안 비동기 동기화 메서드 (@Async 활용)
+     * @return
+     */
+    public CompletableFuture<Integer> syncAllBillsAsync() {
+        log.info("모든 국회의원의 법안 비동기(@Async) 동기화 시작");
+        return billAsyncService.syncAllBillsAsync();
+    }
+
+    /**
+     * 비동기 법안 동기화 메서드 (메시지 큐 활용)
+     * @param proposerName
+     * @return
+     */
+    public String queueBillSyncTask(String proposerName) {
+        String jobId = UUID.randomUUID().toString();
+        log.info("발의자 {}의 법안 비동기(큐) 동기화 작업({}) 시작", proposerName, jobId);
+        proposedBillQueueService.queueBillsSyncTask(proposerName, jobId);
+        return jobId;
+    }
+
+    /**
+     * 모든 국회의원 법안 비동기 동기화 메서드 (메시지 큐 활용)
+     * @return
+     */
+    public String queueAllBillsSyncTask() {
+        log.info("모든 국회의원의 법안 비동기(큐) 동기화 작업 시작");
+        return proposedBillQueueService.queueAllBillsSyncTask();
+    }
+
+    /**
+     * 작업 상태 조회 메서드
+     * @param jobId
+     * @return
+     */
+    public ProposedBillQueueService.JobStatus getJobStatus(String jobId) {
+        return proposedBillQueueService.getJobStatus(jobId);
+    }
 
     @Transactional
     public ProposedBill updateFromApiData(String billId, ProposedBillApiDTO apiData) {
