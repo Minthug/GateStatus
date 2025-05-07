@@ -6,6 +6,7 @@ import com.example.GateStatus.domain.proposedBill.service.ProposedBillQueueServi
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillResponse;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillService;
 import com.example.GateStatus.global.config.open.ApiResponse;
+import com.google.protobuf.Api;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -15,10 +16,12 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import retrofit2.http.Path;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/v1/proposed")
@@ -124,5 +127,52 @@ public class ProposedController {
             log.error("법안 동기화 중 오류 발생: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("법안 동기화 실패: " + e.getMessage()));
         }
+    }
+
+    @PostMapping("/sync/async-spring")
+    public ResponseEntity<ApiResponse<String>> syncBillsAsyncSpring(@RequestParam String proposerName) {
+        try {
+            CompletableFuture<Integer> future;
+            if (proposerName != null && !proposerName.isEmpty()) {
+                future = proposedBillService.syncBillsByProposerAsync(proposerName);
+            } else {
+                future = proposedBillService.syncAllBillsAsync();
+            }
+
+            return ResponseEntity.ok(ApiResponse.success( "비동기 법안 동기화 작업이 시작되었습니다. 결과는 백그라운드에서 처리됩니다.",
+                    "ASYNC_STARTED"));
+        } catch (Exception e) {
+            log.error("비동기 법안 동기화 작업 시작 중 오류 발생: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("비동기 법안 동기화 작업 시작 실패: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/sync/async-queue")
+    public ResponseEntity<ApiResponse<String>> syncBillAsyncQueue(@RequestParam(required = false) String proposerName) {
+        try {
+            String jobId;
+            if (proposerName != null && !proposerName.isEmpty()) {
+                jobId = proposedBillService.queueBillSyncTask(proposerName);
+            } else {
+                jobId = proposedBillService.queueAllBillsSyncTask();
+            }
+
+            return ResponseEntity.ok(ApiResponse.success("비동기 법안 동기화 작업이 큐에 추가되었습니다.", jobId));
+        } catch (Exception e) {
+            log.error("비동기 법안 동기화 작업 큐 추가 중 오류 발생: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("비동기 법안 동기화 작업 큐 추가 실패: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/sync/status/{jobId}")
+    public ResponseEntity<ApiResponse<ProposedBillQueueService.JobStatus>> getSyncStatus(@PathVariable String jobId) {
+
+        ProposedBillQueueService.JobStatus status = proposedBillService.getJobStatus(jobId);
+
+        if (status == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("법안 동기화 작업 상태", status));
     }
 }
