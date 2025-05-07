@@ -54,7 +54,6 @@ public class ProposedController {
         return ResponseEntity.ok(bills);
     }
 
-
     /**
      * 인기 법안 목록 조회
      * @param limit
