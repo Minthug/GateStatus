@@ -16,15 +16,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -206,11 +203,6 @@ public class FigureService {
         return UpdateFigureResponse.from(updateFigure);
     }
 
-//    @CacheEvict(value = {"figures", "figure-dtos"}, key = "#figure.figureId")
-//    public void updateCache(Figure figure) {
-//        log.info("Cache evicted for figure ID: {}", figure.getFigureId());
-//    }
-
 
     @Transactional
     public void deleteFigure(String figureId) {
@@ -249,11 +241,4 @@ public class FigureService {
         return figureApiService.syncFigureInfoByName(name);
     }
 
-//    /**
-//     * 모든 캐시 초기화
-//     */
-//    public void clearAllCaches() {
-//        log.info("모든 국회의원 캐시 초기화");
-//        figureCacheService.clearAllCaches();
-//    }
 }

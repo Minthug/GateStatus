@@ -1,17 +1,13 @@
 package com.example.GateStatus.domain.figure.controller;
 
 import com.example.GateStatus.domain.figure.FigureType;
-import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
-import com.example.GateStatus.domain.figure.service.FigureCacheService;
 import com.example.GateStatus.domain.figure.service.FigureService;
 import com.example.GateStatus.domain.figure.service.request.RegisterFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureRequest;
 import com.example.GateStatus.domain.figure.service.response.*;
 import com.example.GateStatus.global.config.open.ApiResponse;
-import com.example.GateStatus.global.config.redis.CacheConfig;
-import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
