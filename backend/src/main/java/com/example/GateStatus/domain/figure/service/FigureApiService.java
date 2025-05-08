@@ -190,7 +190,7 @@ public class FigureApiService {
             // 저장
             Figure savedFigure = figureRepository.save(figure);
 
-// EntityManager로 직접 조회
+        // EntityManager로 직접 조회
             boolean exists = false;
             try {
                 Figure found = entityManager.createQuery(
@@ -416,7 +416,7 @@ public class FigureApiService {
      *
      * @return
      */
-    private List<FigureInfoDTO> fetchAllFiguresFromAPiV2() {
+    public List<FigureInfoDTO> fetchAllFiguresFromAPiV2() {
         log.info("전체 국회의원 정보 API 호출 시작");
         List<FigureInfoDTO> allFigures = new ArrayList<>();
 
