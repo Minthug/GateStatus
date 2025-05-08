@@ -66,7 +66,7 @@ public class FigureController {
         return ResponseEntity.ok(figureService.findAllFigures(pageRequest, type, keyword));
     }
 
-    @GetMapping("/v1/type/{figureId}")
+    @GetMapping("/type/{figureId}")
     public ResponseEntity<List<FindFigureDetailResponse>> findFiguresByType(@PathVariable FigureType figureType) {
         return ResponseEntity.ok(figureService.findFiguresByType(figureType));
     }

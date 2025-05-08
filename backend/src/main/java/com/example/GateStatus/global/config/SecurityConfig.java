@@ -38,7 +38,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/v1/figures/sync/all").permitAll()
-                        .requestMatchers("/v1/figures/sync").permitAll()
+                        .requestMatchers("/v1/figures/sync/**").permitAll()
                         .requestMatchers("/v1/figures/test/**").permitAll()
                         .requestMatchers("/v1/proposed/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/figures/**").hasRole("ADMIN")

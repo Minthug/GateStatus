@@ -418,43 +418,61 @@ public class FigureApiService {
      */
     private List<FigureInfoDTO> fetchAllFiguresFromAPiV2() {
         log.info("전체 국회의원 정보 API 호출 시작");
+        List<FigureInfoDTO> allFigures = new ArrayList<>();
 
-        try {
-            String jsonResponse = webClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path(figureApiPath)
-                            .queryParam("KEY", apiKey)
-                            .build())
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+        int maxPages = 4;
 
-            if (isEmpty(jsonResponse)) {
-                log.error("API에서 빈 응답을 반환");
+        for (int pageNo = 1; pageNo <= maxPages; pageNo++) {
+            try {
+                log.info("국회의원 정보 API 호출: 페이지 {}", pageNo);
+                int finalPageNo = pageNo;
+                String jsonResponse = webClient.get()
+                        .uri(uriBuilder -> uriBuilder
+                                .path(figureApiPath)
+                                .queryParam("KEY", apiKey)
+                                .queryParam("Type", "json")
+                                .queryParam("pIndex", finalPageNo)
+                                .queryParam("pSize", 100)
+                                .build())
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .block();
+
+                if (isEmpty(jsonResponse)) {
+                    log.error("API에서 빈 응답을 반환");
+                    return Collections.emptyList();
+                }
+
+                log.info("API 응답 수신 (일부): {}", jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
+
+                JsonNode rootNode = mapper.readTree(jsonResponse);
+                JsonNode rowsNode = rootNode.path("nwvrqwxyaytdsfvhu")
+                        .path(1)
+                        .path("row");
+
+                if (!rowsNode.isArray() || rowsNode.size() == 0) {
+                    log.info("페이지 {}에서 더 이상 데이터가 없습니다.", pageNo);
+                    break;
+                }
+
+                // 매퍼를 사용하여 DTO로 변환
+                List<FigureInfoDTO> pageFigures = figureMapper.mapFromJsonNode(rowsNode);
+                log.info("페이지 {} 국회의원 정보 파싱 완료: {}명", pageNo, pageFigures.size());
+
+                allFigures.addAll(pageFigures);
+
+                if (pageFigures.size() < 100) {
+                    log.info("마지막 페이지 도달 (페이지 {})", pageNo);
+                    break;
+                }
+            } catch (Exception e) {
+                log.error("전체 국회의원 정보 조회 중 오류: {}", e.getMessage(), e);
                 return Collections.emptyList();
             }
-
-            log.info("API 응답 수신 (일부): {}", jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
-
-            JsonNode rootNode = mapper.readTree(jsonResponse);
-            JsonNode rowsNode = rootNode.path("nwvrqwxyaytdsfvhu")
-                    .path(1)
-                    .path("row");
-
-            if (!rowsNode.isArray()) {
-                log.warn("JSON 응답에서 row 배열을 찾을 수 없습니다");
-                return Collections.emptyList();
-            }
-
-            // 매퍼를 사용하여 DTO로 변환
-            List<FigureInfoDTO> figures = figureMapper.mapFromJsonNode(rowsNode);
-            log.info("국회의원 정보 파싱 완료: {}명", figures.size());
-
-            return figures;
-        } catch (Exception e) {
-            log.error("전체 국회의원 정보 조회 중 오류: {}", e.getMessage(), e);
-            return Collections.emptyList();
         }
+
+        log.info("전체 국회의원 정보 API 호출 완료: 총 {}명", allFigures.size());
+        return allFigures;
     }
 
     private List<FigureInfoDTO> parseJsonResponse(String jsonResponse) {
