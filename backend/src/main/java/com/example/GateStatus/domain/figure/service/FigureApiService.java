@@ -13,10 +13,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -24,9 +26,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +50,9 @@ public class FigureApiService {
 
     @PersistenceContext
     private final EntityManager entityManager;
+
+    private final ConcurrentMap<String, SyncJobStatus> syncJobStatusMap = new ConcurrentHashMap<>();
+
 
     @Autowired
     private PlatformTransactionManager transactionManager;
@@ -214,61 +225,6 @@ public class FigureApiService {
             throw e; // 트랜잭션 롤백을 위해 예외 다시 던지기
         }
     }
-
-//    public int syncAllFiguresV4() {
-//        log.info("모든 국회의원 정보 동기화 시작 V4");
-//        List<FigureInfoDTO> allFigures = fetchAllFiguresFromAPiV2();
-//
-//        if (allFigures.isEmpty()) {
-//            log.warn("동기화할 국회의원 정보가 없습니다");
-//            return 0;
-//        }
-//
-//        log.info("동기화 대상 국회의원: {}명", allFigures.size());
-//
-//        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-//
-//        int successCount = 0;
-//        int failCount = 0;
-//
-//        for (FigureInfoDTO figure : allFigures) {
-//            try {
-//                Boolean result = transactionTemplate.execute(status -> {
-//                    try {
-//                        boolean exists = figureRepository.existsByFigureId(figure.figureId());
-//
-//                        if (exists) {
-//                            updateFigureBasicInfo(figure);
-//                        } else {
-//                            insertFigureBasicInfo(figure);
-//                        }
-//
-//                        updateCollectionsWithNativeSql(figure);
-//
-//                        return true;
-//                    } catch (Exception e) {
-//                        log.error("국회의원 저장 중 오류: {} - {}", figure.name(), e.getMessage(), e);
-//                        status.setRollbackOnly();
-//                        return false;
-//                    }
-//                });
-//
-//                if (Boolean.TRUE.equals(result)) {
-//                    successCount++;
-//                    log.info("국회의원 정보 동기화 성공: {}", figure.name());
-//                } else {
-//                    failCount++;
-//                    log.warn("국회의원 정보 동기화 실패: {}", figure.name());
-//                }
-//            } catch (Exception e) {
-//                log.error("국회의원 처리 중 예외 발생: {} - {}", figure.name(), e.getMessage(), e);
-//                failCount++;
-//            }
-//        }
-//
-//        log.info("국회의원 정보 동기화 완료: 총 {}명 중 {}명 성공, {}명 실패", allFigures.size(), successCount, failCount);
-//        return successCount;
-//    }
 
 
     /**
@@ -494,6 +450,8 @@ public class FigureApiService {
         }
     }
 
+
+
     // 문자열을 FigureParty 열거형으로 변환
     private FigureParty convertToFigureParty(String partyName) {
         if (partyName == null || partyName.isEmpty()) {
@@ -716,6 +674,165 @@ public class FigureApiService {
             log.debug("활동 정보 업데이트 완료: {}", figure.name());
         } catch (Exception e) {
             log.warn("활동 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage());
+        }
+    }
+
+    /**
+     * 모든 국회의원 정보를 비동기적으로 동기화합니다
+     * @return 작업 ID (상태 추적용)
+     */
+    public String syncAllFiguresV4() {
+        log.info("모든 국회의원 정보 동기화 시작 V4");
+
+        String jobId = UUID.randomUUID().toString();
+
+        CompletableFuture.runAsync(() -> {
+            processFigureSyncJob(jobId);
+        });
+
+        return jobId;
+    }
+
+    /**
+     * 실제 동기화 작업을 수행하는 메서드
+     * @param jobId
+     */
+    @Async
+    protected void processFigureSyncJob(String jobId) {
+        log.info("국회의원 정보 동기화 작업({}) 시작", jobId);
+
+        // 작업 상태 초기화
+        SyncJobStatus jobStatus = new SyncJobStatus(jobId);
+        syncJobStatusMap.put(jobId, jobStatus);
+
+        try {
+            // 국회의원 정보
+            List<FigureInfoDTO> allFigures = fetchAllFiguresFromAPiV2();
+
+            if (allFigures.isEmpty()) {
+                log.warn("동기화할 국회의원 정보가 없습니다");
+                jobStatus.setTotalTasks(0);
+                jobStatus.setCompleted(true);
+                return;
+            }
+
+            // 작업 상태 업데이트
+            jobStatus.setTotalTasks(allFigures.size());
+            log.info("동기화 대상 국회의원: {}명", allFigures.size());
+
+            // 배치 단위로 처리 (성능 최적화)
+            int batchSize = 10;
+            List<List<FigureInfoDTO>> batches = splitIntoBatches(allFigures, batchSize);
+
+
+            // 각 배치별로 비동기 처리
+            List<CompletableFuture<Integer>> batchFutures = new ArrayList<>();
+
+            for (List<FigureInfoDTO> batch : batches) {
+                CompletableFuture<Integer> batchFuture = CompletableFuture.supplyAsync(() -> {
+                    return processFigureBatch(batch, jobId);
+                });
+                batchFutures.add(batchFuture);
+            }
+
+            // 모든 배치 작업 완료 대기
+            CompletableFuture<Void> allBatchesComplete = CompletableFuture.allOf(
+                    batchFutures.toArray(new CompletableFuture[0]));
+
+
+            // 결과 집계 - 여기서 join()을 호출하여 모든 작업이 완료될 때까지 대기
+            allBatchesComplete.thenAccept(v -> {
+                int totalSuccess = batchFutures.stream()
+                        .map(CompletableFuture::join)
+                        .mapToInt(Integer::intValue)
+                        .sum();
+
+                int totalFail = allFigures.size() - totalSuccess;
+
+                // 작업 상태 완료로 업데이트
+                jobStatus.setSuccessCount(totalSuccess);
+                jobStatus.setFailCount(totalFail);
+                jobStatus.setCompleted(true);
+                jobStatus.setEndTime(LocalDateTime.now());
+
+                log.info("국회의원 정보 동기화 작업({}) 완료: 총 {}명 중 {}명 성공, {}명 실패", jobId, allFigures.size(), totalSuccess, totalFail);
+
+            });
+
+        } catch (Exception e) {
+            log.error("국회의원 정보 동기화 작업({}) 중 오류 발생: {}", jobId, e.getMessage(), e);
+            jobStatus.setError(true);
+            jobStatus.setErrorMessage(e.getMessage());
+            jobStatus.setCompleted(true);
+            jobStatus.setEndTime(LocalDateTime.now());
+        }
+    }
+
+    /**
+     * 국회의원 배치를 처리하는 메서드
+     * @param figures
+     * @param jobId
+     * @return
+     */
+    private Integer processFigureBatch(List<FigureInfoDTO> figures, String jobId) {
+        int successCount = 0;
+        SyncJobStatus jobStatus = syncJobStatusMap.get(jobId);
+
+        for (FigureInfoDTO figure : figures) {
+            try {
+
+            }
+        }
+    }
+
+    private List<List<FigureInfoDTO>> splitIntoBatches(List<FigureInfoDTO> allFigures, int batchSize) {
+        return null;
+    }
+
+
+    public SyncJobStatus getSyncJobStatus(String jobId) {
+        return syncJobStatusMap.get(jobId);
+    }
+
+    @Data
+    public static class SyncJobStatus {
+
+        private final String jobId;
+        private int totalTasks;
+        private int completedTasks;
+        private int successCount;
+        private int failCount;
+        private boolean completed;
+        private boolean error;
+        private String errorMessage;
+        private final LocalDateTime startTime = LocalDateTime.now();
+        private LocalDateTime endTime;
+
+
+        public SyncJobStatus(String jobId) {
+            this.jobId = jobId;
+        }
+
+        public void incrementCompletedTasks() {
+            this.completedTasks++;
+        }
+
+        public void incrementSuccessCount() {
+            this.successCount++;
+        }
+
+        public void incrementFailCount() {
+            this.failCount++;
+        }
+
+        public int getProgressPercentage() {
+            if (totalTasks == 0) return 100;
+            return (int) ((completedTasks * 100.0) / totalTasks);
+        }
+
+        public Duration getElapsedTime() {
+            LocalDateTime end = endTime != null ? endTime : LocalDateTime.now();
+            return Duration.between(startTime, end);
         }
     }
 }

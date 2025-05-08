@@ -17,6 +17,11 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class FigureAsyncService {
 
+
+    /**
+     * 해당 서비스 클래스는 아마 추후 더 큰 확장성이 필요할 때
+     * 기존 FigureApiService에 있는 Method를 대체하기 위한 비동기 처리 전용 서비스라고 생각한다
+     */
     private final FigureApiService figureApiService;
     private final PlatformTransactionManager transactionManager;
     private final FigureRepository figureRepository;
