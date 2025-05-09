@@ -8,6 +8,7 @@ import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureRequest;
 import com.example.GateStatus.domain.figure.service.response.*;
 import com.example.GateStatus.global.config.open.ApiResponse;
+import com.google.protobuf.Api;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import retrofit2.Response;
 
 import java.util.List;
 
@@ -143,6 +145,24 @@ public class FigureController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("국회의원 정보 동기화 실패: " + e.getMessage()));
         }
+    }
+
+    @PostMapping("/sync/allV2")
+    public ResponseEntity<ApiResponse<String>> syncFiguresAsync() {
+        String jobId = figureApiService.syncAllFiguresV4();
+        return ResponseEntity.ok(ApiResponse.success("국회의원 정보 비동기 동기화 작업이 시작되었습니다", jobId));
+    }
+
+    @GetMapping("/sync/status/{jobId}")
+    public ResponseEntity<ApiResponse<FigureApiService.SyncJobStatus>> getSyncStatus(@PathVariable String jobId) {
+
+        FigureApiService.SyncJobStatus status = figureApiService.getSyncJobStatus(jobId);
+
+        if (status == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("국회의원 정보 동기화 작업 상태", status));
     }
 
     @PostMapping("/sync/party")
