@@ -886,10 +886,39 @@ public class FigureApiService {
         String figureId = dto.figureId();
 
         try {
-            Figure figure = figureRepository.findByFigureId(figureId)
-                    .orElseThrow(() -> new EntityNotFoundException("국회의원을 찾을 수 없습니다 " + figureId));
+            if (!figureRepository.existsByFigureId(figureId)) {
+                log.warn("컬렉션 업데이트를 위한 국회의원을 찾을 수 없습니다: {}", figureId);
+                return;
+            }
 
-            figure.clearAllCollections();
+            Figure figure = figureRepository.findByFigureId(figureId)
+                    .orElseThrow(() -> new EntityNotFoundException("국회의원을 찾을 수 없습니다: " + figureId));
+
+            // 이하 기존 코드와 동일
+            // 컬렉션 초기화
+            if (figure.getEducation() == null) {
+                figure.setEducation(new ArrayList<>());
+            } else {
+                figure.getEducation().clear();
+            }
+
+            if (figure.getCareers() == null) {
+                figure.setCareers(new ArrayList<>());
+            } else {
+                figure.getCareers().clear();
+            }
+
+            if (figure.getSites() == null) {
+                figure.setSites(new ArrayList<>());
+            } else {
+                figure.getSites().clear();
+            }
+
+            if (figure.getActivities() == null) {
+                figure.setActivities(new ArrayList<>());
+            } else {
+                figure.getActivities().clear();
+            }
 
             if (dto.education() != null) {
                 for (String education : dto.education()) {
