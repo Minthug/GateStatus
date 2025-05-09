@@ -143,6 +143,12 @@ public class CareerParser {
         String trimmed = dateStr.trim();
 
         try {
+
+            if (!trimmed.matches("\\d{4}([-./년\\s]\\s*\\d{1,2}([-./월\\s]\\s*\\d{1,2})?)?")) {
+                log.debug("날짜 형식이 아닙니다: {}", dateStr);
+                return null;
+            }
+
             String[] patterns = {
                     "yyyy.MM", "yyyy-MM", "yyyy/MM",
                     "yyyy.M", "yyyy-M", "yyyy/M",

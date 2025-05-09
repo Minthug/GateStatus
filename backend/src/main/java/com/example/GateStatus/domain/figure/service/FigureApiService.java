@@ -811,7 +811,6 @@ public class FigureApiService {
      */
     private boolean processOneFigure(FigureInfoDTO figure) {
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-
         transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         transactionTemplate.setIsolationLevel(TransactionDefinition.ISOLATION_DEFAULT);
 
@@ -820,14 +819,17 @@ public class FigureApiService {
                 try {
                     // 이 블록 내에서 실행되는 모든 데이터베이스 작업은 트랜잭션 내에서 실행됩니다
                     boolean exists = figureRepository.existsByFigureId(figure.figureId());
+                    Figure figureEntity;
 
                     if (exists) {
-                        updateFigureBasicInfoJpa(figure);
+                        figureEntity = updateFigureBasicInfoJpa(figure);
                     } else {
-                        insertFigureBasicInfoJpa(figure);
+                        figureEntity = insertFigureBasicInfoJpa(figure);
                     }
 
-                    updateCollectionsWithJpa(figure);
+                    if (figureEntity != null) {
+                        updateCollectionsWithJpa(figureEntity, figure);
+                    }
 
                     return true;
                 } catch (Exception e) {
@@ -844,26 +846,38 @@ public class FigureApiService {
         }
     }
 
-    private void updateFigureBasicInfoJpa(FigureInfoDTO dto) {
-        Figure figure = figureRepository.findByFigureId(dto.figureId())
-                .orElseThrow(() -> new IllegalStateException("존재하지 않는 의원 ID: " + dto.figureId()));
+    private Figure updateFigureBasicInfoJpa(FigureInfoDTO dto) {
 
-        // Update Entity
-        figure.setName(dto.name());
-        figure.setEnglishName(dto.englishName());
-        figure.setBirth(dto.birth());
-        figure.setConstituency(dto.constituency());
-        figure.setFigureParty(dto.partyName());
-        figure.setUpdateSource("국회 Open API");
+        try {
+            Figure figure = figureRepository.findByFigureId(dto.figureId())
+                    .orElse(null);
 
-        // Save
-        figureRepository.save(figure);
-        log.debug("국회의원 기본 정보 JPA 업데이트 완료: {}", dto.name());
+            if (figure == null) {
+                log.warn("업데이트할 국회의원을 찾을 수 없습니다: {}", dto.figureId());
+                return null;
+            }
 
+            // Update Entity
+            figure.setName(dto.name());
+            figure.setEnglishName(dto.englishName());
+            figure.setBirth(dto.birth());
+            figure.setConstituency(dto.constituency());
+            figure.setFigureParty(dto.partyName());
+            figure.setUpdateSource("국회 Open API");
+
+            // Save
+            figureRepository.save(figure);
+            log.debug("국회의원 기본 정보 JPA 업데이트 완료: {}", dto.name());
+            return figure;
+        } catch (Exception e) {
+            log.error("국회의원 기본 정보 업데이트 중 오류: {} - {}", dto.name(), e.getMessage(), e);
+            return null;
+        }
     }
 
-    private void insertFigureBasicInfoJpa(FigureInfoDTO dto) {
+    private Figure insertFigureBasicInfoJpa(FigureInfoDTO dto) {
 
+        try {
         // Make New Entity
         Figure figure = Figure.builder()
                 .figureId(dto.figureId())
@@ -880,20 +894,15 @@ public class FigureApiService {
         // Save
         figureRepository.save(figure);
         log.debug("새 국회의원 정보 JPA 삽입 완료: {}", dto.name());
+        return null;
+        } catch (Exception e) {
+            log.error("새 국회의원 정보 삽입 중 오류: {} - {}", dto.name(), e.getMessage(), e);
+            return null;
+        }
     }
 
-    private void updateCollectionsWithJpa(FigureInfoDTO dto) {
-        String figureId = dto.figureId();
-
+    private void updateCollectionsWithJpa(Figure figure, FigureInfoDTO dto) {
         try {
-            if (!figureRepository.existsByFigureId(figureId)) {
-                log.warn("컬렉션 업데이트를 위한 국회의원을 찾을 수 없습니다: {}", figureId);
-                return;
-            }
-
-            Figure figure = figureRepository.findByFigureId(figureId)
-                    .orElseThrow(() -> new EntityNotFoundException("국회의원을 찾을 수 없습니다: " + figureId));
-
             // 이하 기존 코드와 동일
             // 컬렉션 초기화
             if (figure.getEducation() == null) {
