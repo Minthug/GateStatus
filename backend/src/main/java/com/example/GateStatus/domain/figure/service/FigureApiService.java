@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.PersistenceContext;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +20,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -809,18 +812,22 @@ public class FigureApiService {
     private boolean processOneFigure(FigureInfoDTO figure) {
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
 
+        transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        transactionTemplate.setIsolationLevel(TransactionDefinition.ISOLATION_DEFAULT);
+
         try {
             Boolean result = transactionTemplate.execute(status -> {
                 try {
+                    // 이 블록 내에서 실행되는 모든 데이터베이스 작업은 트랜잭션 내에서 실행됩니다
                     boolean exists = figureRepository.existsByFigureId(figure.figureId());
 
                     if (exists) {
-                        updateFigureBasicInfo(figure);
+                        updateFigureBasicInfoJpa(figure);
                     } else {
-                        insertFigureBasicInfo(figure);
+                        insertFigureBasicInfoJpa(figure);
                     }
 
-                    updateCollectionsWithNativeSql(figure);
+                    updateCollectionsWithJpa(figure);
 
                     return true;
                 } catch (Exception e) {
@@ -837,8 +844,129 @@ public class FigureApiService {
         }
     }
 
-    private List<List<FigureInfoDTO>> splitIntoBatches(List<FigureInfoDTO> allFigures, int batchSize) {
-        return null;
+    private void updateFigureBasicInfoJpa(FigureInfoDTO dto) {
+        Figure figure = figureRepository.findByFigureId(dto.figureId())
+                .orElseThrow(() -> new IllegalStateException("존재하지 않는 의원 ID: " + dto.figureId()));
+
+        // Update Entity
+        figure.setName(dto.name());
+        figure.setEnglishName(dto.englishName());
+        figure.setBirth(dto.birth());
+        figure.setConstituency(dto.constituency());
+        figure.setFigureParty(dto.partyName());
+        figure.setUpdateSource("국회 Open API");
+
+        // Save
+        figureRepository.save(figure);
+        log.debug("국회의원 기본 정보 JPA 업데이트 완료: {}", dto.name());
+
+    }
+
+    private void insertFigureBasicInfoJpa(FigureInfoDTO dto) {
+
+        // Make New Entity
+        Figure figure = Figure.builder()
+                .figureId(dto.figureId())
+                .name(dto.name())
+                .englishName(dto.englishName())
+                .birth(dto.birth())
+                .constituency(dto.constituency())
+                .figureType(FigureType.POLITICIAN)
+                .figureParty(dto.partyName())
+                .viewCount(0L)
+                .updateSource("국회 Open API")
+                .build();
+
+        // Save
+        figureRepository.save(figure);
+        log.debug("새 국회의원 정보 JPA 삽입 완료: {}", dto.name());
+    }
+
+    private void updateCollectionsWithJpa(FigureInfoDTO dto) {
+        String figureId = dto.figureId();
+
+        try {
+            Figure figure = figureRepository.findByFigureId(figureId)
+                    .orElseThrow(() -> new EntityNotFoundException("국회의원을 찾을 수 없습니다 " + figureId));
+
+            figure.clearAllCollections();
+
+            if (dto.education() != null) {
+                for (String education : dto.education()) {
+                    if (education != null && !education.trim().isEmpty()) {
+                        figure.getEducation().add(education.trim());
+                    }
+                }
+            }
+
+            if (dto.electedCount() != null && !dto.electedCount().isEmpty()) {
+                Career assemblyCareer = Career.builder()
+                        .title(dto.electedCount() + "대 국회의원")
+                        .position("국회의원")
+                        .organization("대한민국 국회")
+                        .period(dto.electedDate() != null ? dto.electedDate() + " ~ 현재" : "현재")
+                        .build();
+                figure.getCareers().add(assemblyCareer);
+            }
+
+            if (dto.committeeName() != null && !dto.committeeName().isEmpty()) {
+                String position = dto.committeePosition() != null ? dto.committeePosition() : "위원";
+                Career committeeCareer = Career.builder()
+                        .title("국회 " + dto.committeeName())
+                        .position(position)
+                        .organization(dto.committeeName())
+                        .period("현재")
+                        .build();
+                figure.getCareers().add(committeeCareer);
+            }
+
+            if (dto.career() != null && !dto.career().isEmpty()) {
+                figure.getCareers().addAll(dto.career());
+            }
+
+            if (dto.homepage() != null && !dto.homepage().trim().isEmpty()) {
+                figure.getSites().add(dto.homepage().trim());
+            }
+
+            // Add email as mailto: link if available
+            if (dto.email() != null && !dto.email().trim().isEmpty()) {
+                figure.getSites().add("mailto:" + dto.email().trim());
+            }
+
+            // Update activities collection
+            // Add elected info if available
+            if (dto.electedCount() != null && !dto.electedCount().isEmpty()) {
+                figure.getActivities().add(dto.electedCount() + "대 국회의원");
+            }
+
+            // Add committee info if available
+            if (dto.committeeName() != null && !dto.committeeName().isEmpty()) {
+                String position = dto.committeePosition() != null ? dto.committeePosition() : "위원";
+                figure.getActivities().add(dto.committeeName() + " " + position);
+            }
+
+            figureRepository.save(figure);
+            log.debug("컬렉션 정보 JPA 업데이트 완료: {}", dto.name());
+        } catch (Exception e) {
+            log.error("컬렉션 정보 JPA 업데이트 중 오류: {} - {}", dto.name(), e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    private <T> List<List<T>> splitIntoBatches(List<T> items, int batchSize) {
+        if (items == null) {
+            log.warn("splitIntoBatches: 입력 목록이 null입니다");
+            return new ArrayList<>();
+        }
+
+        List<List<T>> batches = new ArrayList<>();
+        for (int i = 0; i < items.size(); i += batchSize) {
+            batches.add(new ArrayList<>(
+                    items.subList(i, Math.min(i + batchSize, items.size()))));
+        }
+
+        log.debug("splitIntoBatches: 총 {}개 항목을 {}개 배치로 분할했습니다", items.size(), batches.size());
+        return batches;
     }
 
 
@@ -846,147 +974,6 @@ public class FigureApiService {
         return syncJobStatusMap.get(jobId);
     }
 
-
-    private void updateFigureBasicInfo(FigureInfoDTO figure) {
-        entityManager.createNativeQuery(
-                        "UPDATE figure SET " +
-                                "name = ?, " +
-                                "english_name = ?, " +
-                                "birth = ?, " +
-                                "constituency = ?, " +
-                                "figure_party = ?, " +
-                                "update_source = ?, " +
-                                "WHERE figure_id = ?")
-                .setParameter(1, figure.name())
-                .setParameter(2, figure.englishName())
-                .setParameter(3, figure.birth())
-                .setParameter(4, figure.constituency())
-                .setParameter(5, figure.partyName() != null ? figure.partyName().toString() : null)
-                .setParameter(6, "국회 Open API")
-                .setParameter(7, figure.figureId())
-                .executeUpdate();
-
-        log.debug("국회의원 기본 정보 업데이트 완료: {}", figure.name());
-    }
-
-
-
-    private void insertFigureBasicInfo(FigureInfoDTO figure) {
-        entityManager.createNativeQuery(
-                        "INSERT INTO figure (figure_id, name, english_name, birth, constituency, figure_type, figure_party, view_count, update_source) " +
-                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                .setParameter(1, figure.figureId())
-                .setParameter(2, figure.name())
-                .setParameter(3, figure.englishName())
-                .setParameter(4, figure.birth())
-                .setParameter(5, figure.constituency())
-                .setParameter(6, "POLITICIAN")
-                .setParameter(7, figure.partyName() != null ? figure.partyName().toString() : null)
-                .setParameter(8, 0L)
-                .setParameter(9, "국회 Open API")
-                .executeUpdate();
-
-        log.debug("새 국회의원 정보 삽입 완료: {}", figure.name());
-    }
-
-    private void updateCollectionsWithNativeSql(FigureInfoDTO figure) {
-        String figureId = figure.figureId();
-
-        try {
-            entityManager.createNativeQuery("DELETE FROM figure_education WHERE figure_id = ?")
-                    .setParameter(1, figureId)
-                    .executeUpdate();
-
-            entityManager.createNativeQuery("DELETE FROM figure_career WHERE figure_id = ?")
-                    .setParameter(1, figureId)
-                    .executeUpdate();
-
-            entityManager.createNativeQuery("DELETE FROM figure_site WHERE figure_id = ?")
-                    .setParameter(1, figureId)
-                    .executeUpdate();
-
-            entityManager.createNativeQuery("DELETE FROM figure_activity WHERE figure_id = ?")
-                    .setParameter(1, figureId)
-                    .executeUpdate();
-
-            if (figure.education() != null) {
-                for (String education : figure.education()) {
-                    if (education != null && !education.trim().isEmpty()) {
-                        entityManager.createNativeQuery(
-                                        "INSERT INTO figure_education (figure_id, education) VALUES (?, ?)")
-                                .setParameter(1, figureId)
-                                .setParameter(2, education.trim())
-                                .executeUpdate();
-                    }
-                }
-            }
-
-            // 경력 정보 삽입
-            // 국회의원 기본 경력
-            if (figure.electedCount() != null && !figure.electedCount().isEmpty()) {
-                entityManager.createNativeQuery(
-                                "INSERT INTO figure_career (figure_id, title, position, organization, period) VALUES (?, ?, ?, ?, ?)")
-                        .setParameter(1, figureId)
-                        .setParameter(2, figure.electedCount() + "대 국회의원")
-                        .setParameter(3, "국회의원")
-                        .setParameter(4, "대한민국 국회")
-                        .setParameter(5, figure.electedDate() != null ? figure.electedDate() + " ~ 현재" : "현재")
-                        .executeUpdate();
-            }
-
-            // 위원회 경력
-            if (figure.committeeName() != null && !figure.committeeName().isEmpty()) {
-                String position = figure.committeePosition() != null ? figure.committeePosition() : "위원";
-                entityManager.createNativeQuery(
-                                "INSERT INTO figure_career (figure_id, title, position, organization, period) VALUES (?, ?, ?, ?, ?)")
-                        .setParameter(1, figureId)
-                        .setParameter(2, "국회 " + figure.committeeName())
-                        .setParameter(3, position)
-                        .setParameter(4, figure.committeeName())
-                        .setParameter(5, "현재")
-                        .executeUpdate();
-            }
-
-            // 사이트 정보 삽입
-            if (figure.homepage() != null && !figure.homepage().trim().isEmpty()) {
-                entityManager.createNativeQuery(
-                                "INSERT INTO figure_site (figure_id, site) VALUES (?, ?)")
-                        .setParameter(1, figureId)
-                        .setParameter(2, figure.homepage().trim())
-                        .executeUpdate();
-            }
-
-            if (figure.email() != null && !figure.email().trim().isEmpty()) {
-                entityManager.createNativeQuery(
-                                "INSERT INTO figure_site (figure_id, site) VALUES (?, ?)")
-                        .setParameter(1, figureId)
-                        .setParameter(2, "mailto:" + figure.email().trim())
-                        .executeUpdate();
-            }
-
-            if (figure.electedCount() != null && !figure.electedCount().isEmpty()) {
-                entityManager.createNativeQuery(
-                                "INSERT INTO figure_activity (figure_id, activity) VALUES (?, ?)")
-                        .setParameter(1, figureId)
-                        .setParameter(2, figure.electedCount() + "대 국회의원")
-                        .executeUpdate();
-            }
-
-            if (figure.committeeName() != null && !figure.committeeName().isEmpty()) {
-                String position = figure.committeePosition() != null ? figure.committeePosition() : "위원";
-                entityManager.createNativeQuery(
-                                "INSERT INTO figure_activity (figure_id, activity) VALUES (?, ?)")
-                        .setParameter(1, figureId)
-                        .setParameter(2, figure.committeeName() + " " + position)
-                        .executeUpdate();
-            }
-
-            log.debug("컬렉션 정보 업데이트 완료: {}", figure.name());
-        } catch (Exception e) {
-            log.error("컬렉션 정보 업데이트 중 오류: {} - {}", figure.name(), e.getMessage(), e);
-            throw e;
-        }
-    }
 
 
     @Data
