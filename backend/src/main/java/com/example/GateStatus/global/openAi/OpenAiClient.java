@@ -1,5 +1,7 @@
 package com.example.GateStatus.global.openAi;
 
+import com.example.GateStatus.domain.statement.entity.StatementType;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.theokanning.openai.completion.chat.ChatCompletionRequest;
 import com.theokanning.openai.completion.chat.ChatCompletionResult;
 import com.theokanning.openai.completion.chat.ChatMessage;
@@ -8,9 +10,12 @@ import org.checkerframework.checker.units.qual.C;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.swing.plaf.nimbus.State;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class OpenAiClient {
@@ -50,5 +55,75 @@ public class OpenAiClient {
 
     }
 
+    /**
+     * 발언 내용 분석하여 유형 분류
+     */
+    public StatementType classifyStatement(String statement) {
+        ChatMessage systemMessage = new ChatMessage("system",
+                "당신은 정치인의 발언을 분석하여 유형을 분류하는 AI입니다. " +
+                        "가능한 유형은 SPEECH(연설), INTERVIEW(인터뷰), PRESS_RELEASE(보도자료), " +
+                        "DEBATE(토론), ASSEMBLY_SPEECH(국회연설), COMMITTEE_SPEECH(위원회발언), " +
+                        "MEDIA_COMMENT(언론논평), SOCIAL_MEDIA(SNS), OTHER(기타) 입니다. " +
+                        "결과는 유형만 대문자로 정확히 반환하세요."
+        );
 
+        ChatMessage userMessage = new ChatMessage("user", "다음 발언의 유형을 분류해주세요:\n\n" + statement);
+
+        List<ChatMessage> messages = new ArrayList<>();
+        messages.add(systemMessage);
+        messages.add(userMessage);
+
+        ChatCompletionRequest request = ChatCompletionRequest.builder()
+                .model("gpt-4")
+                .messages(messages)
+                .temperature(0.0)
+                .build();
+
+        ChatCompletionResult result = service.createChatCompletion(request);
+
+        String type = result.getChoices().get(0).getMessage().getContent().trim();
+        try {
+            return StatementType.valueOf(type);
+        } catch (IllegalArgumentException e) {
+            return StatementType.OTHER;
+        }
+    }
+
+
+    public Map<String, Double> analyzeSentiment(String statement) {
+        ChatMessage systemMessage = new ChatMessage("system",
+                "당신은 발언의 감성을 분석하는 AI입니다. " +
+                        "발언을 분석하여 긍정(POSITIVE), 부정(NEGATIVE), 중립(NEUTRAL)의 확률을 " +
+                        "점수로 반환하세요. 세 점수의 합은 1.0이 되어야 합니다. " +
+                        "JSON 형식으로 {\"POSITIVE\": 0.3, \"NEGATIVE\": 0.2, \"NEUTRAL\": 0.5}와 같이 응답하세요."
+        );
+
+        ChatMessage userMessage = new ChatMessage("user",
+                "다음 발언의 감성을 분석해주세요:\n\n" + statement);
+
+        List<ChatMessage> messages = new ArrayList<>();
+        messages.add(systemMessage);
+        messages.add(userMessage);
+
+        ChatCompletionRequest request = ChatCompletionRequest.builder()
+                .model("gpt-4")
+                .messages(messages)
+                .temperature(0.0)
+                .build();
+
+        ChatCompletionResult result = service.createChatCompletion(request);
+
+        String jsonString = result.getChoices().get(0).getMessage().getContent();
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(jsonString, Map.class);
+        } catch (Exception e) {
+            Map<String, Double> fallback = new HashMap<>();
+            fallback.put("POSITIVE", 0.0);
+            fallback.put("NEGATIVE", 0.0);
+            fallback.put("NEUTRAL", 1.0);
+            return fallback;
+        }
+    }
 }
