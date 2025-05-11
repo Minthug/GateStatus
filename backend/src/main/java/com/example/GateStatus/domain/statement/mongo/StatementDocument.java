@@ -14,6 +14,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Document(collection = "statements")
 @Data
@@ -55,6 +56,13 @@ public class StatementDocument {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    private List<String> topics;        // 발언 관련 토픽
+    private List<String> relatedEvents; // 관련 사건
+    private List<String> entities;      // 언급된 인물/단체
+    private Map<String, Object> nlpData; // NLP 분석 결과
+    private String occasion;            // 발언 배경 (회의, 기자회견 등)
+    private List<String> relatedBillIds; // 관련 법안
+    private List<String> relatedStatementIds; // 관련된 다른 발언
     private List<String> issueIds;
 
     public void incrementViewCount() {
