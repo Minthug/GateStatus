@@ -48,4 +48,7 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     @Query("{'figureId': ?0, 'issueIds': ?1, 'statementDate': {$gte: ?2, $lte: ?3}}")
     List<StatementDocument> findByFigureIdAndIssueIdsContainingAndStatementDateBetween(
             Long figureId, String issueId, LocalDate startDate, LocalDate endDate);
+
+    Page<StatementDocument> findByFigureName(String figureName, Pageable pageable);
+
 }

@@ -28,18 +28,26 @@ public class StatementMongoController {
 
     private final StatementService statementService;
     
-    @GetMapping("/{id}")
+    @GetMapping("/detail/{id}")
     public ResponseEntity<StatementResponse> getStatementById(@PathVariable String id) {
         log.info("[MongoDB] 발언 상세 정보 조회 요청: {}", id);
         StatementResponse response = statementService.findStatementById(id);
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/{figureId}")
+    @GetMapping("/by-figure/{figureId}")
     public ResponseEntity<Page<StatementResponse>> getStatementByFigure(@PathVariable Long figureId,
                                                                         @PageableDefault(size = 10)Pageable pageable) {
         log.info("[MongoDB] 정치인별 발언 목록 조회 요청: {}", figureId);
         Page<StatementResponse> responses = statementService.findStatementsByFigure(figureId, pageable);
+        return ResponseEntity.ok(responses);
+    }
+
+    @GetMapping("/by-figure-name")
+    public ResponseEntity<Page<StatementResponse>> getStatementByFigureName(@RequestParam String figureName,
+                                                                            @PageableDefault(size = 10) Pageable pageable) {
+        log.info("[MongoDB] 정치인 이름으로 발언 목록 조회 요청: {}", figureName);
+        Page<StatementResponse> responses = statementService.findStatementsByFigureName(figureName, pageable);
         return ResponseEntity.ok(responses);
     }
 

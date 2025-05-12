@@ -560,4 +560,19 @@ public class StatementService {
         log.info("{}개의 발언 데이터를 JPA에서 MongoDB로 마이그레이션 했습니다", documents.size());
     }
 
+    @Transactional
+    public Page<StatementResponse> findStatementsByFigureName(String figureName, Pageable pageable) {
+        log.info("정치인 이름으로 발언 목록 조회: {}", figureName);
+
+        // 1. 정치인 이름으로 Figure 엔티티 조회
+        Figure figure = figureRepository.findByName(figureName)
+                .orElseThrow(() -> new EntityNotFoundException("해당 이름의 정치인이 존재하지 않습니다: " + figureName));
+
+        Page<StatementDocument> statements = statementMongoRepository.findByFigureName(figureName, pageable);
+
+        if (statements.isEmpty()) {
+            statements = statementMongoRepository.findByFigureId(figure.getId(), pageable);
+        }
+        return statements.map(StatementResponse::from);
+    }
 }
