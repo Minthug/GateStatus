@@ -15,6 +15,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -68,6 +69,13 @@ public class StatementDocument {
     private List<String> relatedBillIds; // 관련 법안
     private List<String> relatedStatementIds; // 관련된 다른 발언
     private List<String> issueIds;       // 관련 이슈 ID
+
+    public Map<String, Object> getNlpData() {
+        if (this.nlpData == null ) {
+            this.nlpData = new HashMap<>();
+        }
+        return this.nlpData;
+    }
 
     public void addRelatedBill(String billId) {
         if (this.relatedBillIds == null) {

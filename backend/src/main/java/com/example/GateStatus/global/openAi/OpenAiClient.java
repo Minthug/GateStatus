@@ -9,6 +9,8 @@ import com.theokanning.openai.service.OpenAiService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -19,9 +21,12 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class OpenAiClient {
 
     private final OpenAiService service;
+
 
     public OpenAiClient(@Value("${spring.openai.api.key}") String apiKey) {
         this.service = new OpenAiService(apiKey, Duration.ofSeconds(60));
@@ -232,7 +237,7 @@ public class OpenAiClient {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    class FactCheckResult {
+    public static class FactCheckResult {
         private int score;
         private String explanation;
         private List<String> checkableItems;

@@ -438,8 +438,26 @@ public class StatementService {
                 .orElseThrow(() -> new EntityNotFoundException("해당 발언이 존재하지 않습니다 " + id));
 
         try {
-             result = openAiClient.factCheckStatement(statement.getContent());
+            log.info("발언 ID {} 팩트체크 시작", id);
+             OpenAiClient.FactCheckResult result = openAiClient.factCheckStatement(statement.getContent());
 
+             statement.updateFactCheck(result.getScore(), result.getExplanation());
+
+             if (statement.getNlpData() == null) {
+                 statement.setNlpData(new HashMap<>());
+             }
+
+             statement.getNlpData().put("checkableItems", result.getCheckableItems());
+
+             statement.setUpdatedAt(LocalDateTime.now());
+
+             StatementDocument savedStatement = statementMongoRepository.save(statement);
+             log.info("발언 ID {} 팩트체크 완료: 점수={}", id, result.getScore());
+
+             return StatementResponse.from(savedStatement);
+        } catch (Exception e) {
+            log.error("팩트체크 처리 중 오류 발생: {}", e.getMessage(), e);
+            throw new RuntimeException("팩트체크 처리 중 오류 발생", e);
         }
     }
 
