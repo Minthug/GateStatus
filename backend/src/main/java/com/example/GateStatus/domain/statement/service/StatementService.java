@@ -11,6 +11,7 @@ import com.example.GateStatus.domain.statement.service.request.StatementRequest;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
+import com.example.GateStatus.global.openAi.OpenAiClient;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +28,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,6 +43,7 @@ public class StatementService {
     private final StatementMongoRepository statementMongoRepository;
     private final StatementApiMapper mapper;
     private final WebClient.Builder webclientBuilder;
+    private final OpenAiClient openAiClient;
 
     @Value("${spring.openapi.assembly.url}")
     private String baseUrl;
@@ -405,6 +410,51 @@ public class StatementService {
                 return StatementType.SOCIAL_MEDIA;
             default:
                 return StatementType.OTHER;
+        }
+    }
+
+
+
+    public StatementDocument convertApiDtoToDocument(StatementApiDTO dto, Figure figure) {
+        StatementDocument.StatementDocumentBuilder builder = StatementDocument.builder()
+                .figureId(figure.getId())
+                .figureName(figure.getName())
+                .title(dto.title())
+                .content(dto.content())
+                .statementDate(dto.statementDate())
+                .source(dto.source())
+                .context(dto.context())
+                .originalUrl(dto.originalUrl())
+                .type(determineStatementType(dto.typeCode()))
+                .viewCount(0)
+                .factCheckScore(null)
+                .factCheckResult(null)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now());
+
+        if (dto.content() != null && dto.content().length() > 50) {
+            try {
+                List<String> keywords = openAiClient.extractKeywords(dto.content());
+                builder.topics(keywords);
+
+                StatementType aiDeterminedType = openAiClient.classifyStatement(dto.content());
+                if (aiDeterminedType != StatementType.OTHER) {
+                    builder.type(aiDeterminedType);
+                }
+
+                if (dto.content().length() > 200) {
+                    String summary = openAiClient.summarizeStatement(dto.content());
+                    builder.summary(summary);
+                }
+
+                // 감성 분석
+                Map<String, Double> sentiment = openAiClient.analyzeSentiment(dto.content());
+                Map<String, Object> nlpData = new HashMap<>();
+                nlpData.put("sentiment", sentiment);
+                builder.nlpData(nlpData);
+            } catch (Exception e) {
+                log.warn("AI 분석 중 오류 발생: {}", e.getMessage());
+            }
         }
     }
 
