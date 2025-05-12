@@ -47,6 +47,7 @@ public class SecurityConfig {
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         // 조회는 모든 사용자 허용
                         .requestMatchers(HttpMethod.GET, "/v1/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v2/**").permitAll()
                         .requestMatchers("/","/index", "/css/**", "/js/**", "/images/**").permitAll()
                         .requestMatchers("/admin/login").permitAll()
                         .anyRequest().authenticated()

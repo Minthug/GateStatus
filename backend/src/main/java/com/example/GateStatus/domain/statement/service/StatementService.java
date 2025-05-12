@@ -96,33 +96,47 @@ public class StatementService {
 
 
     /**
-     * 키워드로 발언 검색 (정규식 기반)
+     * 발언 내용만으로 검색 (페이징 없음)
      * @param keyword
      * @return
      */
     @Transactional(readOnly = true)
-    public List<StatementResponse> searchStatements(String keyword) {
+    public List<StatementResponse> searchStatementContent(String keyword) {
+        log.info("발언 내용 검색: 키워드 = {}", keyword);
         List<StatementDocument> statements = statementMongoRepository.findByContentContainingKeyword(keyword);
+        log.info("발언 내용 검색 완료: 키워드 = {}, 결과 수 = {}", keyword, statements.size());
         return statements.stream()
                 .map(StatementResponse::from)
                 .collect(Collectors.toList());
     }
 
     /**
-     * 키워드로 발언 검색 (페이징 적용)
+     * 키워드로 발언 검색 (페이징 적용, 제목과 내용 모두 검색 )
      * @param keyword
      * @param pageable
      * @return
      */
     @Transactional(readOnly = true)
     public Page<StatementResponse> searchStatements(String keyword, Pageable pageable) {
+        log.info("발언 검색 요청 시작: 키워드 = {}", keyword);
+
         try {
-            return statementMongoRepository.fullTextSearch(keyword, pageable)
-                    .map(StatementResponse::from);
+            Page<StatementDocument> results = statementMongoRepository.fullTextSearch(keyword, pageable);
+
+            if (results.isEmpty()) {
+                log.info("텍스트 검색 결과 없음, 정규식 검색으로 전환: {}", keyword);
+                results = statementMongoRepository.searchByRegex(keyword, pageable);
+            }
+
+            // 검색 결과 로그
+            log.info("발언 검색 완료: 키워드 = {}, 결과 수 = {}", keyword, results.getTotalElements());
+
+
+            return results.map(StatementResponse::from);
         } catch (Exception e) {
-            log.warn("텍스트 검색 실패, 정규식 검색으로 대체: {}", e.getMessage());
-            return statementMongoRepository.searchByRegex(keyword, pageable)
-                    .map(StatementResponse::from);
+            log.error("발언 검색 중 오류 발생: {}", e.getMessage(), e);
+            Page<StatementDocument> fallbackResults = statementMongoRepository.searchByRegex(keyword, pageable);
+            return fallbackResults.map(StatementResponse::from);
         }
     }
 

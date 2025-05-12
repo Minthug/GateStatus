@@ -16,10 +16,6 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
 
     List<StatementDocument> findByType(StatementType type);
 
-    // 텍스트 인덱스 기반 검색 (인덱스 설정 필요)
-    @Query("{'$text': {$search: ?0}}")
-    Page<StatementDocument> fullTextSearch(String keyword, Pageable pageable);
-
     @Query("{ 'statementDate': { $gte: ?0, $lte: ?1 } }")
     List<StatementDocument> findByPeriod(LocalDate startDate, LocalDate endDate);
 
@@ -28,13 +24,6 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     List<StatementDocument> findByFactCheckScoreGreaterThanEqual(Integer minScore);
 
     List<StatementDocument> findBySource(String source);
-
-    // 정규식 기반 검색 (대안)
-    @Query("{ 'content': { $regex: ?0, $options:  'i' } }")
-    List<StatementDocument> findByContentContainingKeyword(String keyword);
-
-    @Query("{ $or: [ { 'title': { $regex: ?0, $options: 'i' } }, { 'content': { $regex: ?0, $options: 'i' } } ] }")
-    Page<StatementDocument> searchByRegex(String keyword, Pageable pageable);
 
     boolean existsByOriginalUrl(String originalUrl);
 
@@ -51,4 +40,23 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
 
     Page<StatementDocument> findByFigureName(String figureName, Pageable pageable);
 
+    // 발언 내용만 검색
+    @Query("{ 'content': { $regex: ?0, $options:  'i' } }")
+    List<StatementDocument> findByContentContainingKeyword(String keyword);
+
+    // 정규식 기반 내용 검색 (제목과 내용에서 검색)
+    @Query("{ $or: [ { 'title': { $regex: ?0, $options: 'i' } }, { 'content': { $regex: ?0, $options: 'i' } } ] }")
+    Page<StatementDocument> searchByRegex(String keyword, Pageable pageable);
+
+    // 텍스트 인덱스 기반 검색 (인덱스 설정 필요)
+    @Query("{'$text': {$search: ?0}}")
+    Page<StatementDocument> fullTextSearch(String keyword, Pageable pageable);
+
+    // 발언 내용에서 정확한 문구 검색 (정확한 일치)
+    @Query("{'content': {$regex: ?0}}")
+    List<StatementDocument> findByExactPhraseInContent(String phrase);
+
+    // 여러 키워드를 모두 포함하는 발언 검색(AND 조건)
+    @Query("{ $and: [ {'content': {$regex: ?0, $options: 'i'}}, {'content': {$regex: ?1, $options: 'i'}} ] }")
+    List<StatementDocument> findByMultipleKeywords(String keyword1, String keyword2);
 }

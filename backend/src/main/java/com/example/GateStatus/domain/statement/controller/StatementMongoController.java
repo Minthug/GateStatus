@@ -66,14 +66,14 @@ public class StatementMongoController {
         return ResponseEntity.ok(responses);
     }
 
-    @GetMapping("/{type}")
+    @GetMapping("/by-type/{type}")
     public ResponseEntity<List<StatementResponse>> getStatementsByType(@PathVariable StatementType type) {
         log.info("[MongoDB] 유형별 발언 목록 조회 요청: {}", type);
         List<StatementResponse> responses = statementService.findStatementsByType(type);
         return ResponseEntity.ok(responses);
     }
 
-    @GetMapping("/period")
+    @GetMapping("/by-period")
     public ResponseEntity<List<StatementResponse>> getStatementsByPeriod(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
                                                                          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         log.info("[MongoDB] 기간별 발언 목록 조회 요청: {} ~ {}", startDate, endDate);
@@ -88,10 +88,10 @@ public class StatementMongoController {
         return ResponseEntity.ok(responses);
     }
 
-    @GetMapping("/keyword/{keyword}")
+    @GetMapping("/by-keyword/{keyword}")
     public ResponseEntity<List<StatementResponse>> getStatementsByKeyword(@PathVariable String keyword) {
         log.info("[MongoDB] 키워드 포함 발언 검색 요청: {}", keyword);
-        List<StatementResponse> responses = statementService.searchStatements(keyword);
+        List<StatementResponse> responses = statementService.searchStatementContent(keyword);
         return ResponseEntity.ok(responses);
     }
 
