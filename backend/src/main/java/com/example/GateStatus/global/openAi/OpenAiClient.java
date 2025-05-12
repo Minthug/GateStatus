@@ -9,11 +9,9 @@ import com.theokanning.openai.service.OpenAiService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.checkerframework.checker.units.qual.C;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import javax.swing.plaf.nimbus.State;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;

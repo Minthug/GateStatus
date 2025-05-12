@@ -31,7 +31,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -361,31 +360,6 @@ public class StatementService {
     }
 
     /**
-     * API DTO -> MongoDB Document로 변환
-     * @param dto
-     * @param figure
-     * @return
-     */
-    public StatementDocument convertApiDtoToDocument(StatementApiDTO dto, Figure figure) {
-        return StatementDocument.builder()
-                .figureId(figure.getId())
-                .figureName(figure.getName())
-                .title(dto.title())
-                .content(dto.content())
-                .statementDate(dto.statementDate())
-                .source(dto.source())
-                .context(dto.context())
-                .originalUrl(dto.originalUrl())
-                .type(determineStatementType(dto.typeCode()))
-                .viewCount(0)
-                .factCheckScore(null)
-                .factCheckResult(null)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-    }
-
-    /**
      * API의 발언 유형 코드를 애플리케이션 StatementType으로 변환
      * @param typeCode
      * @return
@@ -412,8 +386,6 @@ public class StatementService {
                 return StatementType.OTHER;
         }
     }
-
-
 
     public StatementDocument convertApiDtoToDocument(StatementApiDTO dto, Figure figure) {
         StatementDocument.StatementDocumentBuilder builder = StatementDocument.builder()
@@ -456,8 +428,20 @@ public class StatementService {
                 log.warn("AI 분석 중 오류 발생: {}", e.getMessage());
             }
         }
+
+        return builder.build();
     }
 
+    @Transactional
+    public StatementResponse performFactCheck(String id) {
+        StatementDocument statement = statementMongoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("해당 발언이 존재하지 않습니다 " + id));
+
+        try {
+             result = openAiClient.factCheckStatement(statement.getContent());
+
+        }
+    }
 
     /**
      * API에서 특정 기간의 발언 정보 가져오기
@@ -529,4 +513,5 @@ public class StatementService {
         statementMongoRepository.saveAll(documents);
         log.info("{}개의 발언 데이터를 JPA에서 MongoDB로 마이그레이션 했습니다", documents.size());
     }
+
 }
