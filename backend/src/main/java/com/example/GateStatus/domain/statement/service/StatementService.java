@@ -461,6 +461,23 @@ public class StatementService {
         }
     }
 
+    @Transactional
+    public StatementResponse updateFactCheck(String id, FactCheckRequest request) {
+        StatementDocument statement = statementMongoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("해당 발언이 존재하지 않습니다: " + id));
+
+        // 기본 팩트체크 정보 업데이트
+        statement.updateFactCheck(request.score(), request.result());
+
+        // 추가 정보 NLP 데이터에 저장
+        Map<String, Object> nlpData = statement.getNlpData();
+
+        if (request.checkableItems() != null) {
+            nlpData.put("checkableItems", request.checkableItems());
+        }
+
+    }
+
     /**
      * API에서 특정 기간의 발언 정보 가져오기
      * @param startDate

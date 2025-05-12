@@ -6,6 +6,8 @@ import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 public record StatementResponse(String id,
                                 Long figureId,
@@ -19,11 +21,22 @@ public record StatementResponse(String id,
                                 StatementType type,
                                 Integer factCheckScore,
                                 String factCheckResult,
+                                List<String> checkableItems,
+                                Map<String, Object> nlpData,
                                 Integer viewCount,
                                 LocalDateTime createdAt,
                                 LocalDateTime updatedAt) {
 
+    /**
+     * MongoDB Document -> DTO
+     */
     public static StatementResponse from(StatementDocument statement) {
+
+        List<String> checkableItems = null;
+        if (statement.getNlpData() != null && statement.getNlpData().containsKey("checkableItems")) {
+            checkableItems = (List<String>) statement.getNlpData().get("checkableItems");
+        }
+
         return new StatementResponse(
                 statement.getId(),
                 statement.getFigureId(),
@@ -37,12 +50,17 @@ public record StatementResponse(String id,
                 statement.getType(),
                 statement.getFactCheckScore(),
                 statement.getFactCheckResult(),
+                checkableItems,
+                statement.getNlpData(),
                 statement.getViewCount(),
                 statement.getCreatedAt(),
                 statement.getUpdatedAt()
         );
     }
 
+    /**
+     * Jpa Entity -> DTO
+     */
     public static StatementResponse from(Statement entity) {
         return new StatementResponse(
                 entity.getId().toString(),
@@ -57,6 +75,8 @@ public record StatementResponse(String id,
                 entity.getType(),
                 entity.getFactCheckScore(),
                 entity.getFactCheckResult(),
+                null,  // JPA Entity에는 checkableItems 없음
+                null,  // JPA Entity에는 nlpData 없음
                 entity.getViewCount(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
