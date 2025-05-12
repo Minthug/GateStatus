@@ -229,16 +229,6 @@ public class StatementService {
         return StatementResponse.from(statement);
     }
 
-    /**
-     * 팩트체크 요청으로 업데이트 (편의 메서드)
-     * @param id
-     * @param request
-     * @return
-     */
-    @Transactional
-    public StatementResponse updateFactCheck(String id, FactCheckRequest request) {
-        return updateFactCheck(id, request.score(), request.result());
-    }
 
     @Transactional
     public int syncStatementsByFigure(String figureName) {
@@ -476,6 +466,27 @@ public class StatementService {
             nlpData.put("checkableItems", request.checkableItems());
         }
 
+        if (request.evidenceUrl() != null) {
+            nlpData.put("evidenceUrl", request.evidenceUrl());
+        }
+
+        if (request.checkerName() != null) {
+            nlpData.put("checkerName", request.checkerName());
+        }
+
+        if (request.checkerInstitution() != null) {
+            nlpData.put("checkerInstitution", request.checkerInstitution());
+        }
+
+        if (request.analysisDetail() != null) {
+            nlpData.put("analysisDetail", request.analysisDetail());
+        }
+
+        statement.setUpdatedAt(LocalDateTime.now());
+        StatementDocument savedStatement = statementMongoRepository.save(statement);
+
+        log.info("발언 ID {} 팩트체크 수동 업데이트 완료: 점수={}", id, request.score());
+        return StatementResponse.from(savedStatement);
     }
 
     /**
