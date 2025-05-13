@@ -25,12 +25,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import javax.swing.plaf.nimbus.State;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -109,6 +111,19 @@ public class StatementService {
                 .map(StatementResponse::from)
                 .collect(Collectors.toList());
     }
+
+    @Transactional(readOnly = true)
+    public List<StatementResponse> searchExtractPhrase(String phrase) {
+        log.info("정확한 문구로 발언 검색: 문구 = {}", phrase);
+        String escapedPhrase = Pattern.quote(phrase);
+        List<StatementDocument> statements = statementMongoRepository.findByExactPhraseInContent(escapedPhrase);
+        log.info("정확한 문구 검색 완료: 문구 = {}, 결과 수 = {}", phrase, statements.size());
+        return statements.stream()
+                .map(StatementResponse::from)
+                .collect(Collectors.toList());
+    }
+
+
 
     /**
      * 키워드로 발언 검색 (페이징 적용, 제목과 내용 모두 검색 )
