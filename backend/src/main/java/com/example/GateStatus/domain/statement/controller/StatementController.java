@@ -1,6 +1,7 @@
 package com.example.GateStatus.domain.statement.controller;
 
 import com.example.GateStatus.domain.statement.entity.StatementType;
+import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.service.StatementService;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import lombok.RequiredArgsConstructor;
@@ -62,17 +63,41 @@ public class StatementController {
 //    }
 
     /**
-     * 키워드로 발언 검색
+     * 통합 검색 엔드포인트 - 모든 필드에서 검색
      * @param keyword
      * @param pageable
      * @return
      */
     @GetMapping("/search")
-    public ResponseEntity<List<StatementResponse>> searchStatements(@RequestParam String keyword,
+    public ResponseEntity<Page<StatementResponse>> searchStatements(@RequestParam String keyword,
                                                                     @PageableDefault(size = 10) Pageable pageable) {
-        log.info("발언 검색 요청: keyword = {}", keyword);
-        List<StatementResponse> statements = statementService.searchStatements(keyword);
+        log.info("[MongoDB] 발언 통합 검색 요청: 키워드 = {}", keyword);
+        Page<StatementResponse> statements = statementService.searchStatements(keyword, pageable);
         return ResponseEntity.ok(statements);
+    }
+
+    /**
+     * 발언 내용 검색 - 정규식 기반 검색으로 유연한 검색 가능
+     * @param keyword
+     * @return
+     */
+    @GetMapping("/search/content")
+    public ResponseEntity<List<StatementResponse>> searchContent(@RequestParam String keyword) {
+        log.info("[MongoDB] 발언 내용 검색 요청: 키워드 = {}", keyword);
+        List<StatementResponse> responses = statementService.searchStatementContent(keyword);
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 정확한 문구 검색 - 완전히 일치하는 문구 검색
+     * @param phrase
+     * @return
+     */
+    @GetMapping("/search/exact")
+    public ResponseEntity<List<StatementResponse>> searchExactPhrase(@RequestParam String phrase) {
+        log.info("[MongoDB] 정확한 문구 검색 요청: 문구 = {}", phrase);
+        List<StatementResponse> responses = statementService.searchExtractPhrase(phrase);
+        return ResponseEntity.ok(responses);
     }
 
     /**
@@ -100,4 +125,5 @@ public class StatementController {
         List<StatementResponse> statements = statementService.findStatementsByPeriod(startDate, endDate);
         return ResponseEntity.ok(statements);
     }
+
 }
