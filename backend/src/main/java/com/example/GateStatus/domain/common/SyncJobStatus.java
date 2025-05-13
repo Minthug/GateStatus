@@ -45,5 +45,3 @@ public class SyncJobStatus {
         return Duration.between(startTime, end);
     }
 }
-
-}

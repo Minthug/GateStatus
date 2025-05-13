@@ -2,6 +2,7 @@ package com.example.GateStatus.domain.statement.service;
 
 import com.example.GateStatus.domain.common.SyncJobStatus;
 import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
@@ -75,7 +76,7 @@ public class StatementSyncService {
                 continue;
             }
 
-            StatementDocument statement = convertToStatement(dto, figure);
+            StatementDocument statement = convertApiDtoToDocument(dto, figure);
             statementRepository.save(statement);
             syncCount++;
         }
@@ -108,6 +109,40 @@ public class StatementSyncService {
         String resultMessage = extractResultMessage(xmlResponse);
 
         return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
+    }
+
+    @Transactional
+    public int syncAllStatements() {
+        log.info("모든 국회의원의 발언 정보 동기화 시작");
+        List<Figure> allFigures = figureRepository.findByFigureType(FigureType.POLITICIAN);
+
+        if (allFigures.isEmpty()) {
+            log.warn("동기화할 국회의원 정보가 없습니다");
+            return 0;
+        }
+
+        log.info("동기화 대상 국회의원: {}명", allFigures.size());
+
+        int totalSuccess = 0;
+        int totalFail = 0;
+
+        for (Figure figure : allFigures) {
+            try {
+                String name = figure.getName();
+                log.info("국회의원 {}의 발언 정보 동기화 시작", name);
+
+                int success = syncStatementsByFigure(name);
+                totalSuccess += success;
+                log.info("국회의원 {}의 발언 정보 동기화 완료: {}건", name, success);
+            } catch (Exception e) {
+                totalFail++;
+                log.error("국회의원 {}의 발언 정보 동기화 중 오류: {}", figure.getName(), e.getMessage(), e);
+            }
+        }
+
+        log.info("모든 국회의원 발언 정보 동기화 완료: 총 {}명 중 성공 {}건, 실패 {}건",
+                allFigures.size(), totalSuccess, totalFail);
+        return totalSuccess;
     }
 
     /**
