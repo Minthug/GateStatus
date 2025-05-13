@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.figure.controller;
 
+import com.example.GateStatus.domain.common.SyncJobStatus;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureService;
@@ -154,9 +155,9 @@ public class FigureController {
     }
 
     @GetMapping("/sync/status/{jobId}")
-    public ResponseEntity<ApiResponse<FigureApiService.SyncJobStatus>> getSyncStatus(@PathVariable String jobId) {
+    public ResponseEntity<ApiResponse<SyncJobStatus>> getSyncStatus(@PathVariable String jobId) {
 
-        FigureApiService.SyncJobStatus status = figureApiService.getSyncJobStatus(jobId);
+        SyncJobStatus status = figureApiService.getSyncJobStatus(jobId);
 
         if (status == null) {
             return ResponseEntity.notFound().build();

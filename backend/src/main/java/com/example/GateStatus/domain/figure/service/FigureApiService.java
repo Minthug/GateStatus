@@ -2,6 +2,7 @@ package com.example.GateStatus.domain.figure.service;
 
 import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.career.CareerParser;
+import com.example.GateStatus.domain.common.SyncJobStatus;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
@@ -13,7 +14,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1011,47 +1010,5 @@ public class FigureApiService {
     }
 
 
-
-    @Data
-    public static class SyncJobStatus {
-
-        private final String jobId;
-        private int totalTasks;
-        private int completedTasks;
-        private int successCount;
-        private int failCount;
-        private boolean completed;
-        private boolean error;
-        private String errorMessage;
-        private final LocalDateTime startTime = LocalDateTime.now();
-        private LocalDateTime endTime;
-
-
-        public SyncJobStatus(String jobId) {
-            this.jobId = jobId;
-        }
-
-        public void incrementCompletedTasks() {
-            this.completedTasks++;
-        }
-
-        public void incrementSuccessCount() {
-            this.successCount++;
-        }
-
-        public void incrementFailCount() {
-            this.failCount++;
-        }
-
-        public int getProgressPercentage() {
-            if (totalTasks == 0) return 100;
-            return (int) ((completedTasks * 100.0) / totalTasks);
-        }
-
-        public Duration getElapsedTime() {
-            LocalDateTime end = endTime != null ? endTime : LocalDateTime.now();
-            return Duration.between(startTime, end);
-        }
-    }
 }
 
