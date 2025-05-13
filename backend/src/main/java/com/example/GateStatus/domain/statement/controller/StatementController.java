@@ -7,12 +7,14 @@ import com.example.GateStatus.domain.statement.service.response.StatementRespons
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.swing.plaf.nimbus.State;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -97,6 +99,60 @@ public class StatementController {
     public ResponseEntity<List<StatementResponse>> searchExactPhrase(@RequestParam String phrase) {
         log.info("[MongoDB] 정확한 문구 검색 요청: 문구 = {}", phrase);
         List<StatementResponse> responses = statementService.searchExtractPhrase(phrase);
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 다중 키워드 검색 - 모든 키워드를 포함하는 발언 검색 (AND 조건)
+     * @param keywords
+     * @return
+     */
+    @GetMapping("/search/multi")
+    public ResponseEntity<List<StatementResponse>> searchMultiKeywords(@RequestParam List<String> keywords) {
+        log.info("[MongoDB] 다중 키워드 검색 요청: 키워드 = {}", keywords);
+        List<StatementResponse> responses = statementService.searchWithMultipleKeywords(keywords);
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 최근 발언 중 키워드 검색
+     * @param keyword
+     * @param limit
+     * @return
+     */
+    @GetMapping("/search/recent")
+    public ResponseEntity<List<StatementResponse>> searchRecentStatements(@RequestParam String keyword,
+                                                                          @RequestParam(defaultValue = "10") int limit) {
+        log.info("[MongoDB] 최근 발언 검색 요청: 키워드 = {}, 제한 = {}", keyword, limit);
+        List<StatementResponse> responses = statementService.searchRecentStatements(keyword, limit);
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 발언 길이 기준 검색 - 긴 발언
+     * @param minLength
+     * @param size
+     * @return
+     */
+    @GetMapping("/search/long")
+    public ResponseEntity<List<StatementResponse>> searchLongStatements(@RequestParam(defaultValue = "500") int minLength,
+                                                                        @RequestParam(defaultValue = "10") int size) {
+        log.info("[MongoDB] 긴 발언 검색 요청: 최소 길이 = {}", minLength);
+        List<StatementResponse> responses = statementService.findLongStatements(minLength, PageRequest.of(0, size));
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 발언 길이 기준 검색 - 짧은 발언
+     * @param maxLength
+     * @param size
+     * @return
+     */
+    @GetMapping("/search/short")
+    public ResponseEntity<List<StatementResponse>> searchShortStatements(@RequestParam(defaultValue = "100") int maxLength,
+                                                                         @RequestParam(defaultValue = "10") int size) {
+        log.info("[MongoDB] 짧은 발언 검색 요청: 최대 길이 = {}", maxLength);
+        List<StatementResponse> responses = statementService.findShortStatements(maxLength, PageRequest.of(0, size));
         return ResponseEntity.ok(responses);
     }
 
