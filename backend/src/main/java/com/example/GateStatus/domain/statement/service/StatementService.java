@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import javax.swing.plaf.PanelUI;
 import javax.swing.plaf.nimbus.State;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -112,6 +113,9 @@ public class StatementService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 정확한 문구로 발언 검색
+     */
     @Transactional(readOnly = true)
     public List<StatementResponse> searchExtractPhrase(String phrase) {
         log.info("정확한 문구로 발언 검색: 문구 = {}", phrase);
@@ -123,6 +127,34 @@ public class StatementService {
                 .collect(Collectors.toList());
     }
 
+
+    /**
+     * 여러 키워드를 모두 포함하는 발언 검색 (AND 조건)
+     */
+    @Transactional(readOnly = true)
+    public List<StatementResponse> searchWithMultipleKeywords(List<String> keywords) {
+        if (keywords == null || keywords.size() < 2) {
+            throw new IllegalArgumentException("최소 2개 이상의 키워드가 필요합니다");
+        }
+
+        log.info("다중 키워드 발언 검색: 키워드 = {}", keywords);
+
+        List<StatementDocument> results = statementMongoRepository.findByMultipleKeywords(keywords.get(0), keywords.get(1));
+
+        if (keywords.size() > 2) {
+            for (int i = 0; i < keywords.size(); i++) {
+                final String keyword = keywords.get(i);
+                results = results.stream()
+                        .filter(statement -> statement.getContent().toLowerCase()
+                                .contains(keyword.toLowerCase()))
+                        .collect(Collectors.toList());
+            }
+        }
+        log.info("다중 키워드 검색 완료: 키워드 = {}, 결과 수 = {}", keywords, results.size());
+        return results.stream()
+                .map(StatementResponse::from)
+                .collect(Collectors.toList());
+    }
 
 
     /**
@@ -168,6 +200,56 @@ public class StatementService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 최근 발언 중 특정 키워드를 포함하는 발언 검색
+     * @param keyword
+     * @param limit
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<StatementResponse> searchRecentStatements(String keyword, int limit) {
+        log.info("최근 발언 검색: 키워드 = {}, 제한 = {}", keyword, limit);
+        List<StatementDocument> statements = statementMongoRepository.findByKeywordOrderByStatementDateDesc(
+                keyword, PageRequest.of(0, limit));
+        log.info("최근 발언 검색 완료: 키워드 = {}, 결과 수 = {}", keyword, statements.size());
+        return statements.stream()
+                .map(StatementResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 발언 길이에 따른 검색 (긴 발언, 짧은 발언 구분)
+     * @param minLength
+     * @param pageable
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<StatementResponse> findLongStatements(int minLength, Pageable pageable) {
+        log.info("긴 발언 검색: 최소 길이 = {}", minLength);
+        List<StatementDocument> statements = statementMongoRepository.findByContentLengthGreaterThan(minLength, pageable);
+        log.info("긴 발언 검색 완료: 최소 길이 = {}, 결과 수 = {}", minLength, statements.size());
+
+        return statements.stream()
+                .map(StatementResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 발언 길이에 따른 검색 (짧은 발언)
+     * @param maxLength
+     * @param pageable
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<StatementResponse> findShortStatements(int maxLength, Pageable pageable) {
+        log.info("짧은 발언 검색: 최대 길이 = {}", maxLength);
+        List<StatementDocument> statements = statementMongoRepository.findByContentLengthLessThan(maxLength, pageable);
+        log.info("짧은 발언 검색 완료: 최대 길이 = {}, 결과 수 = {}", maxLength, statements.size());
+
+        return statements.stream()
+                .map(StatementResponse::from)
+                .collect(Collectors.toList());
+    }
 
     /**
      * 기간별 발언 목록 조회
