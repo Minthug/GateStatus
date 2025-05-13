@@ -2,6 +2,7 @@ package com.example.GateStatus.domain.statement.repository;
 
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
+import org.apache.kafka.common.metrics.Stat;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -13,6 +14,8 @@ import java.util.List;
 public interface StatementMongoRepository extends MongoRepository<StatementDocument, String> {
 
     Page<StatementDocument> findByFigureId(Long figureId, Pageable pageable);
+
+    Page<StatementDocument> findByFigureName(String figureName, Pageable pageable);
 
     List<StatementDocument> findByType(StatementType type);
 
@@ -38,8 +41,6 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     List<StatementDocument> findByFigureIdAndIssueIdsContainingAndStatementDateBetween(
             Long figureId, String issueId, LocalDate startDate, LocalDate endDate);
 
-    Page<StatementDocument> findByFigureName(String figureName, Pageable pageable);
-
     // 발언 내용만 검색
     @Query("{ 'content': { $regex: ?0, $options:  'i' } }")
     List<StatementDocument> findByContentContainingKeyword(String keyword);
@@ -59,4 +60,18 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     // 여러 키워드를 모두 포함하는 발언 검색(AND 조건)
     @Query("{ $and: [ {'content': {$regex: ?0, $options: 'i'}}, {'content': {$regex: ?1, $options: 'i'}} ] }")
     List<StatementDocument> findByMultipleKeywords(String keyword1, String keyword2);
+
+
+    // 발언 내용 일부로 검색  (더 유연한 검색을 위한 메서드)
+    @Query("{'content': {$regex: '.*?0.*', $options: 'i'}}")
+    Page<StatementDocument> findByContentContaining(String contentSnippet, Pageable pageable);
+
+    @Query("{'content': {$regex: ?0, $options: 'i'}}")
+    List<StatementDocument> findByKeywordOrderByStatementDateDesc(String keyword, Pageable pageable);
+
+    @Query("{'$expr': {$gt: [{$strLenCp: '$content'}, ?0]}}")
+    List<StatementDocument> findByContentLengthGreaterThan(int length, Pageable pageable);
+
+    @Query("{'$expr': {$lt: [{$strLenCp: '$content'}, ?0]}}")
+    List<StatementDocument> findByContentLengthLessThan(int length, Pageable pageable);
 }
