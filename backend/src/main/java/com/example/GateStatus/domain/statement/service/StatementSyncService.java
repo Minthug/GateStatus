@@ -12,6 +12,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cglib.core.Local;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -19,9 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -143,6 +147,76 @@ public class StatementSyncService {
         log.info("모든 국회의원 발언 정보 동기화 완료: 총 {}명 중 성공 {}건, 실패 {}건",
                 allFigures.size(), totalSuccess, totalFail);
         return totalSuccess;
+    }
+
+    /**
+     * 비동기로 발언 정보 동기화를 시작합니다.
+     * @return
+     */
+    public String syncStatementsAsync() {
+        String jobId = UUID.randomUUID().toString();
+
+        SyncJobStatus jobStatus = new SyncJobStatus(jobId);
+        jobStatusMap.put(jobId, jobStatus);
+
+        CompletableFuture.runAsync(() -> {
+            processStatementSyncJob(jobId);
+        });
+
+        return jobId;
+    }
+
+    /**
+     * 비동기로 특정 국회의원의 발언 정보 동기화를 시작합니다.
+     * @param figureName
+     * @return
+     */
+    public String syncStatementsByFigureAsync(String figureName) {
+        String jobId = UUID.randomUUID().toString();
+
+        SyncJobStatus jobStatus = new SyncJobStatus(jobId);
+        jobStatus.setTotalTasks(1);
+        jobStatusMap.put(jobId, jobStatus);
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                int count = syncStatementsByFigure(figureName);
+                jobStatus.setSuccessCount(count);
+                jobStatus.incrementCompletedTasks();
+                jobStatus.setCompleted(true);
+                jobStatus.setEndTime(LocalDateTime.now());
+            } catch (Exception e) {
+                jobStatus.setError(true);
+                jobStatus.setErrorMessage(e.getMessage());
+                jobStatus.incrementCompletedTasks();
+                jobStatus.setCompleted(true);
+                jobStatus.setEndTime(LocalDateTime.now());
+            }
+        });
+
+        return jobId;
+    }
+
+    protected void processStatementSyncJob(String jobId) {
+        log.info("발언 정보 동기화 작업({}) 시작", jobId);
+
+        SyncJobStatus jobStatus = jobStatusMap.get(jobId);
+
+        try {
+            List<Figure> allFigures = figureRepository.findByFigureType(FigureType.POLITICIAN);
+
+            if (allFigures.isEmpty()) {
+                log.warn("동기화할 국회의원 정보가 없습니다");
+                jobStatus.setTotalTasks(0);
+                jobStatus.setCompleted(true);
+                jobStatus.setEndTime(LocalDateTime.now());
+                return;
+            }
+
+            // 작업 상태 업데이트
+
+        } catch ()
+
     }
 
     /**
