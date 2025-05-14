@@ -275,44 +275,44 @@ public class StatementSyncService {
      * @param endDate
      * @return
      */
-    @Transactional
-    public int syncStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
-        log.info("국회방송국 API에서 기간({} ~ {}) 발언 정보 동기화 시작", startDate, endDate);
-
-        AssemblyApiResponse<String> apiResponse = fetchStatementsByPeriod(startDate, endDate);
-        if (!apiResponse.isSuccess()) {
-            throw new RuntimeException("API 호출 실패: " + apiResponse.resultMessage());
-        }
-
-        List<StatementApiDTO> apiDtos = statementApiMapper.map(apiResponse);
-        int syncCount = 0;
-
-        for (StatementApiDTO dto : apiDtos) {
-            Optional<StatementDocument> existingStatement = statementRepository.findAll().stream()
-                    .filter(s -> s.getOriginalUrl().equals(dto.originalUrl()))
-                    .findFirst();
-
-            if (existingStatement.isPresent()) {
-                log.debug("이미 존재하는 발언 건너뜀: {}", dto.originalUrl());
-                continue;
-            }
-
-            Figure figure = figureRepository.findByName(dto.figureName())
-                    .orElseGet(() -> {
-                        Figure newFigure = Figure.builder()
-                                .name(dto.figureName())
-                                .build();
-                        return figureRepository.save(newFigure);
-                    });
-
-            StatementDocument statement = convert(dto, figure);
-            statementRepository.save(statement);
-            syncCount++;
-        }
-
-        log.info("기간({} ~ {}) 발언 정보 동기화 완료. 총 {} 건 처리됨", startDate, endDate, syncCount);
-        return syncCount;
-    }
+//    @Transactional
+//    public int syncStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
+//        log.info("국회방송국 API에서 기간({} ~ {}) 발언 정보 동기화 시작", startDate, endDate);
+//
+//        AssemblyApiResponse<String> apiResponse = fetchStatementsByPeriod(startDate, endDate);
+//        if (!apiResponse.isSuccess()) {
+//            throw new RuntimeException("API 호출 실패: " + apiResponse.resultMessage());
+//        }
+//
+//        List<StatementApiDTO> apiDtos = statementApiMapper.map(apiResponse);
+//        int syncCount = 0;
+//
+//        for (StatementApiDTO dto : apiDtos) {
+//            Optional<StatementDocument> existingStatement = statementRepository.findAll().stream()
+//                    .filter(s -> s.getOriginalUrl().equals(dto.originalUrl()))
+//                    .findFirst();
+//
+//            if (existingStatement.isPresent()) {
+//                log.debug("이미 존재하는 발언 건너뜀: {}", dto.originalUrl());
+//                continue;
+//            }
+//
+//            Figure figure = figureRepository.findByName(dto.figureName())
+//                    .orElseGet(() -> {
+//                        Figure newFigure = Figure.builder()
+//                                .name(dto.figureName())
+//                                .build();
+//                        return figureRepository.save(newFigure);
+//                    });
+//
+//            StatementDocument statement = convert(dto, figure);
+//            statementRepository.save(statement);
+//            syncCount++;
+//        }
+//
+//        log.info("기간({} ~ {}) 발언 정보 동기화 완료. 총 {} 건 처리됨", startDate, endDate, syncCount);
+//        return syncCount;
+//    }
 
     /**
      * API에서 특정 기간의 발언 정보 가져오기

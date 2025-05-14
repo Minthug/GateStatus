@@ -60,13 +60,13 @@ public class StatementController {
      * @param pageable
      * @return
      */
-    @GetMapping("/{figureId}")
-    public ResponseEntity<Page<StatementResponse>> getStatementsByFigure(@PathVariable Long figureId,
-                                                                         @PageableDefault(size = 10) Pageable pageable) {
-        log.info("정치인별 발언 목록 조회 요청: {}", figureId);
-        Page<StatementResponse> statements = statementService.findStatementsByFigure(figureId, pageable);
-        return ResponseEntity.ok(statements);
-    }
+//    @GetMapping("/{figureId}")
+//    public ResponseEntity<Page<StatementResponse>> getStatementsByFigure(@PathVariable Long figureId,
+//                                                                         @PageableDefault(size = 10) Pageable pageable) {
+//        log.info("정치인별 발언 목록 조회 요청: {}", figureId);
+//        Page<StatementResponse> statements = statementService.findStatementsByFigure(figureId, pageable);
+//        return ResponseEntity.ok(statements);
+//    }
 
 //    /**
 //     * 인기 발언 목록 조회
@@ -198,8 +198,8 @@ public class StatementController {
         return ResponseEntity.ok(statements);
     }
 
-    @GetMapping("/search/direct")
-    public ResponseEntity<List<StatementApiDTO>> getStatementsByFigureDirect(@PathVariable String figureName) {
+    @GetMapping("/search/figure/{figureName}")
+    public ResponseEntity<List<StatementApiDTO>> getStatementsByFigure (@PathVariable String figureName) {
         log.info("정치인 발언 직접 조회 요청: {}", figureName);
 
         String cacheKey = "direct:statements:figure:" + figureName;
@@ -237,6 +237,7 @@ public class StatementController {
 
         return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
     }
+
 
 
     /**
