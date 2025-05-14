@@ -90,6 +90,16 @@ public class StatementSyncService {
     }
 
     /**
+     * API DTO -> MongoDB Document
+     * @param dto
+     * @param figure
+     * @return
+     */
+    private StatementDocument convertApiDtoToDocument(StatementApiDTO dto, Figure figure) {
+        return statementService.convertApiDtoToDocument(dto, figure);
+    }
+
+    /**
      * API에서 특정 인물의 발언 정보 가져오기
      * @param figureName
      * @return
@@ -214,10 +224,50 @@ public class StatementSyncService {
             }
 
             // 작업 상태 업데이트
+            jobStatus.setTotalTasks(allFigures.size());
+            log.info("동기화 대상 국회의원: {}명", allFigures.size());
 
-        } catch ()
+            int totalSuccess = 0;
+            int totalFail = 0;
 
+            for (Figure figure : allFigures) {
+                try {
+                    String name = figure.getName();
+                    log.info("국회의원 {}의 발언 정보 동기화 시작", name);
+
+                    int success = syncStatementsByFigure(name);
+                    totalSuccess += success;
+                    jobStatus.incrementSuccessCount();
+
+                    log.info("국회의원 {}의 발언 정보 동기화 완료: {}건", name, success);
+                } catch (Exception e) {
+                    totalFail++;
+                    jobStatus.incrementFailCount();
+                    log.error("국회의원 {}의 발언 정보 동기화 중 오류: {}", figure.getName(), e.getMessage(), e);
+                } finally {
+                    jobStatus.incrementCompletedTasks();
+                }
+            }
+
+            jobStatus.setCompleted(true);
+            jobStatus.setEndTime(LocalDateTime.now());
+
+            log.info("발언 정보 동기화 작업({}) 완료: 총 {}명 중 {}건 성공, {}건 실패",
+                    jobId, allFigures.size(), totalSuccess, totalFail);
+        } catch (Exception e) {
+            log.error("발언 정보 동기화 작업({}) 중 오류 발생: {}", jobId, e.getMessage(), e);
+            jobStatus.setError(true);
+            jobStatus.setErrorMessage(e.getMessage());
+            jobStatus.setCompleted(true);
+            jobStatus.setEndTime(LocalDateTime.now());
+        }
     }
+
+    public SyncJobStatus getSyncJobStatus(String jobId) {
+        return jobStatusMap.get(jobId);
+    }
+
+
 
     /**
      * 특정 기간 동안의 모든 발언 정보를 동기화
