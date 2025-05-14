@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,11 +38,68 @@ public class StatementApiService {
         return apiMapper.map(response);
     }
 
+    public List<StatementApiDTO> getStatementsByKeyword(String keyword) {
+        try {
+            AssemblyApiResponse<String> response = searchStatementsByKeyword(keyword);
+            if (!response.isSuccess()) {
+                log.error("API 호출 실패: {}", response.resultMessage());
+                return List.of();
+            }
 
+            return apiMapper.map(response);
+        } catch (Exception e) {
+            log.error("키워드 검색 중 오류: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private AssemblyApiResponse<String> searchStatementsByKeyword(String keyword) {
+        WebClient webClient = webClientBuilder.baseUrl(baseUrl)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
+                .build();
+
+        try {
+            String xmlResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("nauvppbxargkmyovh")
+                            .queryParam("apiKey", apikey)
+                            .queryParam("keyword", keyword)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            String resultCode = extractResultCode(xmlResponse);
+            String resultMessage = extractResultMessage(xmlResponse);
+
+            return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
+        } catch (Exception e) {
+            log.error("API 호출 중 오류: {}", e.getMessage(), e);
+            return new AssemblyApiResponse<>("99", e.getMessage(), null);
+        }
+    }
+
+    public List<StatementApiDTO> searchStatements(String politician, String keyword) {
+        if (politician != null) {
+            List<StatementApiDTO> statements = getStatementsByPolitician(politician);
+
+            if (keyword != null && !keyword.isEmpty()) {
+                return statements.stream()
+                        .filter(stmt ->
+                                stmt.title().contains(keyword) || stmt.content().contains(keyword))
+                        .collect(Collectors.toList());
+            }
+            return statements;
+        } else if (keyword != null) {
+            return getStatementsByKeyword(keyword);
+        }
+
+        return List.of();
+    }
 
 
     public AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {
-        WebClient webClient = webclientBuilder.baseUrl(baseUrl)
+        WebClient webClient = webClientBuilder.baseUrl(baseUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
                 .build();
 
