@@ -7,6 +7,8 @@ import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -134,8 +136,13 @@ public class RedisCacheService {
             log.debug("캐시 미스: {}", key);
             T newValue = supplier.get();
 
-            if (newValue != null) {
+            // null이거나 빈 컬렉션인 경우 캐싱하지 않음
+            if (newValue != null && !(newValue instanceof Collection && ((Collection<?>) newValue).isEmpty())) {
                 set(key, newValue, expirationSeconds);
+            } else {
+                // 빈 결과는 짧은 시간만 캐싱 (30초)
+                log.debug("빈 결과는 짧은 시간만 캐싱: {}", key);
+                set(key, newValue, 30);
             }
 
             return newValue;
