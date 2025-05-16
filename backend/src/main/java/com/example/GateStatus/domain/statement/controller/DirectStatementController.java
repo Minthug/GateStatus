@@ -1,16 +1,15 @@
 package com.example.GateStatus.domain.statement.controller;
 
 import com.example.GateStatus.domain.statement.service.StatementApiService;
+import com.example.GateStatus.domain.statement.service.StatementService;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.global.config.redis.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.common.metrics.Stat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
 import java.util.List;
@@ -23,23 +22,20 @@ public class DirectStatementController {
 
     private final StatementApiService apiService;
     private final RedisCacheService cacheService;
+    private final StatementService statementService;
 
-    @GetMapping("/politician")
-    public ResponseEntity<List<StatementApiDTO>> getStatementsByPolitician(@RequestParam String name) {
-        log.info("정치인 발언 검색: {}", name);
+    @GetMapping("/politician/{name}")
+    public ResponseEntity<List<StatementApiDTO>> getStatementsByPolitician(@PathVariable String name) {
+       String cacheKey = "statements:politician:" + name;
 
-        try {
-            List<StatementApiDTO> statements = cacheService.getOrSet(
-                    "statements:politician:" + name, () -> apiService.getStatementsByPolitician(name), 600);
+        log.info("정치인 '{}' 발언 조회 시작", name);
 
-            if (statements.isEmpty()) {
-                return ResponseEntity.ok().body(Collections.emptyList());
-            }
-            return ResponseEntity.ok(statements);
-        } catch (Exception e) {
-            log.error("정치인 발언 검색 중 오류: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.emptyList());
-        }
+        cacheService.delete(cacheKey);
+
+       List<StatementApiDTO> statements = cacheService.getOrSet(cacheKey, () -> apiService.getStatementsByPolitician(name),
+               3600);
+
+       return ResponseEntity.ok(statements);
     }
 
     @GetMapping("/search")

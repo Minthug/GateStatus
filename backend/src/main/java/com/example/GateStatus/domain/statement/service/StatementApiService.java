@@ -35,10 +35,79 @@ public class StatementApiService {
      * @return
      */
     public List<StatementApiDTO> getStatementsByPolitician(String name) {
-        AssemblyApiResponse<String> response = fetchStatementsByFigure(name);
+        log.info("정치인 '{}' 발언 정보 API 조회 시작", name);
 
-        return parseResponseToStatements(response);
+        try {
+            log.info("API 호출 URL: {}, 매개변수: name={}",
+                    baseUrl + "/news/figure", name,
+                    apikey.substring(0, Math.min(4, apikey.length())) + "***");
+
+            WebClient webClient = webClientBuilder.baseUrl(baseUrl)
+                    .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
+                    .build();
+
+            String response = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/news/figure")
+                            .queryParam("apiKey", apikey)
+                            .queryParam("name", name)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            if (response != null) {
+                log.info("API 응답 수신 - 길이: {} 바이트", response.length());
+
+                String previewContent = response.substring(0, Math.min(500, response.length()));
+                log.debug("API 응답 미리보기: {}", previewContent);
+
+                if (response.contains("nauvppbxargkmyovh")) {
+                    log.info("응답에 'nauvppbxargkmyovh' 포함됨 - 국회 API 응답 헤더로 보임");
+                }
+
+                if (response.contains("<CODE>")) {
+                    String resultCode = extractResultCode(response);
+                    String resultMessage = extractResultMessage(resultCode);
+
+                    log.info("API 응답 결과 코드: {}, 메시지: {}", resultCode, resultMessage);
+
+                    if (!"INFO-000".equals(resultCode)) {
+                        log.warn("API 응답이 INFO-000이 아님. 오류 가능성: {}", resultMessage);
+                    }
+                }
+
+                if (response.contains("<row>")) {
+                    log.info("API 응답에 데이터 행(<row>) 포함됨");
+                } else {
+                    log.warn("API 응답에 데이터 행(<row>)이 없음. 데이터 없음 또는 형식 불일치");
+                }
+            } else {
+                log.warn("API가 null 응답 반환");
+                return Collections.emptyList();
+            }
+
+            AssemblyApiResponse<String> apiResponse = new AssemblyApiResponse<>(
+                    extractResultCode(response),
+                    extractResultMessage(response),
+                    response);
+
+            if (!apiResponse.isSuccess()) {
+                log.warn("API 응답 실패: {}", apiResponse.resultMessage());
+                return Collections.emptyList();
+            }
+
+            List<StatementApiDTO> result = apiMapper.map(apiResponse);
+            log.info("API 결과 처리 완료: {}건의 발언 정보", result.size());
+
+            return result;
+        } catch (Exception e) {
+            log.error("API 호출 중 오류 발생: {}", e.getMessage(), e);
+
+            return Collections.emptyList();
+        }
     }
+
 
     /**
      * API 응답을 파싱하여 발언 목록 반환
@@ -147,29 +216,43 @@ public class StatementApiService {
     }
 
     // XML 응답에서 결과 코드/메시지 추출 유틸리티 메소드
-    private String extractResultCode(String xmlResponse) {
-        if (xmlResponse == null) return "99";
+    private String extractResultCode(String response) {
+        if (response == null) return "ERROR";
 
-        if (xmlResponse.contains("<CODE>")) {
-            int start = xmlResponse.indexOf("<CODE>") + "<CODE>".length();
-            int end = xmlResponse.indexOf("</CODE>");
-            if (start > 0 && end > start) {
-                return xmlResponse.substring(start, end);
+        // RESULT 태그 내의 CODE 값 추출
+        try {
+            int startIdx = response.indexOf("<CODE>");
+            if (startIdx != -1) {
+                startIdx += "<CODE>".length();
+                int endIdx = response.indexOf("</CODE>", startIdx);
+                if (endIdx != -1) {
+                    return response.substring(startIdx, endIdx);
+                }
             }
+        } catch (Exception e) {
+            log.warn("결과 코드 추출 실패: {}", e.getMessage());
         }
-        return "99";
+
+        return "UNKNOWN";
     }
 
-    private String extractResultMessage(String xmlResponse) {
-        if (xmlResponse == null) return "응답이 없습니다";
+    private String extractResultMessage(String response) {
+        if (response == null) return "Unknown error";
 
-        if (xmlResponse.contains("<MESSAGE>")) {
-            int start = xmlResponse.indexOf("<MESSAGE>") + "<MESSAGE>".length();
-            int end = xmlResponse.indexOf("</MESSAGE>");
-            if (start > 0 && end > start) {
-                return xmlResponse.substring(start, end);
+        // RESULT 태그 내의 MESSAGE 값 추출
+        try {
+            int startIdx = response.indexOf("<MESSAGE>");
+            if (startIdx != -1) {
+                startIdx += "<MESSAGE>".length();
+                int endIdx = response.indexOf("</MESSAGE>", startIdx);
+                if (endIdx != -1) {
+                    return response.substring(startIdx, endIdx);
+                }
             }
+        } catch (Exception e) {
+            log.warn("결과 메시지 추출 실패: {}", e.getMessage());
         }
-        return "처리 중 오류가 발생했습니다";
+
+        return "Unknown message";
     }
 }
