@@ -5,6 +5,7 @@ import com.example.GateStatus.domain.statement.service.StatementApiMapper;
 import com.example.GateStatus.domain.statement.service.StatementService;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
+import com.example.GateStatus.global.config.open.ApiResponse;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.example.GateStatus.global.config.redis.RedisCacheService;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -199,13 +201,13 @@ public class StatementController {
     }
 
     @GetMapping("/search/figure/{figureName}")
-    public ResponseEntity<List<StatementApiDTO>> getStatementsByFigure (@PathVariable String figureName) {
+    public ResponseEntity<List<StatementApiDTO>> getStatementsByFigure(@PathVariable String figureName) {
         log.info("정치인 발언 직접 조회 요청: {}", figureName);
 
         String cacheKey = "direct:statements:figure:" + figureName;
 
         List<StatementApiDTO> statements = cacheService.getOrSet(cacheKey, () -> {
-                        AssemblyApiResponse<String> apiResponse = fetchStatementsByFigure(figureName);
+                        AssemblyApiResponse<String> apiResponse = statementService.fetchStatementsByFigure(figureName);
                         if (!apiResponse.isSuccess()) {
                             log.error("API 호출 실패: {}", apiResponse.resultMessage());
                             return List.of();
@@ -217,58 +219,20 @@ public class StatementController {
         return ResponseEntity.ok(statements);
     }
 
-    private AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {
-        WebClient webClient = webclientBuilder.baseUrl(baseUrl)
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
-                .build();
+    @PostMapping("/sync/{figureName}")
+    public ResponseEntity<ApiResponse<Integer>> syncStatementsByFigure(@PathVariable String figureName) {
+        log.info("국회의원 '{}' 발언 정보 동기화 요청", figureName);
 
-        String xmlResponse = webClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("nauvppbxargkmyovh")
-                        .queryParam("apiKe", key)
-                        .queryParam("name", figureName)
-                        .build())
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-
-        String resultCode = extractResultCode(xmlResponse);
-        String resultMessage = extractResultMessage(xmlResponse);
-
-        return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
-    }
-
-
-
-    /**
-     * XML 응답에서 결과 메시지 추출
-     * @param xmlResponse
-     * @return
-     */
-    private String extractResultMessage(String xmlResponse) {
-        if (xmlResponse.contains("<MESSAGE>")) {
-            int start = xmlResponse.indexOf("<MESSAGE>") + "<MESSAGE>".length();
-            int end = xmlResponse.indexOf("</MESSAGE>");
-            if (start > 0 && end > start) {
-                return xmlResponse.substring(start, end);
-            }
+        try {
+            int count = statementService.syncStatementsByFigure(figureName);
+            return ResponseEntity.ok(ApiResponse.success(String.format("국회의원 '%s' 발언 정보 %d건 동기화 완료", figureName, count), count));
+        } catch (Exception e) {
+            log.error("발언 정보 동기화 실패: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("발언 정보 동기화 실패: " + e.getMessage()));
         }
-        return "처리 중 오류가 발생했습니다";
     }
 
-    /**
-     * XML 응답에서 결과 코드 추출
-     * @param xmlResponse
-     * @return
-     */
-    private String extractResultCode(String xmlResponse) {
-        if (xmlResponse.contains("<CODE>")) {
-            int start = xmlResponse.indexOf("<CODE>") + "<CODE>".length();
-            int end = xmlResponse.indexOf("</CODE>");
-            if (start > 0 && end > start) {
-                return xmlResponse.substring(start, end);
-            }
-        }
-        return "99";
-    }
+
 }
+
