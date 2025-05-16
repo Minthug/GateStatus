@@ -1,13 +1,16 @@
 package com.example.GateStatus.domain.statement.controller;
 
+import com.example.GateStatus.domain.common.SyncJobStatus;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.service.StatementApiMapper;
 import com.example.GateStatus.domain.statement.service.StatementService;
+import com.example.GateStatus.domain.statement.service.StatementSyncService;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import com.example.GateStatus.global.config.open.ApiResponse;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.example.GateStatus.global.config.redis.RedisCacheService;
+import com.google.protobuf.Api;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +39,7 @@ public class StatementController {
     private final StatementService statementService;
     private final StatementApiMapper apiMapper;
     private final RedisCacheService cacheService;
+    private final StatementSyncService statementSyncService;
 
     @Value("${spring.openai.api.url}")
     private String baseUrl;
@@ -233,6 +237,23 @@ public class StatementController {
         }
     }
 
+    @PostMapping("/sync/all")
+    public ResponseEntity<ApiResponse<String>> syncAllStatementsAsync() {
+        log.info("모든 국회의원 발언 정보 비동기 동기화 요청");
 
+        String jobId = statementSyncService.syncStatementsAsync();
+        return ResponseEntity.ok(ApiResponse.success("모든 국회의원 발언 정보 비동기 동기화 작업이 시작되었습니다", jobId));
+    }
+
+    @GetMapping("sync/status/{jobId}")
+    public ResponseEntity<ApiResponse<SyncJobStatus>> getSyncStatus(@PathVariable String jobId) {
+        SyncJobStatus status = statementSyncService.getSyncJobStatus(jobId);
+
+        if (status == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("발언 정보 동기화 작업 상태", status));
+    }
 }
 
