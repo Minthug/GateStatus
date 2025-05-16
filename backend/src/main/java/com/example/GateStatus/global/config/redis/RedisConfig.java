@@ -21,7 +21,6 @@ import org.springframework.hateoas.Links;
 import org.springframework.hateoas.RepresentationModel;
 
 import java.io.IOException;
-import java.io.Serial;
 import java.util.HashMap;
 
 @Configuration

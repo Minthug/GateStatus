@@ -1,6 +1,7 @@
 package com.example.GateStatus.global.config.redis;
 
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
@@ -21,21 +22,50 @@ public class RedisCacheService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final CacheManager cacheManager;
+    private final ObjectMapper objectMapper;
 
 
     /**
-     * 캐시에 값 저장
+     * 캐시에 값 저장 - JSON 문자열로 변환하여 저장
      * @param key
      * @param value
      * @param expirationSeconds
      */
     public void set(String key, Object value, long expirationSeconds) {
         try {
-            redisTemplate.opsForValue().set(key, value, expirationSeconds, TimeUnit.SECONDS);
-            log.debug("캐시 저장 성공: {}, 만료 시간: {}초", key, expirationSeconds);
+            if (value == null) {
+                redisTemplate.opsForValue().set(key, null, expirationSeconds, TimeUnit.SECONDS);
+                return;
+            }
+
+            if (isHateoasRelatedType(value)) {
+                log.debug("HATEOAS 관련 타입은 캐싱하지 않음: {}, 타입: {}", key, value.getClass().getName());
+                return;
+            }
+
+            String jsonValue = objectMapper.writeValueAsString(value);
+            redisTemplate.opsForValue().set(key, jsonValue, expirationSeconds, TimeUnit.SECONDS);
+            log.debug("캐시 저장 성공 (JSON): {}, 만료 시간: {}초", key, expirationSeconds);
         } catch (Exception e) {
-            log.error("캐시 저장 실: {}", key, e);
+            log.error("캐시 저장 실패: {}, 오류: {}", key, e.getMessage(), e);
         }
+    }
+
+    /**
+     * HATEOAS 관련 타입인지 확인
+     * @param value
+     * @return
+     */
+    private boolean isHateoasRelatedType(Object value) {
+        Class<?> clazz = value.getClass();
+        String className = clazz.getName();
+
+        return className.startsWith("org.springframework.hateoas") ||
+                className.startsWith("org.springframework.data.rest") ||
+                className.contains("RepresentationModel") ||
+                className.contains("EntityModel") ||
+                className.contains("Link") ||
+                className.contains("Resource");
     }
 
     /**
@@ -45,11 +75,28 @@ public class RedisCacheService {
      * @param <T>
      */
     @SuppressWarnings("unchecked")
-    public <T> T get(String key) {
+    public <T> T get(String key, Class<T> type) {
         try {
-            return (T) redisTemplate.opsForValue().get(key);
+            Object value = redisTemplate.opsForValue().get(key);
+
+            if (value == null) {
+                return null;
+            }
+
+            if (value instanceof String) {
+                return objectMapper.readValue((String) value, type);
+            } else {
+                try {
+                    return type.cast(value);
+                } catch (ClassCastException e) {
+                    log.warn("캐시 타입 불일치 (삭제됨): {}, 예상 타입: {}, 실제 타입: {}", key, type.getName(), value.getClass().getName());
+                    delete(key);
+                    return null;
+                }
+            }
         } catch (Exception e) {
             log.error("캐시 조회 실패: {}", key, e);
+            delete(key);
             return null;
         }
     }
