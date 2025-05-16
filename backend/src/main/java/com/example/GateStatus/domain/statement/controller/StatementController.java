@@ -60,13 +60,13 @@ public class StatementController {
      * @param pageable
      * @return
      */
-//    @GetMapping("/{figureId}")
-//    public ResponseEntity<Page<StatementResponse>> getStatementsByFigure(@PathVariable Long figureId,
-//                                                                         @PageableDefault(size = 10) Pageable pageable) {
-//        log.info("정치인별 발언 목록 조회 요청: {}", figureId);
-//        Page<StatementResponse> statements = statementService.findStatementsByFigure(figureId, pageable);
-//        return ResponseEntity.ok(statements);
-//    }
+    @GetMapping("/{figureId}")
+    public ResponseEntity<Page<StatementResponse>> getStatementsByFigure(@PathVariable Long figureId,
+                                                                         @PageableDefault(size = 10) Pageable pageable) {
+        log.info("정치인별 발언 목록 조회 요청: {}", figureId);
+        Page<StatementResponse> statements = statementService.findStatementsByFigure(figureId, pageable);
+        return ResponseEntity.ok(statements);
+    }
 
 //    /**
 //     * 인기 발언 목록 조회

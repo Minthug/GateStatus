@@ -8,6 +8,6 @@ public record AssemblyApiResponse<T>(String resultCode, String resultMessage, T 
 
 
     public boolean isSuccess() {
-        return "00".equals(resultCode);
+        return "00".equals(resultCode) || "INFO-000".equals(resultCode);
     }
 }

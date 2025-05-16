@@ -399,42 +399,42 @@ public class StatementService {
      * @param endDate
      * @return
      */
-    @Transactional
-    public int syncStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
-        log.info("국회방송국 API에서 기간({} ~ {}) 발언 정보 동기화 시작", startDate, endDate);
-
-        AssemblyApiResponse<String> apiResponse = fetchStatementsByPeriod(startDate, endDate);
-        if (!apiResponse.isSuccess()) {
-            throw new RuntimeException("API 호출 실패: " + apiResponse.resultMessage());
-        }
-
-        List<StatementApiDTO> apiDtos = mapper.map(apiResponse);
-        int syncCount = 0;
-
-        for (StatementApiDTO dto : apiDtos) {
-            // 중복 체크 - exists 메서드 사용으로 최적화
-            if (statementMongoRepository.existsByOriginalUrl(dto.originalUrl())) {
-                log.debug("이미 존재하는 발언 건너뜀: {}", dto.originalUrl());
-                continue;
-            }
-
-            // 발언자 확인
-            Figure figure = figureRepository.findByName(dto.figureName())
-                    .orElseGet(() -> {
-                        Figure newFigure = Figure.builder()
-                                .name(dto.figureName())
-                                .build();
-                        return figureRepository.save(newFigure);
-                    });
-
-            StatementDocument document = convertApiDtoToDocument(dto, figure);
-            statementMongoRepository.save(document);
-            syncCount++;
-        }
-
-        log.info("기간({} ~ {}) 발언 정보 동기화 완료. 총 {}건 처리됨", startDate, endDate, syncCount);
-        return syncCount;
-    }
+//    @Transactional
+//    public int syncStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
+//        log.info("국회방송국 API에서 기간({} ~ {}) 발언 정보 동기화 시작", startDate, endDate);
+//
+//        AssemblyApiResponse<String> apiResponse = fetchStatementsByPeriod(startDate, endDate);
+//        if (!apiResponse.isSuccess()) {
+//            throw new RuntimeException("API 호출 실패: " + apiResponse.resultMessage());
+//        }
+//
+//        List<StatementApiDTO> apiDtos = mapper.map(apiResponse);
+//        int syncCount = 0;
+//
+//        for (StatementApiDTO dto : apiDtos) {
+//            // 중복 체크 - exists 메서드 사용으로 최적화
+//            if (statementMongoRepository.existsByOriginalUrl(dto.originalUrl())) {
+//                log.debug("이미 존재하는 발언 건너뜀: {}", dto.originalUrl());
+//                continue;
+//            }
+//
+//            // 발언자 확인
+//            Figure figure = figureRepository.findByName(dto.figureName())
+//                    .orElseGet(() -> {
+//                        Figure newFigure = Figure.builder()
+//                                .name(dto.figureName())
+//                                .build();
+//                        return figureRepository.save(newFigure);
+//                    });
+//
+//            StatementDocument document = convertApiDtoToDocument(dto, figure);
+//            statementMongoRepository.save(document);
+//            syncCount++;
+//        }
+//
+//        log.info("기간({} ~ {}) 발언 정보 동기화 완료. 총 {}건 처리됨", startDate, endDate, syncCount);
+//        return syncCount;
+//    }
 
     /**
      * JPA entity -> MongoDB Document로 변환

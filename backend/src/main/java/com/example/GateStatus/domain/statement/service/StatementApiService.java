@@ -1,17 +1,21 @@
 package com.example.GateStatus.domain.statement.service;
 
+import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
+import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.Collections;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,6 +25,7 @@ public class StatementApiService {
 
     private final WebClient.Builder webClientBuilder;
     private final StatementApiMapper apiMapper;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @Value("${spring.openapi.assembly.url}")
     private String baseUrl;
@@ -28,84 +33,97 @@ public class StatementApiService {
     @Value("${spring.openapi.assembly.key}")
     private String apikey;
 
+    @Value("${spring.openapi.assembly.news-figure-path}")
+    private String newsFigurePath;  // 설정 파일의 경로 주입
 
     /**
      * 정치인 이름으로 발언 검색
      * @param name
      * @return
      */
-    public List<StatementApiDTO> getStatementsByPolitician(String name) {
+    public List<StatementResponse> getStatementsByPolitician(String name) {
         log.info("정치인 '{}' 발언 정보 API 조회 시작", name);
 
-        try {
-            log.info("API 호출 URL: {}, 매개변수: name={}",
-                    baseUrl + "/news/figure", name,
-                    apikey.substring(0, Math.min(4, apikey.length())) + "***");
+        String cacheKey = "statements:politician:" + name;
 
-            WebClient webClient = webClientBuilder.baseUrl(baseUrl)
-                    .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
-                    .build();
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            log.debug("캐시 히트: {}", cacheKey);
+            return (List<StatementResponse>) cached;
+        }
+        log.debug("캐시 미스: {}", cacheKey);
 
-            String response = webClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/news/figure")
-                            .queryParam("apiKey", apikey)
-                            .queryParam("name", name)
-                            .build())
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+        AssemblyApiResponse<String> apiResponse = fetchStatementsByFigure(name);
 
-            if (response != null) {
-                log.info("API 응답 수신 - 길이: {} 바이트", response.length());
-
-                String previewContent = response.substring(0, Math.min(500, response.length()));
-                log.debug("API 응답 미리보기: {}", previewContent);
-
-                if (response.contains("nauvppbxargkmyovh")) {
-                    log.info("응답에 'nauvppbxargkmyovh' 포함됨 - 국회 API 응답 헤더로 보임");
-                }
-
-                if (response.contains("<CODE>")) {
-                    String resultCode = extractResultCode(response);
-                    String resultMessage = extractResultMessage(resultCode);
-
-                    log.info("API 응답 결과 코드: {}, 메시지: {}", resultCode, resultMessage);
-
-                    if (!"INFO-000".equals(resultCode)) {
-                        log.warn("API 응답이 INFO-000이 아님. 오류 가능성: {}", resultMessage);
-                    }
-                }
-
-                if (response.contains("<row>")) {
-                    log.info("API 응답에 데이터 행(<row>) 포함됨");
-                } else {
-                    log.warn("API 응답에 데이터 행(<row>)이 없음. 데이터 없음 또는 형식 불일치");
-                }
-            } else {
-                log.warn("API가 null 응답 반환");
-                return Collections.emptyList();
-            }
-
-            AssemblyApiResponse<String> apiResponse = new AssemblyApiResponse<>(
-                    extractResultCode(response),
-                    extractResultMessage(response),
-                    response);
-
-            if (!apiResponse.isSuccess()) {
-                log.warn("API 응답 실패: {}", apiResponse.resultMessage());
-                return Collections.emptyList();
-            }
-
-            List<StatementApiDTO> result = apiMapper.map(apiResponse);
-            log.info("API 결과 처리 완료: {}건의 발언 정보", result.size());
-
-            return result;
-        } catch (Exception e) {
-            log.error("API 호출 중 오류 발생: {}", e.getMessage(), e);
-
+        if (!apiResponse.isSuccess()) {
+            log.warn("API 응답 실패: {}", apiResponse.resultMessage());
+            redisTemplate.opsForValue().set(cacheKey, Collections.emptyList(), 30, TimeUnit.SECONDS);
             return Collections.emptyList();
         }
+
+        List<StatementApiDTO> apiDtos = apiMapper.map(apiResponse);
+
+        List<StatementResponse> responses = apiDtos.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+
+        if (!responses.isEmpty()) {
+            redisTemplate.opsForValue().set(cacheKey, responses, 1, TimeUnit.HOURS);
+            log.debug("캐시 저장 성공 (JSON): {}, 만료 시간: 1시간", cacheKey);
+        } else {
+            redisTemplate.opsForValue().set(cacheKey, responses, 30, TimeUnit.SECONDS);
+            log.debug("빈 결과는 짧은 시간만 캐싱: {}", cacheKey);
+        }
+        return responses;
+    }
+
+    private StatementResponse convertToResponse(StatementApiDTO dto) {
+
+        Map<String, Object> nlpData = new HashMap<>();
+        List<String> checkableItems = extractCheckableItems(dto.content());
+        if (!checkableItems.isEmpty()) {
+            nlpData.put("checkableItems", checkableItems);
+        }
+
+        return new StatementResponse(
+                null,
+                null,
+                dto.figureName(),
+                dto.title(),
+                dto.content(),
+                dto.statementDate(),
+                dto.source(),
+                dto.context(),
+                dto.originalUrl(),
+                determineStatementType(dto.typeCode()),
+                null,
+                null,
+                checkableItems,
+                nlpData,
+                0,
+                LocalDateTime.now(),
+                LocalDateTime.now());
+    }
+
+    private List<String> extractCheckableItems(String content) {
+        if (content == null || content.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> items = new ArrayList<>();
+
+        String[] sentences = content.split("\\. ");
+        for (String sentence : sentences) {
+            if (sentence.matches(".*\\d+.*") ||
+            sentence.contains("이다") ||
+            sentence.contains("했다") ||
+            sentence.contains("라고 말했") ||
+            sentence.contains("주장")) {
+                items.add(sentence.trim() + (sentence.endsWith(".") ? "" : "."));
+            }
+        }
+
+        return items.stream().limit(3).collect(Collectors.toList());
     }
 
 
@@ -157,7 +175,7 @@ public class StatementApiService {
         try {
             String xmlResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path("nauvppbxargkmyovh")
+                            .path("/nauvppbxargkmyovh")
                             .queryParam("apiKey", apikey)
                             .queryParam("keyword", keyword)
                             .build())
@@ -175,23 +193,23 @@ public class StatementApiService {
         }
     }
 
-    public List<StatementApiDTO> searchStatements(String politician, String keyword) {
-        if (politician != null) {
-            List<StatementApiDTO> statements = getStatementsByPolitician(politician);
-
-            if (keyword != null && !keyword.isEmpty()) {
-                return statements.stream()
-                        .filter(stmt ->
-                                stmt.title().contains(keyword) || stmt.content().contains(keyword))
-                        .collect(Collectors.toList());
-            }
-            return statements;
-        } else if (keyword != null) {
-            return getStatementsByKeyword(keyword);
-        }
-
-        return List.of();
-    }
+//    public List<StatementApiDTO> searchStatements(String politician, String keyword) {
+//        if (politician != null) {
+//            List<StatementApiDTO> statements = getStatementsByPolitician(politician);
+//
+//            if (keyword != null && !keyword.isEmpty()) {
+//                return statements.stream()
+//                        .filter(stmt ->
+//                                stmt.title().contains(keyword) || stmt.content().contains(keyword))
+//                        .collect(Collectors.toList());
+//            }
+//            return statements;
+//        } else if (keyword != null) {
+//            return getStatementsByKeyword(keyword);
+//        }
+//
+//        return List.of();
+//    }
 
 
     public AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {
@@ -254,5 +272,34 @@ public class StatementApiService {
         }
 
         return "Unknown message";
+    }
+
+
+    /**
+     * API의 발언 유형 코드를 애플리케이션 StatementType으로 변환
+     * @param typeCode
+     * @return
+     */
+    public StatementType determineStatementType(String typeCode) {
+        switch (typeCode) {
+            case "SPEECH":
+                return StatementType.SPEECH;
+            case "INTERVIEW":
+                return StatementType.INTERVIEW;
+            case "PRESS":
+                return StatementType.PRESS_RELEASE;
+            case "DEBATE":
+                return StatementType.DEBATE;
+            case "ASSEMBLY":
+                return StatementType.ASSEMBLY_SPEECH;
+            case "COMMITTEE":
+                return StatementType.COMMITTEE_SPEECH;
+            case "MEDIA":
+                return StatementType.MEDIA_COMMENT;
+            case "SNS":
+                return StatementType.SOCIAL_MEDIA;
+            default:
+                return StatementType.OTHER;
+        }
     }
 }
