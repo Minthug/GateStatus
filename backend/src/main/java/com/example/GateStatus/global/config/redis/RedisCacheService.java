@@ -1,6 +1,7 @@
 package com.example.GateStatus.global.config.redis;
 
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -8,10 +9,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -69,7 +67,7 @@ public class RedisCacheService {
     }
 
     /**
-     * 캐시에서 값 조회
+     * 캐시에서 값 조회 - JSON 문자열에서 객체로 변환
      * @param key
      * @return
      * @param <T>
@@ -97,6 +95,56 @@ public class RedisCacheService {
         } catch (Exception e) {
             log.error("캐시 조회 실패: {}", key, e);
             delete(key);
+            return null;
+        }
+    }
+
+    public <T> List<T> getList(String key, Class<T> elementType) {
+        try {
+            Object value = redisTemplate.opsForValue().get(key);
+
+            if (value == null) {
+                return null;
+            }
+
+            if (value instanceof String) {
+                JavaType listType = objectMapper.getTypeFactory()
+                        .constructCollectionType(List.class, elementType);
+
+                return objectMapper.readValue((String) value, listType);
+            } else if (value instanceof List) {
+                try {
+                    return (List<T>) value;
+                } catch (ClassCastException e) {
+                    log.warn("리스트 캐시 타입 불일치 (삭제됨): {}", key);
+                    delete(key);
+                    return null;
+                }
+            } else {
+                log.warn("리스트 타입 아님 (삭제됨): {}, 실제 타입: {}", key, value.getClass().getName());
+                delete(key);
+                return null;
+            }
+        } catch (Exception e) {
+            log.error("리스트 캐시 조회 실패: {}, 요소 타입: {}, 오류: {}",
+                    key, elementType.getName(), e.getMessage());
+            delete(key);
+            return null;
+        }
+    }
+
+    // 기존 get method - 간단한 타입용 (하위 호환성 유지)
+    @SuppressWarnings("unchecked")
+    public <T> T get(String key) {
+        try {
+            Object value = redisTemplate.opsForValue().get(key);
+
+            if (value instanceof String && ((String)value).startsWith("{") && ((String)value).endsWith("}")) {
+                log.warn("get() 호출 시 JSON 문자열 감지: {}. get(key, type) 사용 권장", key);
+            }
+            return (T) value;
+        } catch (Exception e) {
+            log.error("캐시 조회 실패: {}", key, e);
             return null;
         }
     }
@@ -173,11 +221,27 @@ public class RedisCacheService {
     @SuppressWarnings("unchecked")
     public <T> T getOrSet(String key, Supplier<T> supplier, long expirationSeconds) {
         try {
-            T cachedValue = (T) redisTemplate.opsForValue().get(key);
 
-            if (cachedValue != null) {
+            Object cachedObj = redisTemplate.opsForValue().get(key);
+
+            if (cachedObj != null) {
                 log.debug("캐시 히트: {}", key);
-                return cachedValue;
+
+                if (cachedObj instanceof String && ((String)cachedObj).startsWith("{")) {
+                    try {
+                        return (T) objectMapper.readValue((String)cachedObj, Object.class);
+                    } catch (Exception e) {
+                        log.warn("캐시 역직렬화 실패 (삭제됨): {}, 오류: {}", key, e.getMessage());
+                        delete(key);
+                    }
+                } else {
+                    try {
+                        return (T) cachedObj;
+                    } catch (ClassCastException e) {
+                        log.warn("캐시 타입 불일치 (삭제됨): {}", key);
+                        delete(key);
+                    }
+                }
             }
 
             log.debug("캐시 미스: {}", key);
