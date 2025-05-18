@@ -14,6 +14,7 @@ import com.google.protobuf.Api;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -254,6 +255,22 @@ public class StatementController {
         }
 
         return ResponseEntity.ok(ApiResponse.success("발언 정보 동기화 작업 상태", status));
+    }
+
+    @PostMapping("/sync/period")
+    public ResponseEntity<ApiResponse<Integer>> syncStatementsByPeriod(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                                                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        log.info("기간별 발언 정보 동기화 요청: {} ~ {}", startDate, endDate);
+
+        try {
+            int count = statementSyncService.syncStatementsByPeriod(startDate, endDate);
+            return ResponseEntity.ok(ApiResponse.success(String.format("기간(%s ~ %s) 발언 정보 %d건 동기화 완료",
+                    startDate, endDate, count), count));
+        } catch (Exception e) {
+            log.error("기간별 발언 정보 동기화 실패: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("기간별 발언 정보 동기화 실패: " + e.getMessage()));
+        }
     }
 }
 
