@@ -246,7 +246,7 @@ public class StatementController {
         return ResponseEntity.ok(ApiResponse.success("모든 국회의원 발언 정보 비동기 동기화 작업이 시작되었습니다", jobId));
     }
 
-    @GetMapping("sync/status/{jobId}")
+    @GetMapping("/sync/status/{jobId}")
     public ResponseEntity<ApiResponse<SyncJobStatus>> getSyncStatus(@PathVariable String jobId) {
         SyncJobStatus status = statementSyncService.getSyncJobStatus(jobId);
 

@@ -30,9 +30,7 @@ import javax.swing.plaf.nimbus.State;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -379,7 +377,7 @@ public class StatementService {
 
         String xmlResponse = webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/news/figure")
+                        .path("/nauvppbxargkmyovh")
                         .queryParam("apiKey", apikey)
                         .queryParam("name", figureName)
                         .build())
@@ -486,6 +484,33 @@ public class StatementService {
             default:
                 return StatementType.OTHER;
         }
+    }
+
+    /**
+     * 본문에서 검증 가능한 항목 추출
+     */
+    private List<String> extractCheckableItems(String content) {
+        if (content == null || content.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> items = new ArrayList<>();
+
+        // 간단한 구현 예
+        String[] sentences = content.split("\\. ");
+        for (String sentence : sentences) {
+            if (sentence.matches(".*\\d+.*") ||
+                    sentence.contains("이다") ||
+                    sentence.contains("했다") ||
+                    sentence.contains("라고 말했") ||
+                    sentence.contains("주장")) {
+
+                items.add(sentence.trim() + (sentence.endsWith(".") ? "" : "."));
+            }
+        }
+
+        // 최대 3개 항목으로 제한
+        return items.stream().limit(3).collect(Collectors.toList());
     }
 
     public StatementDocument convertApiDtoToDocument(StatementApiDTO dto, Figure figure) {
@@ -671,7 +696,7 @@ public class StatementService {
         log.info("{}개의 발언 데이터를 JPA에서 MongoDB로 마이그레이션 했습니다", documents.size());
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<StatementResponse> findStatementsByFigureName(String figureName, Pageable pageable) {
         log.info("정치인 이름으로 발언 목록 조회: {}", figureName);
 
@@ -682,7 +707,9 @@ public class StatementService {
         Page<StatementDocument> statements = statementMongoRepository.findByFigureName(figureName, pageable);
 
         if (statements.isEmpty()) {
-            statements = statementMongoRepository.findByFigureId(figure.getId(), pageable);
+            log.warn("DB에 '{}' 발언 정보가 없습니다. API 동기화가 필요할 수 있습니다.", figureName);
+        } else {
+            log.info("'{}' 발언 정보 {}건 조회 성공", figureName, statements.getTotalElements());
         }
         return statements.map(StatementResponse::from);
     }
