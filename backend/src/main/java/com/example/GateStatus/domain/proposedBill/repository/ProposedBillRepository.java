@@ -38,4 +38,8 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
 
     List<ProposedBill> findByProposerIdAndIdInAndProposeDateBetween(Long proposerId, List<String> billIds, LocalDate startDate, LocalDate endDae);
 
+
+
+
+    List<Object[]> countBillsByStatus(Long figureId);
 }
