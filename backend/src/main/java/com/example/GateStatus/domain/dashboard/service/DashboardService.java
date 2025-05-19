@@ -65,6 +65,13 @@ public class DashboardService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public List<DashboardResponse> getComparisonData(String figureId1, String figureId2) {
+        DashboardResponse data1 = getDashboardData(figureId1);
+        DashboardResponse data2 = getDashboardData(figureId2);
+        return List.of(data1, data2);
+    }
+
     /**
      * 법안 통계 조회
      * @param figureId
