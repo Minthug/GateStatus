@@ -92,7 +92,7 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
             "{ $match: { figureId: ?0 } }",
             "{ $project: { words: { $split: [\"$content\", \" \"] } } }",
             "{ $unwind: \"$words\" }",
-            "{ $match: { \"words\": { $not: /^[0-9]*$/, $nin: ?1 } } }", // 숫자 및 불용어 제외
+            "{ $match: { words: { $not: { $regex: '^[0-9]*$' }, $nin: ?1 } } }", // 수정: $not 연산자 형식 변경
             "{ $group: { _id: \"$words\", count: { $sum: 1 } } }",
             "{ $match: { count: { $gt: 1 } } }", // 2회 이상 등장한 키워드만
             "{ $sort: { count: -1 } }",

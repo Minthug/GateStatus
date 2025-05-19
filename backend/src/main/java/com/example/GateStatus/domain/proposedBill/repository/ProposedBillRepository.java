@@ -49,7 +49,7 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
             "FROM ProposedBill p " +
             "WHERE p.proposer.id = :proposerId AND p.proposeDate BETWEEN :startDate AND :endDate " +
             "GROUP BY FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m') " +
-            "ORDER BY month")
+            "ORDER BY FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m')") // 수정: 명시적 정렬 기준 사용
     List<Object[]> countBillsByMonth(@Param("proposerId") Long proposerId,
                                      @Param("startDate") LocalDate startDate,
                                      @Param("endDate") LocalDate endDate);
