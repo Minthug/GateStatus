@@ -7,6 +7,7 @@ import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import org.apache.kafka.common.metrics.Stat;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
@@ -80,7 +81,22 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
 
     long countByFigureId(Long figureId);
 
+    @Aggregation(pipeline = {
+            "{ $match: { figureId: ?0 } }",
+            "{ $group: { _id: '$cagegoryName', count: { $sum: 1 } } }",
+            "{ $sort: { count: -1 } }"
+    })
     List<CategoryCount> countByCategory(Long figureId);
 
+    @Aggregation(pipeline = {
+            "{ $match: { figureId: ?0 } }",
+            "{ $project: { words: { $split: [\"$content\", \" \"] } } }",
+            "{ $unwind: \"$words\" }",
+            "{ $match: { \"words\": { $not: /^[0-9]*$/, $nin: ?1 } } }", // 숫자 및 불용어 제외
+            "{ $group: { _id: \"$words\", count: { $sum: 1 } } }",
+            "{ $match: { count: { $gt: 1 } } }", // 2회 이상 등장한 키워드만
+            "{ $sort: { count: -1 } }",
+            "{ $limit: 50 }"
+    })
     List<KeywordCount> findTopKeywords(Long figureId, List<String> stopwords);
 }

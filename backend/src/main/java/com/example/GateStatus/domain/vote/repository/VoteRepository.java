@@ -4,6 +4,7 @@ import com.example.GateStatus.domain.vote.Vote;
 import com.example.GateStatus.domain.vote.VoteResultType;
 import org.springframework.cglib.core.Local;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -26,6 +27,12 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
 
     List<Vote> findByFigureIdAndBillBillIdInAndVoteDateBetween(Long figureId, List<String> billIds, LocalDate startDate, LocalDate endDate);
 
+
+
+    @Query("SELECT v.voteResult as result, COUNT(v) as count " +
+            "FROM Vote v " +
+            "WHERE v.figure.id = :figureId " +
+            "GROUP BY v.voteResult")
     List<Object[]> countVotesByResult(Long figureId);
 
 }

@@ -3,7 +3,6 @@ package com.example.GateStatus.domain.proposedBill.repository;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.proposedBill.BillStatus;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;
-import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -39,9 +38,19 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
     List<ProposedBill> findByProposerIdAndIdInAndProposeDateBetween(Long proposerId, List<String> billIds, LocalDate startDate, LocalDate endDae);
 
 
+    @Query("SELECT p.billStatus as status, COUNT (p) as count " +
+            "FROM ProposedBill p " +
+            "WHERE p.proposer.id = :proposerId " +
+            "GROUP BY p.billStatus" )
+    List<Object[]> countBillsByStatus(@Param("proposerId") Long proposerId);
 
 
-    List<Object[]> countBillsByStatus(Long figureId);
-
-    List<Object[]> countBillsByMonth(Long figureId, LocalDate startDate, LocalDate endDate);
+    @Query("SELECT FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m') as month, COUNT(p) as count " +
+            "FROM ProposedBill p " +
+            "WHERE p.proposer.id = :proposerId AND p.proposeDate BETWEEN :startDate AND :endDate " +
+            "GROUP BY FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m') " +
+            "ORDER BY month")
+    List<Object[]> countBillsByMonth(@Param("proposerId") Long proposerId,
+                                     @Param("startDate") LocalDate startDate,
+                                     @Param("endDate") LocalDate endDate);
 }
