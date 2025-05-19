@@ -6,7 +6,7 @@ import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import java.util.List;
 
 public record DashboardResponse(
-        FigureInfoDTO figure,
+        FigureDTO figure,
         BillStatistics billStatistics,
         StatementStatistics statementStatistics,
         VoteStatistics voteStatistics,
@@ -18,7 +18,7 @@ public record DashboardResponse(
     }
 
     // 특정 필드만 변경한 새 인스턴스를 반환하는 with 메서드
-    public DashboardResponse withFigure(FigureInfoDTO figure) {
+    public DashboardResponse withFigure(FigureDTO figure) {
         return new DashboardResponse(figure, this.billStatistics, this.statementStatistics,
                 this.voteStatistics, this.keywords, this.billsOverTime);
     }

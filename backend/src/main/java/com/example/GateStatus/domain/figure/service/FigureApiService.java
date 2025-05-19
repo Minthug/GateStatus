@@ -75,6 +75,34 @@ public class FigureApiService {
             throw new EntityNotFoundException("해당 이름의 정치인을 찾을 수 없습니다");
         }
 
+        if (info.figureId() == null || info.figureId().isEmpty()) {
+            log.warn("API에서 가져온 figureId가 null입니다. 임시 ID를 생성합니다.");
+            // UUID를 사용하여 임시 ID 생성
+            String tempId = "TEMP_" + UUID.randomUUID().toString();
+
+            // 새로운 FigureInfoDTO 생성 (불변 객체일 경우)
+            info = new FigureInfoDTO(
+                    tempId,
+                    info.name(),
+                    info.englishName(),
+                    info.birth(),
+                    info.partyName(),
+                    info.constituency(),
+                    info.committeeName(),
+                    info.committeePosition(),
+                    info.electedCount(),
+                    info.electedDate(),
+                    info.reelection(),
+                    info.profileUrl(),
+                    info.education(),
+                    info.career(),
+                    info.email(),
+                    info.homepage(),
+                    info.blog(),
+                    info.facebook()
+            );
+        }
+
         Figure figure = figureRepository.findByName(figureName)
                 .orElseGet(() -> Figure.builder()
                         .name(figureName)

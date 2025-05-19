@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -75,6 +76,24 @@ public class FigureMapper {
 
 
     public void updateFigureFromDTO(Figure figure, FigureInfoDTO dto) {
+        // 중요: figureId가 없으면 업데이트하지 않도록
+        if (figure.getFigureId() == null || figure.getFigureId().isEmpty()) {
+            if (dto.figureId() != null && !dto.figureId().isEmpty()) {
+                figure.setFigureId(dto.figureId());
+            } else {
+                // 둘 다 없으면 임시 ID 생성
+                figure.setFigureId("TEMP_" + UUID.randomUUID().toString());
+            }
+        }
+
+        figure.setName(dto.name());
+        figure.setEnglishName(dto.englishName());
+        figure.setBirth(dto.birth());
+        figure.setConstituency(dto.constituency());
+        figure.setFigureParty(dto.partyName());
+        figure.setUpdateSource("국회 Open API");
+
+
         figure.update(
                 dto.name(),
                 dto.englishName(),

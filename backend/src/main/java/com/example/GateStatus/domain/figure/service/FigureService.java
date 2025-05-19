@@ -227,6 +227,34 @@ public class FigureService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public FigureDTO findFigureByName(String name) {
+        log.info("이름으로 국회의원 검색: {}", name);
+
+        // 1. DB에서 먼저 검색
+        Figure figure = figureRepository.findByName(name)
+                .orElse(null);
+
+        if (figure != null) {
+            log.debug("DB에서 국회의원 정보 찾음: {}", name);
+            return FigureDTO.from(figure);
+        }
+
+        // 2. DB에 없으면 API에서 동기화 시도
+        try {
+            log.info("DB에 없어 API에서 국회의원 정보 동기화 시도: {}", name);
+            figure = figureApiService.syncFigureInfoByName(name);
+
+            if (figure != null) {
+                return FigureDTO.from(figure);
+            }
+        } catch (Exception e) {
+            log.warn("국회의원 정보 동기화 실패: {} - {}", name, e.getMessage());
+        }
+
+        return null;
+    }
+
 
     /**
      * API에서 국회의원 정보 동기화

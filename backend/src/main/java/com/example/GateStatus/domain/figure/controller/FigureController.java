@@ -153,38 +153,6 @@ public class FigureController {
         return ResponseEntity.ok(ApiResponse.success("국회의원 정보 비동기 동기화 작업이 시작되었습니다", jobId));
     }
 
-    @PostMapping("/sync/name")
-    public ResponseEntity<ApiResponse<String>> syncFigureNameAsync(@RequestParam String name) {
-        if (name == null || name.isEmpty()) {
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("국회의원 이름이 필요합니다"));
-        }
-
-        log.info("국회의원 정보 동기화 요청: 이름 = {}", name);
-
-        try {
-            Figure figure = figureService.syncFromApi(name);
-
-            return ResponseEntity.ok(ApiResponse.success(
-                    String.format("'%s' 국회의원 정보 동기화 성공", name),
-                    figure.getName()
-            ));
-        } catch (IllegalArgumentException e) {
-            log.warn("국회의원 정보 동기화 입력값 오류: {}", e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error(e.getMessage()));
-        } catch (EntityNotFoundException e) {
-            log.warn("국회의원 정보 동기화 실패 - 정치인 찾을 수 없음: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.error(e.getMessage()));
-        } catch (Exception e) {
-            log.error("국회의원 정보 동기화 중 오류 발생: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("국회의원 정보 동기화 중 오류가 발생했습니다: " + e.getMessage()));
-        }
-
-    }
-
     @GetMapping("/sync/status/{jobId}")
     public ResponseEntity<ApiResponse<SyncJobStatus>> getSyncStatus(@PathVariable String jobId) {
 
@@ -201,5 +169,18 @@ public class FigureController {
     public ResponseEntity<SyncPartyResponse> syncFiguresByParty(@RequestParam String partyName) {
         int syncedCount = figureApiService.syncFigureByParty(partyName);
         return ResponseEntity.ok(new SyncPartyResponse(partyName, syncedCount));
+    }
+
+    // FigureController 클래스에 추가
+    @GetMapping("/search/name")
+    public ResponseEntity<?> searchFigureByName(@RequestParam String name) {
+        log.info("이름으로 국회의원 검색 요청: {}", name);
+        FigureDTO figure = figureService.findFigureByName(name);
+
+        if (figure != null) {
+            return ResponseEntity.ok(figure);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 }

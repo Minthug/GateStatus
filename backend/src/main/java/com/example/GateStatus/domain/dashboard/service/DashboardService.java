@@ -34,7 +34,10 @@ public class DashboardService {
     private final VoteRepository voteRepository;
 
     @Transactional(readOnly = true)
-    public DashboardResponse getDashboardData(String figureId) {
+    public DashboardResponse getDashboardData(Figure figure) {
+
+        Figure figureId = figureRepository.findByFigureId(figure.getFigureId())
+                .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다: " + figure.getFigureId()));
 
         // 2. 법안 통계 조회
         BillStatistics billStats = getBillStatistics(figure.getId());
@@ -61,13 +64,13 @@ public class DashboardService {
                 billsOverTime
         );
     }
-
-    @Transactional(readOnly = true)
-    public List<DashboardResponse> getComparisonData(String figureId1, String figureId2) {
-        DashboardResponse data1 = getDashboardData(figureId1);
-        DashboardResponse data2 = getDashboardData(figureId2);
-        return List.of(data1, data2);
-    }
+//
+//    @Transactional(readOnly = true)
+//    public List<DashboardResponse> getComparisonData(String figureId1, String figureId2) {
+//        DashboardResponse data1 = getDashboardData(figureId1);
+//        DashboardResponse data2 = getDashboardData(figureId2);
+//        return List.of(data1, data2);
+//    }
 
     /**
      * 이름으로 대시보드 데이터 조회
