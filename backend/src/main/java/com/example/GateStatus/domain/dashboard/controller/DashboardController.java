@@ -26,6 +26,16 @@ public class DashboardController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * 정치인 이름으로 대시보드 데이터 조회
+     */
+    @GetMapping("/figure/name")
+    public ResponseEntity<DashboardResponse> getFigureDashboardByName(@RequestParam String name) {
+        log.info("이름으로 대시보드 정보 조회 요청: name={}", name);
+        DashboardResponse response = dashboardService.getDashboardDataByName(name);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/compare")
     public ResponseEntity<List<DashboardResponse>> compareFigures(@RequestParam String figureId1,
                                                                   @RequestParam String figureId2) {

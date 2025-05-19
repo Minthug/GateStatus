@@ -1,6 +1,7 @@
 package com.example.GateStatus.domain.figure.controller;
 
 import com.example.GateStatus.domain.common.SyncJobStatus;
+import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureService;
@@ -9,7 +10,6 @@ import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureRequest;
 import com.example.GateStatus.domain.figure.service.response.*;
 import com.example.GateStatus.global.config.open.ApiResponse;
-import com.google.protobuf.Api;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +21,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import retrofit2.Response;
 
 import java.util.List;
 
@@ -152,6 +151,38 @@ public class FigureController {
     public ResponseEntity<ApiResponse<String>> syncFiguresAsync() {
         String jobId = figureApiService.syncAllFiguresV4();
         return ResponseEntity.ok(ApiResponse.success("국회의원 정보 비동기 동기화 작업이 시작되었습니다", jobId));
+    }
+
+    @PostMapping("/sync/name")
+    public ResponseEntity<ApiResponse<String>> syncFigureNameAsync(@RequestParam String name) {
+        if (name == null || name.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("국회의원 이름이 필요합니다"));
+        }
+
+        log.info("국회의원 정보 동기화 요청: 이름 = {}", name);
+
+        try {
+            Figure figure = figureService.syncFromApi(name);
+
+            return ResponseEntity.ok(ApiResponse.success(
+                    String.format("'%s' 국회의원 정보 동기화 성공", name),
+                    figure.getName()
+            ));
+        } catch (IllegalArgumentException e) {
+            log.warn("국회의원 정보 동기화 입력값 오류: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (EntityNotFoundException e) {
+            log.warn("국회의원 정보 동기화 실패 - 정치인 찾을 수 없음: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("국회의원 정보 동기화 중 오류 발생: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("국회의원 정보 동기화 중 오류가 발생했습니다: " + e.getMessage()));
+        }
+
     }
 
     @GetMapping("/sync/status/{jobId}")

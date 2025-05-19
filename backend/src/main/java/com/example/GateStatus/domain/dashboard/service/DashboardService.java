@@ -34,10 +34,7 @@ public class DashboardService {
     private final VoteRepository voteRepository;
 
     @Transactional(readOnly = true)
-    public DashboardResponse getDashboardData(String figureId) {
-        // 1. 정치인 정보 조회
-        Figure figure = figureRepository.findByFigureId(figureId)
-                .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다: " + figureId));
+    public DashboardResponse getDashboardData(Figure figure) {
 
         // 2. 법안 통계 조회
         BillStatistics billStats = getBillStatistics(figure.getId());
@@ -65,12 +62,39 @@ public class DashboardService {
         );
     }
 
+
+    /**
+     * ID로 대시보드 데이터 조회 (기존 메서드 수정)
+     */
+    @Transactional(readOnly = true)
+    public DashboardResponse getDashboardData(String figureId) {
+        // 1. 정치인 정보 조회
+        Figure figure = figureRepository.findByFigureId(figureId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다 (ID): " + figureId));
+
+        return getDashboardData(figure);
+    }
+
     @Transactional(readOnly = true)
     public List<DashboardResponse> getComparisonData(String figureId1, String figureId2) {
         DashboardResponse data1 = getDashboardData(figureId1);
         DashboardResponse data2 = getDashboardData(figureId2);
         return List.of(data1, data2);
     }
+
+    /**
+     * 이름으로 대시보드 데이터 조회
+     */
+    @Transactional(readOnly = true)
+    public DashboardResponse getDashboardDataByName(String name) {
+        // 1. 이름으로 정치인 정보 조회
+        Figure figure = figureRepository.findByName(name)
+                .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다: " + name));
+
+        // 이후 처리는 ID로 조회하는 메서드와 동일
+        return getDashboardData(figure);
+    }
+
 
     /**
      * 법안 통계 조회

@@ -698,7 +698,7 @@ public class FigureApiService {
      * @param jobId
      */
     @Async
-    protected void processFigureSyncJob(String jobId) {
+    public void processFigureSyncJob(String jobId) {
         log.info("국회의원 정보 동기화 작업({}) 시작", jobId);
 
         // 작업 상태 초기화
