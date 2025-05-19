@@ -42,4 +42,6 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
 
 
     List<Object[]> countBillsByStatus(Long figureId);
+
+    List<Object[]> countBillsByMonth(Long figureId, LocalDate startDate, LocalDate endDate);
 }

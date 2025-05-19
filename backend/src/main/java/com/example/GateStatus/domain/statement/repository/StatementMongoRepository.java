@@ -1,5 +1,7 @@
 package com.example.GateStatus.domain.statement.repository;
 
+import com.example.GateStatus.domain.dashboard.dto.internal.CategoryCount;
+import com.example.GateStatus.domain.dashboard.dto.internal.KeywordCount;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import org.apache.kafka.common.metrics.Stat;
@@ -74,4 +76,11 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
 
     @Query("{'$expr': {$lt: [{$strLenCp: '$content'}, ?0]}}")
     List<StatementDocument> findByContentLengthLessThan(int length, Pageable pageable);
+
+
+    long countByFigureId(Long figureId);
+
+    List<CategoryCount> countByCategory(Long figureId);
+
+    List<KeywordCount> findTopKeywords(Long figureId, List<String> stopwords);
 }

@@ -25,4 +25,7 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
     List<Vote> findByFigureIdAndVoteDateBetween(Long figureId, LocalDate startDate, LocalDate endDate);
 
     List<Vote> findByFigureIdAndBillBillIdInAndVoteDateBetween(Long figureId, List<String> billIds, LocalDate startDate, LocalDate endDate);
+
+    List<Object[]> countVotesByResult(Long figureId);
+
 }
