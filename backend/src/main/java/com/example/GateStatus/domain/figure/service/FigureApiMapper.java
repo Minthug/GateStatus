@@ -1,9 +1,13 @@
 package com.example.GateStatus.domain.figure.service;
 
 import com.example.GateStatus.domain.career.Career;
+import com.example.GateStatus.domain.career.CareerDTO;
 import com.example.GateStatus.domain.career.CareerParser;
 import com.example.GateStatus.domain.figure.FigureParty;
+import com.example.GateStatus.domain.figure.FigureType;
+import com.example.GateStatus.domain.figure.service.response.FigureDTO;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
+import com.example.GateStatus.domain.figure.service.response.Figuredto;
 import com.example.GateStatus.global.config.exception.ApiMappingException;
 import com.example.GateStatus.global.config.open.ApiMapper;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
@@ -13,10 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -102,6 +102,39 @@ public class FigureApiMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>>
         return Arrays.stream(edu.split("\\n|\\r\\n|,|;"))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    public FigureDTO convertToFigureDTO(FigureInfoDTO dto) {
+        if (dto == null) return null;
+
+        return FigureDTO.builder()
+                .figureId(dto.figureId())
+                .name(dto.name())
+                .englishName(dto.englishName())
+                .birth(dto.birth())
+                .constituency(dto.constituency())
+                .profileUrl(dto.profileUrl())
+                .figureType(FigureType.POLITICIAN)
+                .figureParty(dto.partyName())
+                .education(dto.education())
+                .careers(convertCareersToDTO(dto.career()))
+                .sites(dto.getLinkUrl())
+                .activities(dto.getActivities())
+                .viewCount(0L)
+                .build();
+    }
+
+    private List<CareerDTO> convertCareersToDTO(List<Career> careers) {
+        if (careers == null) return new ArrayList<>();
+
+        return careers.stream()
+                .map(career -> CareerDTO.builder()
+                        .period(career.getPeriod())
+                        .position(career.getPosition())
+                        .organization(career.getOrganization())
+                        .title(career.getTitle())
+                        .build())
                 .collect(Collectors.toList());
     }
 
