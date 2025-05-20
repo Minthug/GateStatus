@@ -80,7 +80,7 @@ public class StatementApiService {
     private StatementResponse convertToResponse(StatementApiDTO dto) {
 
         Map<String, Object> nlpData = new HashMap<>();
-        List<String> checkableItems = extractCheckableItems(dto.content());
+        List<String> checkableItems = apiMapper.extractCheckableItems(dto.content());
         if (!checkableItems.isEmpty()) {
             nlpData.put("checkableItems", checkableItems);
         }
@@ -104,28 +104,6 @@ public class StatementApiService {
                 LocalDateTime.now(),
                 LocalDateTime.now());
     }
-
-    private List<String> extractCheckableItems(String content) {
-        if (content == null || content.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<String> items = new ArrayList<>();
-
-        String[] sentences = content.split("\\. ");
-        for (String sentence : sentences) {
-            if (sentence.matches(".*\\d+.*") ||
-            sentence.contains("이다") ||
-            sentence.contains("했다") ||
-            sentence.contains("라고 말했") ||
-            sentence.contains("주장")) {
-                items.add(sentence.trim() + (sentence.endsWith(".") ? "" : "."));
-            }
-        }
-
-        return items.stream().limit(3).collect(Collectors.toList());
-    }
-
 
     /**
      * API 응답을 파싱하여 발언 목록 반환
@@ -152,7 +130,7 @@ public class StatementApiService {
         }
     }
 
-    public List<StatementApiDTO> getStatementsByKeyword(String keyword) {
+    public List<StatementResponse> getStatementsByKeyword(String keyword) {
         try {
             AssemblyApiResponse<String> response = searchStatementsByKeyword(keyword);
             if (!response.isSuccess()) {
@@ -193,23 +171,23 @@ public class StatementApiService {
         }
     }
 
-//    public List<StatementApiDTO> searchStatements(String politician, String keyword) {
-//        if (politician != null) {
-//            List<StatementApiDTO> statements = getStatementsByPolitician(politician);
-//
-//            if (keyword != null && !keyword.isEmpty()) {
-//                return statements.stream()
-//                        .filter(stmt ->
-//                                stmt.title().contains(keyword) || stmt.content().contains(keyword))
-//                        .collect(Collectors.toList());
-//            }
-//            return statements;
-//        } else if (keyword != null) {
-//            return getStatementsByKeyword(keyword);
-//        }
-//
-//        return List.of();
-//    }
+    public List<StatementResponse> searchStatements(String politician, String keyword) {
+        if (politician != null) {
+            List<StatementResponse> statements = getStatementsByPolitician(politician);
+
+            if (keyword != null && !keyword.isEmpty()) {
+                return statements.stream()
+                        .filter(stmt ->
+                                stmt.title().contains(keyword) || stmt.content().contains(keyword))
+                        .collect(Collectors.toList());
+            }
+            return statements;
+        } else if (keyword != null) {
+            return getStatementsByKeyword(keyword);
+        }
+
+        return List.of();
+    }
 
 
     public AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {

@@ -26,8 +26,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import javax.swing.plaf.PanelUI;
-import javax.swing.plaf.nimbus.State;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -501,32 +499,32 @@ public class StatementService {
         }
     }
 
-    /**
-     * 본문에서 검증 가능한 항목 추출
-     */
-    private List<String> extractCheckableItems(String content) {
-        if (content == null || content.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<String> items = new ArrayList<>();
-
-        // 간단한 구현 예
-        String[] sentences = content.split("\\. ");
-        for (String sentence : sentences) {
-            if (sentence.matches(".*\\d+.*") ||
-                    sentence.contains("이다") ||
-                    sentence.contains("했다") ||
-                    sentence.contains("라고 말했") ||
-                    sentence.contains("주장")) {
-
-                items.add(sentence.trim() + (sentence.endsWith(".") ? "" : "."));
-            }
-        }
-
-        // 최대 3개 항목으로 제한
-        return items.stream().limit(3).collect(Collectors.toList());
-    }
+//    /**
+//     * 본문에서 검증 가능한 항목 추출
+//     */
+//    private List<String> extractCheckableItems(String content) {
+//        if (content == null || content.isEmpty()) {
+//            return Collections.emptyList();
+//        }
+//
+//        List<String> items = new ArrayList<>();
+//
+//        // 간단한 구현 예
+//        String[] sentences = content.split("\\. ");
+//        for (String sentence : sentences) {
+//            if (sentence.matches(".*\\d+.*") ||
+//                    sentence.contains("이다") ||
+//                    sentence.contains("했다") ||
+//                    sentence.contains("라고 말했") ||
+//                    sentence.contains("주장")) {
+//
+//                items.add(sentence.trim() + (sentence.endsWith(".") ? "" : "."));
+//            }
+//        }
+//
+//        // 최대 3개 항목으로 제한
+//        return items.stream().limit(3).collect(Collectors.toList());
+//    }
 
     public StatementDocument convertApiDtoToDocument(StatementApiDTO dto, Figure figure) {
         StatementDocument.StatementDocumentBuilder builder = StatementDocument.builder()

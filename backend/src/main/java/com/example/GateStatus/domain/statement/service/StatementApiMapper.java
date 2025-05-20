@@ -1,6 +1,8 @@
 package com.example.GateStatus.domain.statement.service;
 
+import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
+import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import com.example.GateStatus.global.config.exception.ApiMappingException;
 import com.example.GateStatus.global.config.open.ApiMapper;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
@@ -18,11 +20,11 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static java.util.regex.Pattern.compile;
 
@@ -193,5 +195,85 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
         }
 
         return "";
+    }
+
+    public List<StatementResponse> mapToStatementResponses(AssemblyApiResponse<String> response) {
+        List<StatementApiDTO> dtos = map(response);
+
+        return dtos.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * StatementApiDTO를 StatementResponse로 변환
+     */
+    private StatementResponse convertToResponse(StatementApiDTO dto) {
+
+        StatementType statementType = determineStatementType(dto.typeCode());
+
+        Map<String, Object> nlpData = new HashMap<>();
+
+
+        // 기본적인 NLP 데이터 초기화 (필요에 따라 조정)
+        nlpData.put("checkableItems", extractCheckableItems(dto.content()));
+        nlpData.put("keyPhrases", extractKeyPhrases(dto.content()));
+        nlpData.put("sentiment", analyzeSentiment(dto.content()));
+
+        return new StatementResponse(
+                UUID.randomUUID().toString(), // 임시 ID 생성
+                null, // figureId는 나중에 설정
+                dto.figureName(),
+                dto.title(),
+                dto.content(),
+                dto.statementDate(),
+                dto.source(),
+                dto.context(),
+                dto.originalUrl(),
+                statementType,
+                null, // factCheckScore는 나중에 설정
+                null, // factCheckResult는 나중에 설정
+                0, // viewCount 초기값
+                LocalDateTime.now(),
+                LocalDateTime.now()
+        );
+    }
+
+    private List<String> extractKeyPhrases(String content) {
+        List<String> phrases = new ArrayList<>();
+
+        String[] parts = content.split("[,\"']");
+        for (String part : parts) {
+            part = part.trim();
+            if (part.length() > 5 && part.length() < 50) {
+                phrases.add(part);
+            }
+        }
+        return phrases.stream().limit(5).collect(Collectors.toList());
+    }
+
+    protected List<String> extractCheckableItems(String content) {
+        if (content == null || content.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> items = new ArrayList<>();
+
+        String[] sentences = content.split("\\. ");
+        for (String sentence : sentences) {
+            if (sentence.matches(".*\\d+.*") ||
+                    sentence.contains("이다") ||
+                    sentence.contains("했다") ||
+                    sentence.contains("라고 말했") ||
+                    sentence.contains("주장")) {
+                items.add(sentence.trim() + (sentence.endsWith(".") ? "" : "."));
+            }
+        }
+
+        return items.stream().limit(3).collect(Collectors.toList());
+    }
+
+    private StatementType determineStatementType(String s) {
+        return null;
     }
 }
