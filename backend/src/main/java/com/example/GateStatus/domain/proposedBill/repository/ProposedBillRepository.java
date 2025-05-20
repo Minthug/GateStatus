@@ -45,11 +45,11 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
     List<Object[]> countBillsByStatus(@Param("proposerId") Long proposerId);
 
 
-    @Query("SELECT FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m') as month, COUNT(p) as count " +
+    @Query("SELECT TO_CHAR(p.proposeDate, 'YYYY-MM') as month, COUNT(p) as count " +
             "FROM ProposedBill p " +
             "WHERE p.proposer.id = :proposerId AND p.proposeDate BETWEEN :startDate AND :endDate " +
-            "GROUP BY FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m') " +
-            "ORDER BY FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m')") // 수정: 명시적 정렬 기준 사용
+            "GROUP BY TO_CHAR(p.proposeDate, 'YYYY-MM') " +
+            "ORDER BY TO_CHAR(p.proposeDate, 'YYYY-MM')") // 수정: 명시적 정렬 기준 사용
     List<Object[]> countBillsByMonth(@Param("proposerId") Long proposerId,
                                      @Param("startDate") LocalDate startDate,
                                      @Param("endDate") LocalDate endDate);
