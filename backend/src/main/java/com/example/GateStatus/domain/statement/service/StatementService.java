@@ -2,6 +2,7 @@ package com.example.GateStatus.domain.statement.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
@@ -44,6 +45,7 @@ public class StatementService {
     private final StatementApiMapper mapper;
     private final WebClient.Builder webclientBuilder;
     private final OpenAiClient openAiClient;
+    private final FigureApiService figureApiService;
 
     @Value("${spring.openapi.assembly.url}")
     private String baseUrl;
@@ -343,8 +345,21 @@ public class StatementService {
     public int syncStatementsByFigure(String figureName) {
         log.info("국회방송국 API에서 '{}' 인물 발언 정보 동기화 시작", figureName);
 
+        // DB에서 국회의원 조회
         Figure figure = figureRepository.findByName(figureName)
-                .orElseThrow(() -> new EntityNotFoundException("해당 인물이 존재하지 않습니다: " + figureName));
+                .orElse(null);
+
+        // DB에 없으면 API에서 가져와 저장
+        if (figure == null) {
+            log.info("DB에 국회의원 정보가 없어 API에서 동기화 시도: {}", figureName);
+            try {
+                figure = figureApiService.syncFigureInfoByName(figureName);
+            } catch (Exception e) {
+                log.error("국회의원 정보 동기화 실패: {} - {}", figureName, e.getMessage());
+                throw new EntityNotFoundException("해당 인물이 존재하지 않습니다: " + figureName);
+            }
+        }
+
 
         AssemblyApiResponse<String> apiResponse = fetchStatementsByFigure(figureName);
         if (!apiResponse.isSuccess()) {

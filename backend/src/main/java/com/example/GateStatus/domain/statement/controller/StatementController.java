@@ -224,8 +224,8 @@ public class StatementController {
         return ResponseEntity.ok(statements);
     }
 
-    @PostMapping("/sync/{figureName}")
-    public ResponseEntity<ApiResponse<Integer>> syncStatementsByFigure(@PathVariable String figureName) {
+    @PostMapping("/sync/figureName")
+    public ResponseEntity<ApiResponse<Integer>> syncStatementsByFigure(@RequestParam String figureName) {
         log.info("국회의원 '{}' 발언 정보 동기화 요청", figureName);
 
         try {

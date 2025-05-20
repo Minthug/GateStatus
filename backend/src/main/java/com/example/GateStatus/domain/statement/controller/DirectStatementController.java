@@ -7,12 +7,9 @@ import com.example.GateStatus.domain.statement.service.response.StatementRespons
 import com.example.GateStatus.global.config.redis.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.common.metrics.Stat;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collections;
 import java.util.List;
 
 @Slf4j
@@ -25,8 +22,8 @@ public class DirectStatementController {
     private final RedisCacheService cacheService;
     private final StatementService statementService;
 
-    @GetMapping("/politician/{name}")
-    public ResponseEntity<List<StatementResponse>> getStatementsByPolitician(@PathVariable String name) {
+    @GetMapping("/politician/name")
+    public ResponseEntity<List<StatementResponse>> getStatementsByPolitician(@RequestParam String name) {
        String cacheKey = "statements:politician:" + name;
 
         log.info("정치인 '{}' 발언 조회 시작", name);
