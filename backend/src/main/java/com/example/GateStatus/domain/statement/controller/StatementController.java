@@ -1,6 +1,9 @@
 package com.example.GateStatus.domain.statement.controller;
 
 import com.example.GateStatus.domain.common.SyncJobStatus;
+import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.service.StatementApiMapper;
 import com.example.GateStatus.domain.statement.service.StatementService;
@@ -10,25 +13,24 @@ import com.example.GateStatus.domain.statement.service.response.StatementRespons
 import com.example.GateStatus.global.config.open.ApiResponse;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.example.GateStatus.global.config.redis.RedisCacheService;
-import com.google.protobuf.Api;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import javax.swing.plaf.nimbus.State;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/statements")
@@ -41,6 +43,8 @@ public class StatementController {
     private final StatementApiMapper apiMapper;
     private final RedisCacheService cacheService;
     private final StatementSyncService statementSyncService;
+    private final FigureRepository figureRepository;
+    private final FigureApiService figureApiService;
 
     @Value("${spring.openai.api.url}")
     private String baseUrl;
@@ -236,6 +240,57 @@ public class StatementController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("발언 정보 동기화 실패: " + e.getMessage()));
         }
+    }
+
+    @GetMapping("/by-name")
+    public ResponseEntity<?> getStatementsByFigureName(@RequestParam String figureName,
+                                                       @RequestParam(required = false, defaultValue = "false") Boolean sync,
+                                                       @PageableDefault(size = 10) Pageable pageable) {
+        log.info("국회의원 이름으로 발언 목록 조회 요청: {}, 동기화 여부: {}", figureName, sync);
+
+        try {
+            Figure figure = figureRepository.findByName(figureName)
+                    .orElse(null);
+
+
+            if (figureName == null || Boolean.TRUE.equals(sync)) {
+                try {
+                    log.info("DB에 국회의원 정보가 없거나 동기화 요청이 있어 API에서 동기화 시도: {}", figureName);
+
+                    if (figure == null) {
+                        figure = figureApiService.syncFigureInfoByName(figureName);
+                    }
+                    // 발언 정보도 함께 동기화
+                    statementService.syncStatementsByFigure(figureName);
+                } catch (Exception e) {
+                    log.warn("국회의원 또는 발언 정보 동기화 실패: {} - {}", figureName, e.getMessage());
+
+                    if (figure == null) {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("해당 국회의원을 찾을 수 없습니다: " + figureName));
+                    }
+                }
+            }
+
+            Page<StatementResponse> statements = statementService.findStatementsByFigure(figure.getId(), pageable);
+
+
+            // 응답 데이터 구성
+            Map<String, Object> response = new HashMap<>();
+            response.put("figureName", figureName);
+            response.put("figureId", figure.getId());
+            response.put("totalStatements", statements.getTotalElements());
+            response.put("statements", statements.getContent());
+            response.put("totalPages", statements.getTotalPages());
+            response.put("currentPage", statements.getNumber());
+
+
+            return ResponseEntity.ok(statements);
+        } catch (Exception e) {
+            log.error("발언 목록 조회 실패: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("발언 목록 조회 실패: " + e.getMessage()));
+        }
+
     }
 
     @PostMapping("/sync/all")
