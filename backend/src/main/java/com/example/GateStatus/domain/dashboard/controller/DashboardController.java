@@ -2,15 +2,13 @@ package com.example.GateStatus.domain.dashboard.controller;
 
 import com.example.GateStatus.domain.dashboard.dto.response.DashboardResponse;
 import com.example.GateStatus.domain.dashboard.service.DashboardService;
-import com.example.GateStatus.domain.figure.Figure;
-import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/v1/dashboard")

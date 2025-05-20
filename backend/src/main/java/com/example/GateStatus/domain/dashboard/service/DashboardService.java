@@ -5,7 +5,9 @@ import com.example.GateStatus.domain.dashboard.dto.internal.KeywordCount;
 import com.example.GateStatus.domain.dashboard.dto.response.*;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.response.FigureDTO;
+import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.domain.proposedBill.BillStatus;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
@@ -32,12 +34,14 @@ public class DashboardService {
     private final ProposedBillRepository billRepository;
     private final StatementMongoRepository statementMongoRepository;
     private final VoteRepository voteRepository;
+    private final FigureApiService figureApiService;
 
     @Transactional(readOnly = true)
-    public DashboardResponse getDashboardData(Figure figure) {
+    public DashboardResponse getDashboardData(String name) {
 
-        Figure figureId = figureRepository.findByFigureId(figure.getFigureId())
-                .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다: " + figure.getFigureId()));
+        // 1. 이름으로 정치인 정보 조회
+        Figure figure = figureRepository.findByName(name)
+                .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다: " + name));
 
         // 2. 법안 통계 조회
         BillStatistics billStats = getBillStatistics(figure.getId());
@@ -77,12 +81,50 @@ public class DashboardService {
      */
     @Transactional(readOnly = true)
     public DashboardResponse getDashboardDataByName(String name) {
-        // 1. 이름으로 정치인 정보 조회
-        Figure figure = figureRepository.findByName(name)
-                .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다: " + name));
+        Figure figure;
 
-        // 이후 처리는 ID로 조회하는 메서드와 동일
-        return getDashboardData(figure);
+        try {
+            figure = figureRepository.findByName(name).orElse(null);
+
+            if (figure == null) {
+                try {
+                    log.info("DB에 없어 API에서 국회의원 정보 조회: {}", name);
+                    figure = figureApiService.syncFigureInfoByName(name);
+                } catch (Exception e) {
+                    log.error("API에서 정치인 정보 동기화 실패: {} - {}", name, e.getMessage());
+                    throw new EntityNotFoundException("해당 정치인을 찾을 수 없습니다: " + name);
+                }
+            }
+        } catch (EntityNotFoundException e) {
+            log.warn("정치인을 찾을 수 없음: {}", name);
+            throw e;
+        }
+
+        // 2. 법안 통계 조회
+        BillStatistics billStats = getBillStatistics(figure.getId());
+
+        // 3. 발언 통계 조회
+        StatementStatistics statementStats = getStatementStatistics(figure.getId());
+
+        // 4. 투표 통계 조회
+        VoteStatistics voteStats = getVoteStatistics(figure.getId());
+
+        // 5. 월별 법안 발의 추이 조회
+        List<BillOverTimeDTO> billsOverTime = getBillOverTime(figure.getId());
+
+        // 6. 발언 키워드 분석
+        List<KeywordDTO> keywords = getKeywords(figure.getId());
+
+
+        return new DashboardResponse(
+                FigureDTO.from(figure),
+                billStats,
+                statementStats,
+                voteStats,
+                keywords,
+                billsOverTime
+        );
+
     }
 
 
