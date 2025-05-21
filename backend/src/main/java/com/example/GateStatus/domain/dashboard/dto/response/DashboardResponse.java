@@ -1,7 +1,6 @@
 package com.example.GateStatus.domain.dashboard.dto.response;
 
 import com.example.GateStatus.domain.figure.service.response.FigureDTO;
-import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 
 import java.util.List;
 

@@ -25,6 +25,7 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     @Query("SELECT f FROM Figure f WHERE f.figureId = :figureId")
     Optional<Figure> findByFigureId(@Param("figureId") String figureId);
+
     List<Figure> findAllByFigureIdIsNotNull();
 
     Page<Figure> findByNameContaining(String name, Pageable pageable);
@@ -32,6 +33,8 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
     Page<Figure> findByConstituencyContaining(String place, Pageable pageable);
 
     List<Figure> findByFigureType(FigureType figureType);
+
+    List<Figure> findByNameContainingAndParty(String keyword, FigureParty party);
 
     List<Figure> findByFigureParty(FigureParty figureParty);
 

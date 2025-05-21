@@ -2,6 +2,8 @@ package com.example.GateStatus.domain.vote.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.figure.service.response.FigureDTO;
+import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import com.example.GateStatus.domain.vote.Vote;
@@ -20,6 +22,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -187,5 +191,10 @@ public class VoteService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public Page<FigureInfoDTO> searchPoliticiansByKeyword(String name, Pageable pageable) {
+        Page<Figure> figures = figureRepository.findByNameContaining(name, pageable);
+        return figures.map(FigureInfoDTO::from);
+    }
 }
 
