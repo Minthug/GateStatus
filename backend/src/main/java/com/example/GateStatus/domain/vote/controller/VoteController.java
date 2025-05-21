@@ -1,7 +1,7 @@
 package com.example.GateStatus.domain.vote.controller;
 
-import com.example.GateStatus.domain.vote.service.BillDetailDTO;
-import com.example.GateStatus.domain.vote.service.BillVoteDTO;
+import com.example.GateStatus.domain.vote.dto.BillDetailDTO;
+import com.example.GateStatus.domain.vote.dto.BillVoteDTO;
 import com.example.GateStatus.domain.vote.service.VoteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

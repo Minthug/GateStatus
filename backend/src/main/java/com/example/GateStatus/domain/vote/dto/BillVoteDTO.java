@@ -1,4 +1,4 @@
-package com.example.GateStatus.domain.vote.service;
+package com.example.GateStatus.domain.vote.dto;
 
 import com.example.GateStatus.domain.vote.VoteResultType;
 import com.fasterxml.jackson.databind.JsonNode;

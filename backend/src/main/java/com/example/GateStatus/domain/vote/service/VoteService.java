@@ -6,6 +6,8 @@ import com.example.GateStatus.domain.proposedBill.ProposedBill;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import com.example.GateStatus.domain.vote.Vote;
 import com.example.GateStatus.domain.vote.VoteResultType;
+import com.example.GateStatus.domain.vote.dto.BillDetailDTO;
+import com.example.GateStatus.domain.vote.dto.BillVoteDTO;
 import com.example.GateStatus.domain.vote.repository.VoteRepository;
 import com.example.GateStatus.global.config.exception.ApiClientException;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
@@ -184,5 +186,6 @@ public class VoteService {
             throw new ApiDataRetrievalException("법안 상세 정보를 가져오는 중 오류 발생: ");
         }
     }
+
 }
 

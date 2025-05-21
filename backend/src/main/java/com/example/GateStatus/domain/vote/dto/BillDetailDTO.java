@@ -1,4 +1,4 @@
-package com.example.GateStatus.domain.vote.service;
+package com.example.GateStatus.domain.vote.dto;
 
 public record BillDetailDTO(String billId,
                             String billNo,

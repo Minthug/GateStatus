@@ -1,6 +1,9 @@
 package com.example.GateStatus.domain.vote.service;
 
 import com.example.GateStatus.domain.vote.VoteResultType;
+import com.example.GateStatus.domain.vote.dto.BillDetailDTO;
+import com.example.GateStatus.domain.vote.dto.BillVoteDTO;
+import com.example.GateStatus.domain.vote.dto.VoteResultDetail;
 import com.example.GateStatus.global.config.exception.ApiMappingException;
 import com.example.GateStatus.global.config.open.ApiMapper;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
