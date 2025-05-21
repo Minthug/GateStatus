@@ -138,7 +138,7 @@ public class StatementApiService {
                 return List.of();
             }
 
-            return apiMapper.map(response);
+            return apiMapper.mapToStatementResponses(response);
         } catch (Exception e) {
             log.error("키워드 검색 중 오류: {}", e.getMessage());
             return List.of();

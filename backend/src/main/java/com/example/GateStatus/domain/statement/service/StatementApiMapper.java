@@ -233,10 +233,45 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
                 statementType,
                 null, // factCheckScore는 나중에 설정
                 null, // factCheckResult는 나중에 설정
+                extractCheckableItems(dto.content()),
+                nlpData,
                 0, // viewCount 초기값
                 LocalDateTime.now(),
                 LocalDateTime.now()
         );
+    }
+
+    private Map<String, Object> analyzeSentiment(String content) {
+        Map<String, Object> sentiment = new HashMap<>();
+
+        int positiveCount = countWords(content, new String[]{"좋은", "발전", "성공", "긍정", "찬성", "지지"});
+        int negativeCount = countWords(content, new String[]{"나쁜", "실패", "문제", "부정", "반대", "비판"});
+
+        double score = 0.5; // 중립 기본값
+
+        if (positiveCount + negativeCount > 0) {
+            score = (double) positiveCount / (positiveCount + negativeCount);
+        }
+
+        sentiment.put("score", score);
+        sentiment.put("positive", positiveCount);
+        sentiment.put("negative", negativeCount);
+
+        return sentiment;
+    }
+
+    private int countWords(String text, String[] words) {
+        int count = 0;
+        String lowerText = text.toLowerCase();
+        for (String word : words) {
+            int index = 0;
+            while ((index = lowerText.indexOf(word.toLowerCase(), index)) != -1) {
+                count++;
+                index += word.length();
+            }
+        }
+
+        return count;
     }
 
     private List<String> extractKeyPhrases(String content) {
