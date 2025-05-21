@@ -196,5 +196,30 @@ public class VoteService {
         Page<Figure> figures = figureRepository.findByNameContaining(name, pageable);
         return figures.map(FigureInfoDTO::from);
     }
+
+    @Transactional(readOnly = true)
+    public Page<BillVoteDTO> getVotesByFigureName(String figureName, Pageable pageable) {
+        Figure figure = figureRepository.findByName(figureName)
+                .orElseThrow(() -> new EntityNotFoundException("정치인을 찾을 수 없습니다: " + figureName));
+
+        Page<Vote> votePage = voteRepository.findByFigureId(figure.getId(), pageable);
+
+        return votePage.map(vote -> {
+            ProposedBill bill = vote.getBill();
+
+            return new BillVoteDTO(
+                    bill.getBillNo(),                               // 의안번호
+                    vote.getVoteTitle() != null ? vote.getVoteTitle() : bill.getBillName(),  // 의안명
+                    figure.getName(),                              // 제안자 - 현재 정치인 이름으로 설정
+                    vote.getMeetingName(),                         // 소관위원회
+                    bill.getProposeDate() != null ? bill.getProposeDate().toString() : "",  // 제안일자
+                    vote.getVoteResult().getDisplayName(),         // 표결 결과
+                    vote.getVoteDate() != null ? vote.getVoteDate().toString() : "",  // 표결일자
+                    vote.getVoteResult(),                          // 표결 결과 타입
+                    bill.getBillStatus() != null ? bill.getBillStatus().toString() : "",  // 법안 상태
+                    bill.getBillUrl()                              // 법안 URL
+            );
+        });
+    }
 }
 

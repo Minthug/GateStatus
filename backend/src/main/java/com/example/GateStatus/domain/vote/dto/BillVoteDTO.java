@@ -17,20 +17,4 @@ public record BillVoteDTO(
         String billStatus,
         String billUrl) {        // 표결일자
 
-    public static BillVoteDTO fromJsonNode(JsonNode node) {
-        String voteResult = getTextValue(node, "RESULT_VOTE_MOD_MM");
-
-        return new BillVoteDTO(
-                getTextValue(node, "BILL_NO"),
-                getTextValue(node, "BILL_NM"),
-                getTextValue(node, "PROPOSER"),
-                getTextValue(node, "COMMITTEE_NM"),
-                getTextValue(node, "PROPOSE_DT"),
-                voteResult,
-                getTextValue(node, "VOTE_DT"),
-                VoteResultType.fromString(voteResult),
-                getTextValue(node, "PROC_RESULT"),
-                getTextValue(node, "LINK_URL")
-        );
-    }
 }

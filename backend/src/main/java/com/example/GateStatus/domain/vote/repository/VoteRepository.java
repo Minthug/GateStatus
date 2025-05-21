@@ -4,6 +4,8 @@ import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.vote.Vote;
 import com.example.GateStatus.domain.vote.VoteResultType;
 import org.springframework.cglib.core.Local;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,7 +15,7 @@ import java.util.List;
 
 public interface VoteRepository extends JpaRepository<Vote, Long> {
 
-    List<Vote> findByFigureId(Long figureId);
+    Page<Vote> findByFigureId(Long figureId, Pageable pageable);
 
     List<Vote> findByBillNo(String billNo);
 
