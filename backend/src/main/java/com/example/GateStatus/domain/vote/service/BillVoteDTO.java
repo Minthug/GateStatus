@@ -3,6 +3,8 @@ package com.example.GateStatus.domain.vote.service;
 import com.example.GateStatus.domain.vote.VoteResultType;
 import com.fasterxml.jackson.databind.JsonNode;
 
+import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
+
 public record BillVoteDTO(
         String billNo,         // 의안번호
         String billName,       // 의안명
@@ -30,16 +32,5 @@ public record BillVoteDTO(
                 getTextValue(node, "PROC_RESULT"),
                 getTextValue(node, "LINK_URL")
         );
-    }
-
-    /**
-     * JsonNode에서 특정 필드의 텍스트 값 추출
-     * @param node
-     * @param fieldName
-     * @return
-     */
-    public static String getTextValue(JsonNode node, String fieldName) {
-        JsonNode field = node.get(fieldName);
-        return (field != null && !field.isNull()) ? field.asText() : "";
     }
 }

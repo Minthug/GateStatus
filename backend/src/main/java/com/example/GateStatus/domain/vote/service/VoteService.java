@@ -24,6 +24,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 
@@ -45,10 +46,15 @@ public class VoteService {
     @Value("${spring.openapi.assembly.key}")
     private String apiKey;
 
+    private static final int CACHE_TTL_SECONDS = 86400; // 1일
+    private static final String ASSEMBLY_AGE = "21";
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+
     @Transactional
     public List<BillVoteDTO> getVotesByFigureId(Long figureId) {
         String cacheKey = "votes:figure:" + figureId;
-        List<BillVoteDTO> votes = cacheService.getOrSet(cacheKey, () -> fetchVotesFromApi(figureId), 86400);
+        List<BillVoteDTO> votes = cacheService.getOrSet(cacheKey, () -> fetchVotesFromApi(figureId), CACHE_TTL_SECONDS);
 
         saveVoteToDB(figureId, votes);
 
@@ -69,7 +75,7 @@ public class VoteService {
             LocalDate voteDate = null;
             if (voteDTO.voteDate() != null && !voteDTO.voteDate().isEmpty()) {
                 try {
-                    voteDate = LocalDate.parse(voteDTO.voteDate());
+                    voteDate = LocalDate.parse(voteDTO.voteDate(), DATE_FORMATTER);
                 } catch (Exception e) {
                     log.warn("날짜 파싱 오류: {}", voteDTO.voteDate());
                     voteDate = LocalDate.now();
@@ -113,7 +119,7 @@ public class VoteService {
                     .uri(uriBuilder -> uriBuilder
                             .path("/ncocpgfiaoituanbr")
                             .queryParam("KEY", apiKey)
-                            .queryParam("AGE", "21")
+                            .queryParam("AGE", ASSEMBLY_AGE)
                             .queryParam("PROPOSER", figure.getName())
                             .build())
                     .retrieve()
@@ -158,12 +164,10 @@ public class VoteService {
                             .queryParam("BILL_ID", billNo)
                             .build())
                     .retrieve()
-                    .onStatus(status -> status.is4xxClientError(), response -> {
-                        return Mono.error(new ApiClientException("Api 클라이언트 오류: " + response.statusCode()));
-                    })
-                    .onStatus(status -> status.is5xxServerError(), response -> {
-                        return Mono.error(new ApiServerException("Api 서버 오류: " + response.statusCode()));
-                    })
+                    .onStatus(status -> status.is4xxClientError(), response ->
+                            Mono.error(new ApiClientException("API 클라이언트 오류: " + response.statusCode())))
+                    .onStatus(status -> status.is5xxServerError(), response ->
+                            Mono.error(new ApiServerException("API 서버 오류: " + response.statusCode())))
                     .bodyToMono(new ParameterizedTypeReference<AssemblyApiResponse<JsonNode>>() {})
                     .block();
 
@@ -178,39 +182,6 @@ public class VoteService {
         } catch (Exception e) {
             log.error("법안 상세 정보 조회 중 예외 발생", e);
             throw new ApiDataRetrievalException("법안 상세 정보를 가져오는 중 오류 발생: ");
-        }
-    }
-
-    private VoteResultDetail parseVoteResults(JsonNode billInfo) {
-        try {
-            int agreeCount = getIntValue(billInfo, "AGREE_COUNT");
-            int disagreeCount = getIntValue(billInfo, "DISAGREE_COUNT");
-            int abstainCount = getIntValue(billInfo, "ABSTAIN_COUNT");
-            int absentCount = getIntValue(billInfo, "ABSENT_COUNT");
-
-            return new VoteResultDetail(
-                    agreeCount,
-                    disagreeCount,
-                    abstainCount,
-                    absentCount,
-                    agreeCount + disagreeCount + abstainCount + absentCount
-            );
-    } catch (Exception e) {
-            log.warn("투표 결과 파싱 중 오류 발생: ", e);
-            return new VoteResultDetail(0, 0, 0, 0, 0);
-        }
-}
-
-    private int getIntValue(JsonNode node, String fieldName) {
-        JsonNode field = node.get(fieldName);
-        if (field == null || field.isNull()) {
-            return 0;
-        }
-
-        try {
-            return field.asInt();
-        } catch (Exception e) {
-            return 0;
         }
     }
 }

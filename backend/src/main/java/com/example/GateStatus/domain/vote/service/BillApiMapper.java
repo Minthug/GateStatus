@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
+
 @Component
 @RequiredArgsConstructor
 public class BillApiMapper implements ApiMapper<JsonNode, List<BillVoteDTO>> {
@@ -139,13 +141,6 @@ public class BillApiMapper implements ApiMapper<JsonNode, List<BillVoteDTO>> {
         }
     }
 
-    /**
-     * JsonNode에서 텍스트 값 추출
-     */
-    private String getTextValue(JsonNode node, String fieldName) {
-        JsonNode field = node.get(fieldName);
-        return (field != null && !field.isNull()) ? field.asText() : "";
-    }
 
     /**
      * 국회 OPEN API 응답을 다른 DTO 타입으로 변환(다른 API에 활용)

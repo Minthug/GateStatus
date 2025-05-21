@@ -29,7 +29,7 @@ public enum VoteResultType {
             case "찬성" -> AGREE;
             case "반대" -> DISAGREE;
             case "기권" -> ABSTAIN;
-            case "불참" -> ABSTAIN;
+            case "불참" -> ABSENT;
             default -> UNKNOWN;
         };
     }
