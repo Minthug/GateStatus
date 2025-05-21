@@ -6,8 +6,12 @@ import com.example.GateStatus.domain.statement.service.response.StatementRespons
 import com.example.GateStatus.global.config.redis.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -20,6 +24,7 @@ public class DirectStatementController {
     private final StatementApiService apiService;
     private final RedisCacheService cacheService;
     private final StatementService statementService;
+    private final RedisTemplate redisTemplate;
 
     @GetMapping("/politician/name")
     public ResponseEntity<List<StatementResponse>> getStatementsByPolitician(@RequestParam String name) {
@@ -34,20 +39,4 @@ public class DirectStatementController {
 
        return ResponseEntity.ok(statements);
     }
-
-    @GetMapping("/search")
-    public ResponseEntity<List<StatementResponse>> searchStatements(@RequestParam(required = false) String politician,
-                                                                    @RequestParam(required = false) String keyword) {
-        if (politician == null && keyword == null) {
-            return ResponseEntity.badRequest().body(List.of());
-        }
-
-        log.info("통합 검색: 정치인={}, 키워드={}", politician, keyword);
-        String cacheKey = "statements:combined:" + (politician != null ? politician : "any") + ":" + (keyword != null ? keyword : "any");
-
-        List<StatementResponse> statements = cacheService.getOrSet(cacheKey, () -> apiService.searchStatements(politician, keyword), 600);
-
-        return ResponseEntity.ok(statements);
-    }
-
 }
