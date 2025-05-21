@@ -4,6 +4,7 @@ import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 
+import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,7 +26,9 @@ public record StatementResponse(String id,
                                 Map<String, Object> nlpData,
                                 Integer viewCount,
                                 LocalDateTime createdAt,
-                                LocalDateTime updatedAt) {
+                                LocalDateTime updatedAt) implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     /**
      * MongoDB Document -> DTO

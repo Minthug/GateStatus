@@ -48,6 +48,8 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     @Query("{ 'content': { $regex: ?0, $options:  'i' } }")
     List<StatementDocument> findByContentContainingKeyword(String keyword);
 
+
+
     // 정규식 기반 내용 검색 (제목과 내용에서 검색)
     @Query("{ $or: [ { 'title': { $regex: ?0, $options: 'i' } }, { 'content': { $regex: ?0, $options: 'i' } } ] }")
     Page<StatementDocument> searchByRegex(String keyword, Pageable pageable);

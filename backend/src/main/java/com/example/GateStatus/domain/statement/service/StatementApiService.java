@@ -107,28 +107,27 @@ public class StatementApiService {
 
     /**
      * API 응답을 파싱하여 발언 목록 반환
-     * @param response
      * @return
      */
-    private List<StatementApiDTO> parseResponseToStatements(AssemblyApiResponse<String> response) {
-        if (response.data() == null) {
-            log.warn("API 응답 데이터 없음");
-            return Collections.emptyList();
-        }
-
-        try {
-            List<StatementApiDTO> statements = apiMapper.map(response);
-
-            if (statements.isEmpty()) {
-                log.info("검색 결과가 없습니다");
-            }
-
-            return statements;
-        } catch (Exception e) {
-            log.error("응답 파싱 중 오류: {}", e.getMessage(), e);
-            return Collections.emptyList();
-        }
-    }
+//    private List<StatementApiDTO> parseResponseToStatements(AssemblyApiResponse<String> response) {
+//        if (response.data() == null) {
+//            log.warn("API 응답 데이터 없음");
+//            return Collections.emptyList();
+//        }
+//
+//        try {
+//            List<StatementApiDTO> statements = apiMapper.map(response);
+//
+//            if (statements.isEmpty()) {
+//                log.info("검색 결과가 없습니다");
+//            }
+//
+//            return statements;
+//        } catch (Exception e) {
+//            log.error("응답 파싱 중 오류: {}", e.getMessage(), e);
+//            return Collections.emptyList();
+//        }
+//    }
 
     public List<StatementResponse> getStatementsByKeyword(String keyword) {
         try {
@@ -172,21 +171,51 @@ public class StatementApiService {
     }
 
     public List<StatementResponse> searchStatements(String politician, String keyword) {
+
+        String cacheKey = "statements:search:" + (politician != null ? politician : "") + ":" +
+                (keyword != null ? keyword : "");
+
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            log.debug("Cache Hit: {}", cacheKey);
+            try {
+                return (List<StatementResponse>) cached;
+            } catch (ClassCastException e) {
+                log.warn("캐시 형변환 실패. 캐시 무시: {}", e.getMessage());
+            }
+        }
+
+        log.debug("Cache Miss: {}", cacheKey);
+
+        List<StatementResponse> result;
+
         if (politician != null) {
             List<StatementResponse> statements = getStatementsByPolitician(politician);
 
             if (keyword != null && !keyword.isEmpty()) {
                 return statements.stream()
                         .filter(stmt ->
-                                stmt.title().contains(keyword) || stmt.content().contains(keyword))
+                                stmt.title().contains(keyword) && stmt.title() != null ||
+                                stmt.content().contains(keyword) && stmt.content() != null)
                         .collect(Collectors.toList());
+            } else {
+                result = statements; // 정치인만 있는 경우
             }
-            return statements;
-        } else if (keyword != null) {
-            return getStatementsByKeyword(keyword);
+        } else if (keyword != null && !keyword.isEmpty()) {
+            result = getStatementsByKeyword(keyword); // 키워드만 있는 경우
+        } else {
+            result = List.of();
         }
 
-        return List.of();
+        if (!result.isEmpty()) {
+            redisTemplate.opsForValue().set(cacheKey, result, 1, TimeUnit.HOURS);
+            log.debug("캐시 저장 성공: {}, 만료 시간: 1시간", cacheKey);
+        } else {
+            redisTemplate.opsForValue().set(cacheKey, result, 30, TimeUnit.SECONDS);
+            log.debug("빈 결과는 짧은 시간만 캐싱: {}", cacheKey);
+        }
+
+        return result;
     }
 
 
