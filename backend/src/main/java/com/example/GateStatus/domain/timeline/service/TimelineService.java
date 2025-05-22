@@ -9,21 +9,24 @@ import com.example.GateStatus.domain.statement.repository.StatementMongoReposito
 import com.example.GateStatus.domain.timeline.TimelineEventDocument;
 import com.example.GateStatus.domain.timeline.TimelineEventType;
 import com.example.GateStatus.domain.timeline.repository.TimelineEventRepository;
+import com.example.GateStatus.global.config.batch.BatchProcessResult;
+import com.example.GateStatus.global.config.batch.BatchResult;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,9 +42,120 @@ public class TimelineService {
     private static final String SOURCE_TYPE_BILL = "BILL";
     private static final String SOURCE_TYPE_CUSTOM = "CUSTOM";
 
+    /**
+     * 발언 데이터를 배치로 타임라인에 동기화
+     * 대량의 발언 데이터를 효율적으로 처리하기 위해 배치 단위로 분할하여 처리
+     * @param startDate
+     * @param endDate
+     * @param batchSize
+     * @return
+     */
     @Transactional
     public BatchProcessResult syncStatementsToTimelineBatch(LocalDate startDate, LocalDate endDate, int batchSize) {
+        log.info("배치 발언 동기화 시작: {} ~ {}, batchSize={}", startDate, endDate, batchSize);
 
+        List<StatementDocument> allStatements = statementRepository.findByPeriod(startDate, endDate);
+
+        List<StatementDocument> newStatements = allStatements.stream()
+                .filter(statement -> !timelineRepository.existsBySourceTypeAndSourceId(
+                        SOURCE_TYPE_STATEMENT, statement.getId()))
+                .collect(Collectors.toList());
+
+        int totalCount = newStatements.size();
+        int processCount = 0;
+        int errorCount = 0;
+        List<String> errorIds = new ArrayList<>();
+
+        for (int i = 0; i < totalCount; i += batchSize) {
+            int endIndex = Math.min(i + batchSize, totalCount);
+            List<StatementDocument> batch = newStatements.subList(i, endIndex);
+
+            try {
+                BatchResult batchResult = processBatchStatements(batch);
+                processCount += batchResult.successCount();
+                errorCount += batchResult.errorCount();
+                errorIds.addAll(batchResult.errorIds());
+
+                log.debug("배치 처리 완료: {}/{}, 성공={}, 실패={}",
+                        endIndex, totalCount, batchResult.successCount(), batchResult.errorCount());
+
+            } catch (Exception e) {
+                log.error("배치 처리 중 전체 실패: batch {}-{}, error={}", i, endIndex, e.getMessage());
+                errorCount += batch.size();
+                batch.forEach(stmt -> errorIds.add(stmt.getId()));
+            }
+        }
+
+        BatchProcessResult result = new BatchProcessResult(
+                totalCount, processCount, errorCount, errorIds,
+                LocalDateTime.now().minusSeconds(1), LocalDateTime.now()
+        );
+
+        log.info("배치 발언 동기화 완료: 전체={}, 성공={}, 실패={}", totalCount, processCount, errorCount);
+        return result;
+    }
+
+    /**
+     * 개별 배치를 별도 트랜잭션으로 처리
+     * 하나의 배치에서 오류가 발생해도 다른 배치에 영향을 주지 않는다.
+     *
+     * @return
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public BatchResult processBatchStatements(List<StatementDocument> statements) {
+        List<TimelineEventDocument> events = new ArrayList<>();
+        List<String> errorIds = new ArrayList<>();
+        int successCount = 0;
+
+        for (StatementDocument statement : statements) {
+            try {
+                TimelineEventDocument event = createStatementEvent(statement, statement.getId());
+                events.add(event);
+                successCount++;
+            } catch (Exception e) {
+                log.warn("발언 처리 실패: statementId={}, error={}", statement.getId(), e.getMessage());
+                errorIds.add(statement.getId());
+            }
+        }
+
+        if (!events.isEmpty()) {
+            timelineRepository.saveAll(events);
+        }
+
+        return new BatchResult(successCount, errorIds.size(), errorIds);
+    }
+
+    /**
+     * 개선된 스케쥴러 - 배치 처리 적용
+     */
+    @Scheduled(cron = "0 0 0 * * ?")
+    @Transactional
+    public void syncStatementsToTimelineScheduled() {
+        LocalDate startDate = LocalDate.now().minusWeeks(1);
+        LocalDate endDate = LocalDate.now();
+
+        BatchProcessResult result = syncStatementsToTimelineBatch(startDate, endDate, 50);
+
+        if (!result.errorIds().isEmpty()) {
+            log.warn("실패한 발언들 재처리 시도: count={}", result.errorIds().size());
+            retryFailedStatements(result.errorIds());
+        }
+    }
+
+    /**
+     * 실패한 발언들을 개별적으로 재처리
+     * @param failedIds
+     */
+    @Async
+    public void retryFailedStatements(List<String> failedIds) {
+        for (String statementId : failedIds) {
+            try {
+                addStatementToTimeline(statementId);
+                log.info("재처리 성공: statementId={}", statementId);
+            } catch (Exception e) {
+                log.error("재처리 실패: statementId={}, error={}", statementId, e.getMessage());
+            }
+        }
     }
 
     /**
@@ -183,38 +297,38 @@ public class TimelineService {
         return TimelineEventResponse.from(savedEvent);
     }
 
-    /**
-     * 매일 자정에 실행되어 최근 1주일간의 발언 데이터를 자동으로 타임라인에 동기화합니다.
-     * 이미 등록된 발언은 건너뛰고 새로운 발언만 추가됩니다.
-     *
-     * 매일 자정 실행
-     */
-    @Scheduled(cron = "0 0 0 * * ?")
-    @Transactional
-    public void syncStatementsToTimeline() {
-        log.info("발언 데이터 타임라인 동기화 시작");
-
-        LocalDate startDate = LocalDate.now().minusWeeks(1);
-        List<StatementDocument> statements = statementRepository.findByPeriod(startDate, LocalDate.now());
-
-        int processedCount = 0;
-        int skippedCount = 0;
-
-        for (StatementDocument statement : statements) {
-            if (timelineRepository.existsBySourceTypeAndSourceId(SOURCE_TYPE_STATEMENT, statement.getId())) {
-                skippedCount++;
-                continue;
-            }
-
-            try {
-                addStatementToTimeline(statement.getId());
-                processedCount++;
-            } catch (Exception e) {
-                log.error("발언 동기화 중 오류 발생: statementId={}, error={}", statement.getId(), e.getMessage());
-            }
-        }
-        log.info("발언 데이터 타임라인 동기화 완료: 처리={}, 스킵={}, 전체={}", processedCount, skippedCount, statements.size());
-    }
+//    /**
+//     * 매일 자정에 실행되어 최근 1주일간의 발언 데이터를 자동으로 타임라인에 동기화합니다.
+//     * 이미 등록된 발언은 건너뛰고 새로운 발언만 추가됩니다.
+//     *
+//     * 매일 자정 실행
+//     */
+//    @Scheduled(cron = "0 0 0 * * ?")
+//    @Transactional
+//    public void syncStatementsToTimeline() {
+//        log.info("발언 데이터 타임라인 동기화 시작");
+//
+//        LocalDate startDate = LocalDate.now().minusWeeks(1);
+//        List<StatementDocument> statements = statementRepository.findByPeriod(startDate, LocalDate.now());
+//
+//        int processedCount = 0;
+//        int skippedCount = 0;
+//
+//        for (StatementDocument statement : statements) {
+//            if (timelineRepository.existsBySourceTypeAndSourceId(SOURCE_TYPE_STATEMENT, statement.getId())) {
+//                skippedCount++;
+//                continue;
+//            }
+//
+//            try {
+//                addStatementToTimeline(statement.getId());
+//                processedCount++;
+//            } catch (Exception e) {
+//                log.error("발언 동기화 중 오류 발생: statementId={}, error={}", statement.getId(), e.getMessage());
+//            }
+//        }
+//        log.info("발언 데이터 타임라인 동기화 완료: 처리={}, 스킵={}, 전체={}", processedCount, skippedCount, statements.size());
+//    }
 
     /**
      * 타임라인 이벤트 삭제

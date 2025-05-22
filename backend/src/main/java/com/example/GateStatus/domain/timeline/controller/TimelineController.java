@@ -4,6 +4,7 @@ import com.example.GateStatus.domain.timeline.TimelineEventType;
 import com.example.GateStatus.domain.timeline.service.TimelineEventRequest;
 import com.example.GateStatus.domain.timeline.service.TimelineEventResponse;
 import com.example.GateStatus.domain.timeline.service.TimelineService;
+import com.example.GateStatus.global.config.batch.BatchProcessResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -132,5 +133,13 @@ public class TimelineController {
         timelineService.deleteTimelineEvent(eventId);
         return ResponseEntity.noContent().build();
 
+    }
+
+    @PostMapping("/admin/sync-batch")
+    public ResponseEntity<BatchProcessResult> syncResult(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                                         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+                                                         @RequestParam(defaultValue = "50") int batchSize) {
+        BatchProcessResult result = timelineService.syncStatementsToTimelineBatch(startDate, endDate, batchSize);
+        return ResponseEntity.ok(result);
     }
 }
