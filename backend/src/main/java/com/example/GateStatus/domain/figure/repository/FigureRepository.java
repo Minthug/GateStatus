@@ -34,8 +34,6 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     List<Figure> findByFigureType(FigureType figureType);
 
-    List<Figure> findByNameContainingAndParty(String keyword, FigureParty party);
-
     List<Figure> findByFigureParty(FigureParty figureParty);
 
     List<Figure> findByNameContainingAndFigureParty(String name, FigureParty figureParty);

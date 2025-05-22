@@ -1,7 +1,6 @@
 package com.example.GateStatus.domain.figure.controller;
 
 import com.example.GateStatus.domain.common.SyncJobStatus;
-import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureService;
@@ -9,6 +8,8 @@ import com.example.GateStatus.domain.figure.service.request.RegisterFigureComman
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
 import com.example.GateStatus.domain.figure.service.request.UpdateFigureRequest;
 import com.example.GateStatus.domain.figure.service.response.*;
+import com.example.GateStatus.domain.vote.dto.BillVoteDTO;
+import com.example.GateStatus.domain.vote.service.VoteService;
 import com.example.GateStatus.global.config.open.ApiResponse;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,9 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +38,8 @@ public class FigureController {
     private final FigureApiService figureApiService;
     @Autowired
     private final CacheManager cacheManager;
+    @Autowired
+    private VoteService voteService;
 
     @PostMapping
     public ResponseEntity<RegisterFigureResponse> registerFigure(@RequestBody RegisterFigureCommand command) {
@@ -182,5 +188,11 @@ public class FigureController {
         } else {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    @GetMapping("/politician/votes")
+    public ResponseEntity<Page<BillVoteDTO>> getVotesByPoliticianName(@RequestParam String name,
+                                                                      @PageableDefault(size = 20, sort = "voteDate", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(voteService.getVotesByFigureName(name, pageable));
     }
 }
