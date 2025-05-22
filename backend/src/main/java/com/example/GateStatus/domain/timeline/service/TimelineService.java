@@ -171,7 +171,7 @@ public class TimelineService {
         Figure figure = getFigureOrThrow(figureId);
         validateCustomEventParameters(title, description, eventDate, type);
 
-        TimelineEventDocument event = createCustomEvent(figure, description, eventDate, type);
+        TimelineEventDocument event = createCustomEvent(figure, title, description, eventDate, type);
         TimelineEventDocument savedEvent = timelineRepository.save(event);
 
         log.info("커스텀 이벤트가 타임라인에 추가되었습니다: figureId={}, type={}, eventId={}", figureId, type, savedEvent.getId());
@@ -248,41 +248,139 @@ public class TimelineService {
         }
     }
 
+    /**
+     * 검색 키워드의 유효성을 검증
+     * @param keyword
+     */
     private void validateKeyword(String keyword) {
-
-    }
-
-
-    private TimelineEventDocument createStatementEvent(StatementDocument statement, String statementId) {
-        return null;
-    }
-
-    private Optional<TimelineEventDocument> findExistingEvent(String sourceTypeStatement, String statementId) {
-        return null;
-    }
-
-    private StatementDocument getStatementOrThrow(String statementId) {
-        return null;
-    }
-
-    private TimelineEventDocument createBillEvent(ProposedBillResponse billResponse, Figure figure, String billId) {
-        return null;
+        if (keyword == null || keyword.trim().isEmpty()) {
+            throw new IllegalArgumentException("검색 키워드는 비어있을 수 있습니다");
+        }
     }
 
     /**
-     *
+     * 정치인 엔티티를 조회하거나 예외를 발생시킴
      * @param figureId
      * @return
      */
     private Figure getFigureOrThrow(Long figureId) {
-        return null;
+        return figureRepository.findById(figureId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다: " + figureId));
     }
 
-    private TimelineEventDocument createCustomEvent(Figure figure, String description, LocalDate eventDate, TimelineEventType type) {
-        return null;
+    /**
+     * 발언 문서를 조회하거나 예외를 발생
+     * @param statementId
+     * @return
+     */
+    private StatementDocument getStatementOrThrow(String statementId) {
+        return statementRepository.findById(statementId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 발언이 존재하지 않습니다: " + statementId));
     }
 
+    /**
+     * 기존 타임라인 이벤트를 조회
+     * @return
+     */
+    private Optional<TimelineEventDocument> findExistingEvent(String sourceType, String statementId) {
+        List<TimelineEventDocument> events = timelineRepository.findBySourceTypeAndSourceId(sourceType, statementId);
+        return events.isEmpty() ? Optional.empty() : Optional.of(events.get(0));
+    }
+
+    /**
+     * 발언 기반 타임라인 이벤트를 생성
+     * @param statement
+     * @param statementId
+     * @return
+     */
+    private TimelineEventDocument createStatementEvent(StatementDocument statement, String statementId) {
+        return TimelineEventDocument.builder()
+                .figureId(statement.getFigureId())
+                .figureName(statement.getFigureName())
+                .eventDate(statement.getStatementDate())
+                .title(statement.getTitle())
+                .description(statement.getContent())
+                .eventType(TimelineEventType.STATEMENT)
+                .sourceType(SOURCE_TYPE_STATEMENT)
+                .sourceId(statementId)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+    }
+
+    /**
+     * 법안 기반 타임라인 이벤트를 생성
+     * @param billResponse
+     * @param figure
+     * @param billId
+     * @return
+     */
+    private TimelineEventDocument createBillEvent(ProposedBillResponse billResponse, Figure figure, String billId) {
+        Map<String, Object> additionalData = new HashMap<>();
+        additionalData.put("billStatus", billResponse.billStatus().toString());
+        additionalData.put("proposerCount", billResponse.coProposers().size() + 1);
+
+        return TimelineEventDocument.builder()
+                .figureId(figure.getId())
+                .figureName(figure.getName())
+                .eventDate(billResponse.processDate())
+                .title(billResponse.billName())
+                .description("법안 발의: " + billResponse.billName())
+                .eventType(TimelineEventType.BILL_PROPOSED)
+                .sourceType(SOURCE_TYPE_BILL)
+                .sourceId(billId)
+                .additionalData(additionalData)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+    }
+
+    /**
+     * 커스텀 타임라인 이벤트를 생성
+     * @param figure
+     * @param description
+     * @param eventDate
+     * @param type
+     * @return
+     */
+    private TimelineEventDocument createCustomEvent(Figure figure, String title, String description,
+                                                    LocalDate eventDate, TimelineEventType type) {
+        return TimelineEventDocument.builder()
+                .figureId(figure.getId())
+                .figureName(figure.getName())
+                .eventDate(eventDate)
+                .title(title)
+                .description(description)
+                .eventType(type)
+                .sourceType(SOURCE_TYPE_CUSTOM)
+                .sourceId(null)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+    }
+
+    /**
+     * 커스텀 이벤트 파라미터의 유효성을 검증
+     * @param title
+     * @param description
+     * @param eventDate
+     * @param type
+     */
     private void validateCustomEventParameters(String title, String description, LocalDate eventDate, TimelineEventType type) {
+        if (title == null || title.trim().isEmpty()) {
+            throw new IllegalArgumentException("이벤트 제목은 비어있을 수 없습니다");
+        }
 
+        if (description == null || description.trim().isEmpty()) {
+            throw new IllegalArgumentException("이벤트 설명은 비어있을 수 없습니다");
+        }
+
+        if (eventDate == null) {
+            throw new IllegalArgumentException("이벤트 날짜는 필수입니다");
+        }
+
+        if (type == null) {
+            throw new IllegalArgumentException("이벤트 타입은 필수입니다");
+        }
     }
 }
