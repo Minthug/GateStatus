@@ -189,10 +189,4 @@ public class FigureController {
             return ResponseEntity.notFound().build();
         }
     }
-
-    @GetMapping("/politician/votes")
-    public ResponseEntity<Page<BillVoteDTO>> getVotesByPoliticianName(@RequestParam String name,
-                                                                      @PageableDefault(size = 20, sort = "voteDate", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(voteService.getVotesByFigureName(name, pageable));
-    }
 }
