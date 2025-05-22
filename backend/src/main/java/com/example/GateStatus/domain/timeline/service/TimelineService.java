@@ -39,6 +39,11 @@ public class TimelineService {
     private static final String SOURCE_TYPE_BILL = "BILL";
     private static final String SOURCE_TYPE_CUSTOM = "CUSTOM";
 
+    @Transactional
+    public BatchProcessResult syncStatementsToTimelineBatch(LocalDate startDate, LocalDate endDate, int batchSize) {
+
+    }
+
     /**
      * 특정 정치인의 전체 타임라인을 최신순으로 조회
      * @param figureId
