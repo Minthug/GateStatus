@@ -14,8 +14,8 @@ import com.example.GateStatus.global.config.batch.BatchResult;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -41,122 +41,131 @@ public class TimelineService {
     private static final String SOURCE_TYPE_STATEMENT = "STATEMENT";
     private static final String SOURCE_TYPE_BILL = "BILL";
     private static final String SOURCE_TYPE_CUSTOM = "CUSTOM";
+    private static final int DEFAULT_BATCH_SIZE = 50;
 
-    /**
-     * 발언 데이터를 배치로 타임라인에 동기화
-     * 대량의 발언 데이터를 효율적으로 처리하기 위해 배치 단위로 분할하여 처리
-     * @param startDate
-     * @param endDate
-     * @param batchSize
-     * @return
-     */
-    @Transactional
-    public BatchProcessResult syncStatementsToTimelineBatch(LocalDate startDate, LocalDate endDate, int batchSize) {
-        log.info("배치 발언 동기화 시작: {} ~ {}, batchSize={}", startDate, endDate, batchSize);
 
-        List<StatementDocument> allStatements = statementRepository.findByPeriod(startDate, endDate);
 
-        List<StatementDocument> newStatements = allStatements.stream()
-                .filter(statement -> !timelineRepository.existsBySourceTypeAndSourceId(
-                        SOURCE_TYPE_STATEMENT, statement.getId()))
-                .collect(Collectors.toList());
 
-        int totalCount = newStatements.size();
-        int processCount = 0;
-        int errorCount = 0;
-        List<String> errorIds = new ArrayList<>();
 
-        for (int i = 0; i < totalCount; i += batchSize) {
-            int endIndex = Math.min(i + batchSize, totalCount);
-            List<StatementDocument> batch = newStatements.subList(i, endIndex);
+// ============================================
+// 향후 확장용 고급 배치 처리 (Advanced Version)
+// 대용량 처리 필요시 활성화 예정
+// ============================================
+        /**
+         * 발언 데이터를 배치로 타임라인에 동기화
+         * 대량의 발언 데이터를 효율적으로 처리하기 위해 배치 단위로 분할하여 처리
+         * @param startDate
+         * @param endDate
+         * @param batchSize
+         * @return
+         */
+        @Transactional
+        public BatchProcessResult syncStatementsToTimelineBatch(LocalDate startDate, LocalDate endDate, int batchSize) {
+            log.info("배치 발언 동기화 시작: {} ~ {}, batchSize={}", startDate, endDate, batchSize);
 
-            try {
-                BatchResult batchResult = processBatchStatements(batch);
-                processCount += batchResult.successCount();
-                errorCount += batchResult.errorCount();
-                errorIds.addAll(batchResult.errorIds());
+            List<StatementDocument> allStatements = statementRepository.findByPeriod(startDate, endDate);
 
-                log.debug("배치 처리 완료: {}/{}, 성공={}, 실패={}",
-                        endIndex, totalCount, batchResult.successCount(), batchResult.errorCount());
+            List<StatementDocument> newStatements = allStatements.stream()
+                    .filter(statement -> !timelineRepository.existsBySourceTypeAndSourceId(
+                            SOURCE_TYPE_STATEMENT, statement.getId()))
+                    .collect(Collectors.toList());
 
-            } catch (Exception e) {
-                log.error("배치 처리 중 전체 실패: batch {}-{}, error={}", i, endIndex, e.getMessage());
-                errorCount += batch.size();
-                batch.forEach(stmt -> errorIds.add(stmt.getId()));
+            int totalCount = newStatements.size();
+            int processCount = 0;
+            int errorCount = 0;
+            List<String> errorIds = new ArrayList<>();
+
+            for (int i = 0; i < totalCount; i += batchSize) {
+                int endIndex = Math.min(i + batchSize, totalCount);
+                List<StatementDocument> batch = newStatements.subList(i, endIndex);
+
+                try {
+                    BatchResult batchResult = processBatchStatements(batch);
+                    processCount += batchResult.successCount();
+                    errorCount += batchResult.errorCount();
+                    errorIds.addAll(batchResult.errorIds());
+
+                    log.debug("배치 처리 완료: {}/{}, 성공={}, 실패={}",
+                            endIndex, totalCount, batchResult.successCount(), batchResult.errorCount());
+
+                } catch (Exception e) {
+                    log.error("배치 처리 중 전체 실패: batch {}-{}, error={}", i, endIndex, e.getMessage());
+                    errorCount += batch.size();
+                    batch.forEach(stmt -> errorIds.add(stmt.getId()));
+                }
+            }
+
+            BatchProcessResult result = new BatchProcessResult(
+                    totalCount, processCount, errorCount, errorIds,
+                    LocalDateTime.now().minusSeconds(1), LocalDateTime.now()
+            );
+
+            log.info("배치 발언 동기화 완료: 전체={}, 성공={}, 실패={}", totalCount, processCount, errorCount);
+            return result;
+        }
+
+        /**
+         * 개별 배치를 별도 트랜잭션으로 처리
+         * 하나의 배치에서 오류가 발생해도 다른 배치에 영향을 주지 않는다.
+         *
+         * @return
+         */
+        @Transactional(propagation = Propagation.REQUIRES_NEW)
+        public BatchResult processBatchStatements(List<StatementDocument> statements) {
+            List<TimelineEventDocument> events = new ArrayList<>();
+            List<String> errorIds = new ArrayList<>();
+            int successCount = 0;
+
+            for (StatementDocument statement : statements) {
+                try {
+                    TimelineEventDocument event = createStatementEvent(statement, statement.getId());
+                    events.add(event);
+                    successCount++;
+                } catch (Exception e) {
+                    log.warn("발언 처리 실패: statementId={}, error={}", statement.getId(), e.getMessage());
+                    errorIds.add(statement.getId());
+                }
+            }
+
+            if (!events.isEmpty()) {
+                timelineRepository.saveAll(events);
+            }
+
+            return new BatchResult(successCount, errorIds.size(), errorIds);
+        }
+
+        /**
+         * 개선된 스케쥴러 - 배치 처리 적용
+         */
+//        @Scheduled(cron = "0 0 0 * * ?")
+        @Transactional
+        public void syncStatementsToTimelineScheduled() {
+            LocalDate startDate = LocalDate.now().minusWeeks(1);
+            LocalDate endDate = LocalDate.now();
+
+            BatchProcessResult result = syncStatementsToTimelineBatch(startDate, endDate, 50);
+
+            if (!result.errorIds().isEmpty()) {
+                log.warn("실패한 발언들 재처리 시도: count={}", result.errorIds().size());
+                retryFailedStatements(result.errorIds());
             }
         }
 
-        BatchProcessResult result = new BatchProcessResult(
-                totalCount, processCount, errorCount, errorIds,
-                LocalDateTime.now().minusSeconds(1), LocalDateTime.now()
-        );
-
-        log.info("배치 발언 동기화 완료: 전체={}, 성공={}, 실패={}", totalCount, processCount, errorCount);
-        return result;
-    }
-
-    /**
-     * 개별 배치를 별도 트랜잭션으로 처리
-     * 하나의 배치에서 오류가 발생해도 다른 배치에 영향을 주지 않는다.
-     *
-     * @return
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public BatchResult processBatchStatements(List<StatementDocument> statements) {
-        List<TimelineEventDocument> events = new ArrayList<>();
-        List<String> errorIds = new ArrayList<>();
-        int successCount = 0;
-
-        for (StatementDocument statement : statements) {
-            try {
-                TimelineEventDocument event = createStatementEvent(statement, statement.getId());
-                events.add(event);
-                successCount++;
-            } catch (Exception e) {
-                log.warn("발언 처리 실패: statementId={}, error={}", statement.getId(), e.getMessage());
-                errorIds.add(statement.getId());
+        /**
+         * 실패한 발언들을 개별적으로 재처리
+         * @param failedIds
+         */
+        @Async
+        public void retryFailedStatements(List<String> failedIds) {
+            for (String statementId : failedIds) {
+                try {
+                    addStatementToTimeline(statementId);
+                    log.info("재처리 성공: statementId={}", statementId);
+                } catch (Exception e) {
+                    log.error("재처리 실패: statementId={}, error={}", statementId, e.getMessage());
+                }
             }
         }
-
-        if (!events.isEmpty()) {
-            timelineRepository.saveAll(events);
-        }
-
-        return new BatchResult(successCount, errorIds.size(), errorIds);
-    }
-
-    /**
-     * 개선된 스케쥴러 - 배치 처리 적용
-     */
-    @Scheduled(cron = "0 0 0 * * ?")
-    @Transactional
-    public void syncStatementsToTimelineScheduled() {
-        LocalDate startDate = LocalDate.now().minusWeeks(1);
-        LocalDate endDate = LocalDate.now();
-
-        BatchProcessResult result = syncStatementsToTimelineBatch(startDate, endDate, 50);
-
-        if (!result.errorIds().isEmpty()) {
-            log.warn("실패한 발언들 재처리 시도: count={}", result.errorIds().size());
-            retryFailedStatements(result.errorIds());
-        }
-    }
-
-    /**
-     * 실패한 발언들을 개별적으로 재처리
-     * @param failedIds
-     */
-    @Async
-    public void retryFailedStatements(List<String> failedIds) {
-        for (String statementId : failedIds) {
-            try {
-                addStatementToTimeline(statementId);
-                log.info("재처리 성공: statementId={}", statementId);
-            } catch (Exception e) {
-                log.error("재처리 실패: statementId={}, error={}", statementId, e.getMessage());
-            }
-        }
-    }
 
     /**
      * 특정 정치인의 전체 타임라인을 최신순으로 조회
@@ -171,6 +180,12 @@ public class TimelineService {
         return timelineRepository.findByFigureIdOrderByEventDateDesc(figureId, pageable)
                 .map(TimelineEventResponse::from);
     }
+
+
+// ============================================
+// 향후 확장용 고급 배치 처리 (Advanced Version)
+// 대용량 처리 필요시 활성화 예정
+// ============================================
 
     /**
      * 특정 정치인의 타임라인 조회 (타입 필터링)
@@ -343,6 +358,85 @@ public class TimelineService {
         timelineRepository.delete(event);
         log.info("타임라인 이벤트 삭제: {}", eventId);
     }
+
+    // ============================================
+// 현재 사용중인 배치 처리 (Simple Version)
+// ============================================
+
+    /**
+     * 🎯 핵심 개선: 배치 처리로 발언 데이터 동기화
+     * 매일 자정 실행 - 메모리 효율적 처리
+     */
+    @Scheduled(cron = "0 0 0 * * ?")
+    @Transactional
+    public void syncStatementsToTimeline() {
+        log.info("발언 데이터 타임라인 동기화 시작");
+
+        LocalDate startDate = LocalDate.now().minusWeeks(1);
+        LocalDate endDate = LocalDate.now();
+
+        // 🔥 핵심 개선: 배치 처리
+        int totalProcessed = syncStatementsInBatches(startDate, endDate);
+
+        log.info("발언 데이터 타임라인 동기화 완료: {} 건 처리", totalProcessed);
+    }
+
+    /**
+     * 🚀 배치 처리 핵심 메서드
+     * - 50개씩 나눠서 처리하여 메모리 효율성 확보
+     * - 개별 실패가 전체에 영향주지 않도록 격리
+     * - 진행상황 실시간 추적 가능
+     */
+    private int syncStatementsInBatches(LocalDate startDate, LocalDate endDate) {
+        int processedCount = 0;
+        int batchNumber = 0;
+
+        while (true) {
+            // 페이징으로 배치별 조회 (메모리 효율적)
+            Pageable pageable = PageRequest.of(batchNumber, DEFAULT_BATCH_SIZE);
+            List<StatementDocument> batch = statementRepository
+                    .findByStatementDateBetween(startDate, endDate, pageable);
+
+            if (batch.isEmpty()) {
+                break; // 더 이상 처리할 데이터 없음
+            }
+
+            log.info("배치 {} 처리 시작: {} 건", batchNumber + 1, batch.size());
+
+            // 배치 내에서 개별 처리
+            int batchProcessed = 0;
+            for (StatementDocument statement : batch) {
+                try {
+                    if (!timelineRepository.existsBySourceTypeAndSourceId(SOURCE_TYPE_STATEMENT, statement.getId())) {
+                        addStatementToTimeline(statement.getId());
+                        batchProcessed++;
+                        processedCount++;
+                    }
+                } catch (Exception e) {
+                    // 개별 실패는 로그만 남기고 계속 진행
+                    log.error("발언 동기화 실패: statementId={}, error={}",
+                            statement.getId(), e.getMessage());
+                }
+            }
+
+            batchNumber++;
+            log.info("배치 {} 처리 완료: {}/{} 건 성공", batchNumber, batchProcessed, batch.size());
+
+            // DB 부하 방지를 위한 잠시 대기 (마지막 배치가 아닌 경우)
+            if (batch.size() == DEFAULT_BATCH_SIZE) {
+                try {
+                    Thread.sleep(100); // 0.1초 대기
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.warn("배치 처리 중단됨");
+                    break;
+                }
+            }
+        }
+
+        return processedCount;
+    }
+
 
 
     // === Private Helper Methods ===

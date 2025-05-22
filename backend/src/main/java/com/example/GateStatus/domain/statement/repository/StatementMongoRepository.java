@@ -101,4 +101,9 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
             "{ $limit: 50 }"
     })
     List<KeywordCount> findTopKeywords(Long figureId, List<String> stopwords);
+
+
+    // 🆕 배치 처리용 메서드 추가
+    @Query("{'statementDate': {$gte: ?0, $lte: ?1}}")
+    List<StatementDocument> findByStatementDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
 }
