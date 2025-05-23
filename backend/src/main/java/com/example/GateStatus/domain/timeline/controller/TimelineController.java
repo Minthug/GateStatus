@@ -134,12 +134,4 @@ public class TimelineController {
         return ResponseEntity.noContent().build();
 
     }
-
-    @PostMapping("/admin/sync-batch")
-    public ResponseEntity<BatchProcessResult> syncResult(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-                                                         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-                                                         @RequestParam(defaultValue = "50") int batchSize) {
-        BatchProcessResult result = timelineService.syncStatementsToTimelineBatch(startDate, endDate, batchSize);
-        return ResponseEntity.ok(result);
-    }
 }
