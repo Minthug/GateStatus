@@ -5,7 +5,6 @@ import com.example.GateStatus.domain.issue.IssueCategory;
 import com.example.GateStatus.domain.issue.service.IssueService;
 import com.example.GateStatus.domain.issue.service.request.IssueRequest;
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -13,9 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import retrofit2.http.Path;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -285,7 +282,7 @@ public class IssueController {
     public ResponseEntity<Page<IssueResponse>> getIssuesByParentCategory(@PathVariable Long categoryId,
                                                                          @RequestParam(defaultValue = "0") int page,
                                                                          @RequestParam(defaultValue = "10") int size) {
-        Page<IssueResponse> issues = issueService.findIssueByParentCategory(categoryId, page, size);
+        Page<IssueResponse> issues = issueService.getIssueByParentCategory(categoryId, page, size);
 
         return ResponseEntity.ok(issues);
     }
