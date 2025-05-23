@@ -16,6 +16,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -336,7 +337,7 @@ public class IssueService {
             }
         }
 
-        log.debug("관련 이슈 검색 완료: issueId={}, 찾은 개수={}", issueId, relatedByCategory.size())
+        log.debug("관련 이슈 검색 완료: issueId={}, 찾은 개수={}", issueId, relatedByCategory.size());
         return relatedByCategory.stream()
                 .map(IssueResponse::from)
                 .collect(Collectors.toList());
@@ -449,5 +450,10 @@ public class IssueService {
         } catch (IllegalArgumentException e) {
             throw new InvalidCategoryException("유효하지 않은 카테고리 코드: " + code);
         }
+    }
+
+    @Async
+    public void autoLinkToRelatedIssues(String contentType, String contentId, String content) {
+
     }
 }

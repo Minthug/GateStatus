@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
-public class issueStatsService {
+public class IssueStatsService {
 
 
     private static final String VIEW_COUNT_KEY = "issue:%d:views";
