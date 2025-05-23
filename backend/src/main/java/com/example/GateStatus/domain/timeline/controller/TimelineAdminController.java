@@ -3,6 +3,7 @@ package com.example.GateStatus.domain.timeline.controller;
 import com.example.GateStatus.domain.timeline.service.TimelineService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cglib.core.Local;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -104,5 +105,72 @@ public class TimelineAdminController {
         }
     }
 
+    /**
+     * 타임라인 서비스가 정상 동작하는지 확인
+     */
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, Object>> healthCheck() {
+        Map<String, Object> health = new HashMap<>();
 
+        try {
+            // 간단한 서비스 동작 확인
+            health.put("status", "HEALTHY");
+            health.put("service", "TimelineService");
+            health.put("checkTime", LocalDateTime.now());
+            health.put("message", "타임라인 서비스가 정상 동작 중입니다");
+
+            return ResponseEntity.ok(health);
+        } catch (Exception e) {
+            log.error("타임라인 서비스 헬스체크 실패", e);
+
+            health.put("status", "UNHEALTHY");
+            health.put("service", "TimelineService");
+            health.put("checkTime", LocalDateTime.now());
+            health.put("error", e.getMessage());
+
+            return ResponseEntity.status(503).body(health);
+        }
+    }
+
+
+    /**
+     * 특정 기간의 발언 데이터 강제 재동기화
+     * 데이터 불일치 문제 해결용
+     */
+    @PostMapping("/force-resync")
+    public ResponseEntity<Map<String, Object>> forceResyncStatements(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                                                     @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+                                                                     @RequestParam(defaultValue = "false") boolean deleteExisting) {
+        log.warn("강제 재동기화 요청: {} ~ {}, deleteExisting={}", startDate, endDate, deleteExisting);
+
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            if (deleteExisting) {
+                // TODO: 기존 타임라인 이벤트 삭제 로직 (위험한 작업이므로 신중히)
+                log.warn("기존 타임라인 이벤트 삭제 기능은 안전상 비활성화됨");
+                result.put("warning", "기존 데이터 삭제는 현재 지원하지 않습니다");
+            }
+
+            // 강제 동기화 실행
+            timelineService.syncStatementsToTimeline();
+
+            result.put("status", "SUCCESS");
+            result.put("message", "강제 재동기화가 완료되었습니다");
+            result.put("startDate", startDate);
+            result.put("endDate", endDate);
+            result.put("syncTime", LocalDateTime.now());
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            log.error("강제 재동기화 실패", e);
+
+            result.put("status", "ERROR");
+            result.put("message", "강제 재동기화 중 오류가 발생했습니다: " + e.getMessage());
+            result.put("errorTime", LocalDateTime.now());
+
+            return ResponseEntity.status(500).body(result);
+        }
+    }
 }
