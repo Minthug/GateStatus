@@ -8,7 +8,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Configuration
 public class NewsConfig {
 
-    @Value("{}")
+    @Value("${news.api.naver.base-url}")
     private String naverBaseUrl;
 
 

@@ -52,7 +52,17 @@ public interface NewsRepository extends MongoRepository<NewsDocument, String> {
     @Query("{'processed': true, 'relatedIssueId': null}")
     Page<NewsDocument> findProcessedButUnlinkedNews(Pageable pageable);
 
+    // 특정 날짜 이후 발행된 뉴스 조회
+    List<NewsDocument> findByPubDateAfter(LocalDateTime date);
+
+    // 컨텐츠 해시와 생성일로 중복 체크
+    List<NewsDocument> findByContentHashAndCreatedAtAfter(String contentHash, LocalDateTime createdAt);
+
+    // 오래된 뉴스 삭제용
+    void deleteByCreatedAtBefore(LocalDateTime date);
+
     // 특정 키워드를 포함한 최근 N시간 내 뉴스 개수
     @Query(value = "{'extractedKeywords': ?0, 'pubDate': {$gte: ?1}}", count = true)
     long countRecentNewsByKeyword(String keyword, LocalDateTime since);
+
 }
