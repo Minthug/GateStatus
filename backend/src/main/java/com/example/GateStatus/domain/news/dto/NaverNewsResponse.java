@@ -1,9 +1,10 @@
 package com.example.GateStatus.domain.news.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Data;
 
 import java.util.List;
+
+import static com.example.GateStatus.domain.common.HtmlUtils.removeHtmlTags;
 
 public record NaverNewsResponse(
         @JsonProperty("lastBuildDate") String lastBuildDate,
@@ -23,38 +24,8 @@ public record NaverNewsResponse(
             @JsonProperty("description") String description,
             @JsonProperty("pubDate") String pubDate
     ) {
-        /**
-         * HTML 태그가 제거된 제목 반환
-         * @return 클린한 제목
-         */
-        public String getCleanTitle() {
-            return removeHtmlTags(title);
-        }
 
-        /**
-         * HTML 태그가 제거된 설명 반환
-         * @return 클린한 설명
-         */
-        public String getCleanDescription() {
-            return removeHtmlTags(description);
-        }
-
-        /**
-         * HTML 태그 제거 헬퍼 메서드
-         */
-        private static String removeHtmlTags(String html) {
-            if (html == null) return "";
-
-            return html.replaceAll("<[^>]*>", "")
-                    .replaceAll("&quot;", "\"")
-                    .replaceAll("&amp;", "&")
-                    .replaceAll("&lt;", "<")
-                    .replaceAll("&gt;", ">")
-                    .replaceAll("&nbsp;", " ")
-                    .trim();
-        }
     }
-
     /**
      * 유효한 응답인지 확인
      * @return 아이템이 있으면 true
