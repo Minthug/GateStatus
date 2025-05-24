@@ -452,6 +452,17 @@ public class IssueService {
         }
     }
 
+    /**
+     * 뉴스와 이슈 연결
+     * @param issueId
+     * @param newsId
+     */
+    public void linkNewsToIssue(String issueId, String newsId) {
+        IssueDocument issue = findByIssueById(issueId);
+        issue.getRelatedNewsIds().add(newsId);
+        issueRepository.save(issue);
+    }
+
     @Async
     public void autoLinkToRelatedIssues(String contentType, String contentId, String content) {
 

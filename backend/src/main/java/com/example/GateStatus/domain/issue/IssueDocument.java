@@ -64,6 +64,9 @@ public class IssueDocument {
     private List<Long> relatedFigureIds = new ArrayList<>();
 
     @Builder.Default
+    private List<String> relatedNewsIds = new ArrayList<>();
+
+    @Builder.Default
     private List<String> tags = new ArrayList<>();
 
     @CreatedDate
