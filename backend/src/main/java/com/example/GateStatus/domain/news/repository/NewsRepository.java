@@ -58,6 +58,8 @@ public interface NewsRepository extends MongoRepository<NewsDocument, String> {
     // 컨텐츠 해시와 생성일로 중복 체크
     List<NewsDocument> findByContentHashAndCreatedAtAfter(String contentHash, LocalDateTime createdAt);
 
+    List<NewsDocument> findByProcessedFalseAndPubDateAfterOrderByViewCountDesc(LocalDateTime cutoff);
+
     // 오래된 뉴스 삭제용
     void deleteByCreatedAtBefore(LocalDateTime date);
 
@@ -65,4 +67,5 @@ public interface NewsRepository extends MongoRepository<NewsDocument, String> {
     @Query(value = "{'extractedKeywords': ?0, 'pubDate': {$gte: ?1}}", count = true)
     long countRecentNewsByKeyword(String keyword, LocalDateTime since);
 
+    Page<NewsDocument> findByRelatedIssueIdIsNull(Pageable pageable);
 }

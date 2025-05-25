@@ -30,6 +30,8 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     Page<Figure> findByNameContaining(String name, Pageable pageable);
 
+    List<Figure> findByNameContaining(String name);
+
     Page<Figure> findByConstituencyContaining(String place, Pageable pageable);
 
     List<Figure> findByFigureType(FigureType figureType);
