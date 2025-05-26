@@ -76,6 +76,8 @@ public interface NewsRepository extends MongoRepository<NewsDocument, String> {
 
     Page<NewsDocument> findByPubDateBetween(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
 
+    List<NewsDocument> findByPubDateBetween(LocalDateTime startDate, LocalDateTime endDate);
+
     Page<NewsDocument> findByRelatedIssueIdIsNullOrderByPubDateDesc(Pageable pageable);
 
     long deleteByCreatedAtBeforeAndRelatedIssueIdIsNull(LocalDateTime cutoffDate);

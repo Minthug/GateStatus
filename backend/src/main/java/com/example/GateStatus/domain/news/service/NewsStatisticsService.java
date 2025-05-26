@@ -1,12 +1,16 @@
 package com.example.GateStatus.domain.news.service;
 
 import com.example.GateStatus.domain.news.NewsDocument;
+import com.example.GateStatus.domain.news.dto.CategoryStats;
+import com.example.GateStatus.domain.news.dto.FigureMentionStats;
 import com.example.GateStatus.domain.news.dto.KeywordStats;
 import com.example.GateStatus.domain.news.dto.TrendingKeyword;
 import com.example.GateStatus.domain.news.repository.NewsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cglib.core.Local;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -148,17 +152,135 @@ public class NewsStatisticsService {
                 .collect(Collectors.toList());
     }
 
-    public Map<String, Integer> getHourlyDistribution(LocalDateTime date) {
+    /**
+     * 시간대별 뉴스 발행량 분포
+     * 특정 날짜의 24시간 뉴스 발행 패턴 분석
+     * @param date
+     * @return
+     */
+    public Map<String, Integer> getHourlyDistribution(LocalDateTime date, Pageable pageable) {
+        LocalDateTime startOfDay = date.toLocalDate().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1);
 
+        log.info("시간대별 뉴스 분포 분석: {}", date.toLocalDate());
 
+        // 해당 날짜의 모든 뉴스 조회
+        List<NewsDocument> dailyNews = newsRepository.findByPubDateBetween(startOfDay, endOfDay);
+
+        // 시간대별 집계
+        Map<Integer, Integer> hourlyCount = new TreeMap<>();
+
+        // 0 - 23 시 초기화
+        for (int i = 0; i < 24; i++) {
+            hourlyCount.put(i, 0);
+        }
+
+        // 뉴스 시간대별 분류
+        for (NewsDocument news : dailyNews) {
+            int hours = news.getPubDate().getHour();
+            hourlyCount.merge(hours, 1, Integer::sum);
+        }
+
+        // 결과를 보기 좋게 변환
+        Map<String, Integer> result = new LinkedHashMap<>();
+        hourlyCount.forEach((hour, count) -> {
+            String timeRange = String.format("%02d:00-%02d:59", hour, hour);
+            result.put(timeRange, count);
+        });
+
+        // 통계 정보 로깅
+        int totalNews = dailyNews.size();
+        int peakHour = hourlyCount.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(0);
+
+        log.info("일일 뉴스 총 {}건, 피크 시간대: {}시 ({}건)",
+                totalNews, peakHour, hourlyCount.get(peakHour));
+
+        return result;
     }
 
+    /**
+     * 카테고리별 뉴스 분포 통계
+     * @param start
+     * @param end
+     * @return
+     */
+    public Map<String, CategoryStats> getCategoryDistribution(LocalDateTime start, LocalDateTime end) {
+        List<NewsDocument> news = newsRepository.findByPubDateBetween(start, end);
 
+        Map<String, CategoryStats> categoryStatsMap = new HashMap<>();
+
+        for (NewsDocument doc : news) {
+            String category = doc.getCategory() != null ? doc.getCategory() : "UNKNOWN";
+
+            categoryStatsMap.computeIfAbsent(category, k -> new CategoryStats(k))
+                    .addNews(doc);
+        }
+        return categoryStatsMap;
+    }
+
+    /**
+     * 정치인별 언급 통계
+     * @param start
+     * @param end
+     * @param limit
+     * @return
+     */
+    public List<FigureMentionStats> getTopMentionedFigures(LocalDateTime start, LocalDateTime end, int limit) {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(
+                        Criteria.where("pubDate").gte(start).lte(end)
+                                .and("mentionedFiguresIds").exists(true).ne(null)
+                ),
+                Aggregation.unwind("mentionedFiguresIds"),
+                Aggregation.group("mentionedFiguresIds")
+                        .count().as("mentionCount")
+                        .addToSet("category").as("categories"),
+                Aggregation.sort(Sort.Direction.DESC, "mentionCount"),
+                Aggregation.limit(limit),
+                Aggregation.project()
+                        .and("_id").as("figureId")
+                        .and("mentionCount").as("count")
+                        .and("categories").as("mentionedInCategories")
+        );
+
+        return mongoTemplate.aggregate(
+                aggregation,
+                NewsDocument.class,
+                FigureMentionStats.class
+        ).getMappedResults();
+    }
+
+    /**
+     * 인기도 가중치 계산
+     * @param news
+     * @return
+     */
     private double calculatePopularityWeight(NewsDocument news) {
+        int viewCount = news.getViewCount() != null ? news.getViewCount() : 0;
+        int commentCount = news.getCommentCount() != null ? news.getCommentCount() : 0;
+
+        double viewScore = Math.log10(1 + viewCount);
+        double commentScore = Math.log10(1 + commentCount) * 2; // 댓글에 더 높은 가중치
+
+        return 1 + (viewScore + commentScore) / 10;
     }
 
-    private double calculateTimeWeight(LocalDateTime pubDate, int hours) {
-        return 0;
+    /**
+     * 시간 가중치 계산 (최신일수록 높은 가중치)
+     * @param pubDate
+     * @return
+     */
+    private double calculateTimeWeight(LocalDateTime pubDate, int totalHours) {
+        long hoursAgo = ChronoUnit.HOURS.between(pubDate, LocalDateTime.now());
+
+        // 지수 감소 함수 사용 (e^(-x))
+        double decayFactor = Math.exp(-hoursAgo / (double) totalHours);
+
+        // 최소 가중치 0.1 보장
+        return Math.max(decayFactor, 0.1);
     }
 
     private static class TrendScore {
