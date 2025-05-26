@@ -6,6 +6,7 @@ import com.example.GateStatus.domain.news.dto.TrendingKeyword;
 import com.example.GateStatus.domain.news.repository.NewsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -14,9 +15,8 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -101,7 +101,105 @@ public class NewsStatisticsService {
         return results.getMappedResults();
     }
 
+    /**
+     * 실시간 트렌드 키워드 계산
+     * 시간 가중치와 인기도를 고려한 트렌드 점수 계산
+     * @param hours
+     * @return
+     */
+    public List<TrendingKeyword> calculateTrendingKeywords(int hours) {
+        LocalDateTime cutoff = LocalDateTime.now().minusHours(hours);
 
-    public List<TrendingKeyword> calculateTrendingKeywords(int hours) { }
-    public Map<String, Integer> getHourlyDistribution(LocalDateTime date) { }
+        log.info("트렌딩 키워드 계산: 최근 {}시간", hours);
+
+        // 최근 뉴스 조회
+        List<NewsDocument> recentNews = newsRepository.findByPubDateAfterOrderByPubDateDesc(cutoff);
+
+        // 키워드별 트렌드 점수 계산
+        Map<String, TrendScore> trendScores = new HashMap<>();
+
+        for (NewsDocument news : recentNews) {
+            if (news.getExtractedKeywords() == null) continue;
+
+            double timeWeight = calculateTimeWeight(news.getPubDate(), hours);
+
+            double popularityWeight = calculatePopularityWeight(news);
+
+            for (String keyword : news.getExtractedKeywords()) {
+                if (keyword == null || keyword.trim().isEmpty()) continue;
+
+                trendScores.computeIfAbsent(keyword, k -> new TrendScore())
+                        .addScore(timeWeight * popularityWeight)
+                        .incrementCount()
+                        .addNewsId(news.getId());
+            }
+        }
+
+        return trendScores.entrySet().stream()
+                .map(entry -> new TrendingKeyword(
+                        entry.getKey(),
+                        entry.getValue().getScore(),
+                        entry.getValue().getCount(),
+                        entry.getValue().getGrowthRate(hours),
+                        entry.getValue().getRecentNewsIds()
+                ))
+                .sorted(Comparator.comparing(TrendingKeyword::score).reversed())
+                .limit(20)
+                .collect(Collectors.toList());
+    }
+
+    public Map<String, Integer> getHourlyDistribution(LocalDateTime date) {
+
+
+    }
+
+
+    private double calculatePopularityWeight(NewsDocument news) {
+    }
+
+    private double calculateTimeWeight(LocalDateTime pubDate, int hours) {
+        return 0;
+    }
+
+    private static class TrendScore {
+        private Double score = 0.0;
+        private int count = 0;
+        private List<String> recentNewsIds = new ArrayList<>();
+        private LocalDateTime firstSeen = LocalDateTime.now();
+
+        public TrendScore addScore(double points) {
+            this.score += points;
+            return this;
+        }
+
+        public TrendScore incrementCount() {
+            this.count++;
+            return this;
+        }
+
+        public TrendScore addNewsId(String newsId) {
+            if (recentNewsIds.size() < 5) {
+                recentNewsIds.add(newsId);
+            }
+            return this;
+        }
+
+        public double getScore() {
+            return score;
+        }
+
+        public int getCount() {
+            return count;
+        }
+
+        public List<String> getRecentNewsIds() {
+            return recentNewsIds;
+        }
+
+        public double getGrowthRate(int hours) {
+            long hoursElapsed = ChronoUnit.HOURS.between(firstSeen, LocalDateTime.now());
+            if (hoursElapsed == 0) return score;
+            return score / hoursElapsed;
+        }
+    }
 }

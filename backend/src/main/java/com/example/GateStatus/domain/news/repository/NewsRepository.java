@@ -79,4 +79,6 @@ public interface NewsRepository extends MongoRepository<NewsDocument, String> {
     Page<NewsDocument> findByRelatedIssueIdIsNullOrderByPubDateDesc(Pageable pageable);
 
     long deleteByCreatedAtBeforeAndRelatedIssueIdIsNull(LocalDateTime cutoffDate);
+
+    List<NewsDocument> findByPubDateAfterOrderByPubDateDesc(LocalDateTime cutoff);
 }
