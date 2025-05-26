@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.repository.Query;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface NewsRepository extends MongoRepository<NewsDocument, String> {
 
@@ -68,4 +69,12 @@ public interface NewsRepository extends MongoRepository<NewsDocument, String> {
     long countRecentNewsByKeyword(String keyword, LocalDateTime since);
 
     Page<NewsDocument> findByRelatedIssueIdIsNull(Pageable pageable);
+
+    Optional<NewsDocument> findByContentHash(String contentHash);
+
+    Page<NewsDocument> findAllByOrderByPubDateDesc(Pageable pageable);
+
+    Page<NewsDocument> findByCategoryOrderByPubDateDesc(String category, Pageable pageable);
+
+    Page<NewsDocument> findByPubDateBetween(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
 }
