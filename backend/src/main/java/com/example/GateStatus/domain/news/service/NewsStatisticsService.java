@@ -8,8 +8,6 @@ import com.example.GateStatus.domain.news.dto.TrendingKeyword;
 import com.example.GateStatus.domain.news.repository.NewsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cglib.core.Local;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -23,6 +21,14 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+
+/**
+ 키워드 빈도 분석: 단순 출현 횟수
+ 트렌딩 분석: 시간/인기도 가중치 적용
+ 시간대별 분포: 뉴스 발행 패턴
+ 카테고리별 통계: 분야별 뉴스 현황
+ 정치인 언급 통계: 화제의 인물 파악
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j

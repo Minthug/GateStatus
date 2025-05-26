@@ -113,12 +113,11 @@ public class IssueDocument {
         }
     }
 
-    public void update(String name, String description, String categoryCode, String categoryName,
+    public void update(String name, String description, String categoryCode,
                        List<String> keywords, String thumbnailUrl, List<String> tags, Boolean isActive, Boolean isHot) {
         if (name != null) this.name = name;
         if (description != null) this.description = description;
         if (categoryCode != null) this.categoryCode = categoryCode;
-        if (categoryName != null) this.categoryName = categoryName;
         if (keywords != null) this.keywords = keywords;
         if (thumbnailUrl != null) this.thumbnailUrl = thumbnailUrl;
         if (tags != null) this.tags = tags;

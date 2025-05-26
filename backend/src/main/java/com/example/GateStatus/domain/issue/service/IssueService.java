@@ -192,9 +192,6 @@ public class IssueService {
                 .isActive(true)
                 .priority(request.priority())
                 .isHot(request.isHot() != null ? request.isHot() : false)
-                .relatedStatementIds(request.relatedStatementIds())
-                .relatedBillIds(request.relatedBillIds())
-                .relatedFigureIds(request.relatedFigureIds())
                 .tags(request.tags())
                 .viewCount(0)
                 .createdAt(LocalDateTime.now())
@@ -223,25 +220,12 @@ public class IssueService {
                 request.name(),
                 request.description(),
                 request.categoryCode(),
-                request.categoryName(),
                 request.keywords(),
                 request.thumbnailUrl(),
                 request.tags(),
                 request.isActive(),
                 request.isHot()
         );
-
-        if (request.relatedStatementIds() != null) {
-            issue.setRelatedStatementIds(request.relatedStatementIds());
-        }
-
-        if (request.relatedBillIds() != null) {
-            issue.setRelatedBillIds(request.relatedBillIds());
-        }
-
-        if (request.relatedFigureIds() != null) {
-            issue.setRelatedFigureIds(request.relatedFigureIds());
-        }
 
         if (request.priority() != null) {
             issue.setPriority(request.priority());
