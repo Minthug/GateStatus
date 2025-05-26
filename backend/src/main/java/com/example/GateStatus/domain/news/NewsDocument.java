@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Document(collection = "news")
@@ -35,13 +36,13 @@ public class NewsDocument {
     private String source;
 
     @Indexed
-    private boolean processed = false;
+    private Boolean processed = false;
 
     private Integer viewCount;
     private Integer commentCount;
 
     @Builder.Default
-    private List<String> extractedKeywords;
+    private List<String> extractedKeywords = new ArrayList<>();
 
     @Indexed
     private String category;
@@ -50,7 +51,7 @@ public class NewsDocument {
     private String relatedIssueId;
 
     @Builder.Default
-    private List<Long> mentionedFigureIds;
+    private List<Long> mentionedFigureIds = new ArrayList<>();
 
     @CreatedDate
     private LocalDateTime createdAt;

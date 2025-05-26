@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +32,18 @@ public class NewsService {
                 log.warn("중복 뉴스 감지: {}", news.getTitle());
                 return existing.get();
             }
+        }
+
+        if (news.getProcessed() == null) {
+            news.setProcessed(false);
+        }
+
+        if (news.getExtractedKeywords() == null) {
+            news.setExtractedKeywords(new ArrayList<>());
+        }
+
+        if (news.getMentionedFigureIds() == null) {
+            news.setMentionedFigureIds(new ArrayList<>());
         }
 
         if (news.getCreatedAt() == null) {
@@ -77,6 +90,10 @@ public class NewsService {
     public void markAsProcessed(String newsId) {
         NewsDocument news = getNews(newsId);
 
+        if (Boolean.TRUE.equals(news.getProcessed())) {
+            log.warn("이미 처리된 뉴스입니다: {}", newsId);
+            return;
+        }
         news.setProcessed(true);
         news.setProcessedAt(LocalDateTime.now());
         newsRepository.save(news);
