@@ -13,7 +13,7 @@ import java.util.Optional;
 public interface NewsRepository extends MongoRepository<NewsDocument, String> {
 
     // 처리되지 않은 뉴스 조회
-    List<NewsDocument> findByProcessedFalseOrderByPubDateDesc();
+    Page<NewsDocument> findByProcessedFalseOrderByPubDateDesc(Pageable pageable);
 
     // 특정 기간 내 뉴스 조회
     @Query("{'pubDate': {$gte: ?0, $lte: ?1}}")
@@ -68,8 +68,6 @@ public interface NewsRepository extends MongoRepository<NewsDocument, String> {
     @Query(value = "{'extractedKeywords': ?0, 'pubDate': {$gte: ?1}}", count = true)
     long countRecentNewsByKeyword(String keyword, LocalDateTime since);
 
-    Page<NewsDocument> findByRelatedIssueIdIsNull(Pageable pageable);
-
     Optional<NewsDocument> findByContentHash(String contentHash);
 
     Page<NewsDocument> findAllByOrderByPubDateDesc(Pageable pageable);
@@ -77,4 +75,8 @@ public interface NewsRepository extends MongoRepository<NewsDocument, String> {
     Page<NewsDocument> findByCategoryOrderByPubDateDesc(String category, Pageable pageable);
 
     Page<NewsDocument> findByPubDateBetween(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
+
+    Page<NewsDocument> findByRelatedIssueIdIsNullOrderByPubDateDesc(Pageable pageable);
+
+    long deleteByCreatedAtBeforeAndRelatedIssueIdIsNull(LocalDateTime cutoffDate);
 }
