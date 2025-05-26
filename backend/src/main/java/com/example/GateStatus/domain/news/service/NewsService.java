@@ -14,6 +14,18 @@ public class NewsService {
 
     private final NewsRepository newsRepository;
 
+    public NewsDocument saveNews(NewsDocument news) {
+        return newsRepository.save(news);
+    }
+
+    public Page<NewsDocument> getNewsByCategory(String category, Pageable pageable) {
+
+    }
+
+    public void markAsProcessed(String newsId) {
+
+    }
+
     /**
      * 관리자가 수동으로 뉴스를 이슈에 연결
      * @param newsId
