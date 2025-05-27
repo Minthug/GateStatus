@@ -19,7 +19,7 @@ public record NaverNewsResponse(
      */
     public static record Item(
             @JsonProperty("title") String title,
-            @JsonProperty("originallink") String originallink,
+            @JsonProperty("originalLink") String originalLink,
             @JsonProperty("link") String link,
             @JsonProperty("description") String description,
             @JsonProperty("pubDate") String pubDate

@@ -198,13 +198,13 @@ public class NewsApiService {
         cleanDescription = truncate(cleanDescription, 500);
 
         LocalDateTime pubDate = parsePubDate(item.pubDate());
-        String contentHash = generateContentHash(cleanTitle, item.originallink());
+        String contentHash = generateContentHash(cleanTitle, item.originalLink());
 
         return NewsDocument.builder()
                 .title(cleanTitle)
                 .description(cleanDescription)
                 .link(item.link())
-                .originalLink(item.originallink())
+                .originalLink(item.originalLink())
                 .pubDate(pubDate)
                 .source(NewsSource.NAVER.name())
                 .processed(false)
