@@ -1,10 +1,7 @@
 package com.example.GateStatus.domain.news.controller;
 
 import com.example.GateStatus.domain.news.NewsDocument;
-import com.example.GateStatus.domain.news.dto.CollectResponse;
-import com.example.GateStatus.domain.news.dto.NaverNewsResponse;
-import com.example.GateStatus.domain.news.dto.NewsResponse;
-import com.example.GateStatus.domain.news.dto.TrendingKeyword;
+import com.example.GateStatus.domain.news.dto.*;
 import com.example.GateStatus.domain.news.service.NewsApiService;
 import com.example.GateStatus.domain.news.service.NewsService;
 import com.example.GateStatus.domain.news.service.NewsStatisticsService;
@@ -19,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -59,12 +57,6 @@ public class NewsController {
         return ResponseEntity.ok(NewsResponse.from(news));
     }
 
-    // 트렌딩 키워드
-    @GetMapping("/trending")
-    public List<TrendingKeyword> getTrendingKeywords() {
-        return newsStatisticsService.calculateTrendingKeywords(24);
-    }
-
     // 수동 뉴스 수집 트리거 (테스트/관리자용)
     @PostMapping("/collect")
     public ResponseEntity<CollectResponse> triggerNewsCollection(@RequestParam(defaultValue = "정치") String keyword,
@@ -91,5 +83,62 @@ public class NewsController {
                     LocalDateTime.now()
             ));
         }
+    }
+
+    /**
+     * 정치 뉴스 자동 수집
+     * @return
+     */
+    @PostMapping("/collect/political")
+    public ResponseEntity<CollectResponse> collectPoliticalNews() {
+        log.info("정치 뉴스 자동 수집 시작");
+
+        try {
+            newsApiService.collectPoliticalNews();
+
+            return ResponseEntity.ok(new CollectResponse(
+                    -1,
+                    "정치 뉴스 수집 시작됨",
+                    LocalDateTime.now()
+            ));
+        } catch (Exception e) {
+            log.error("정치 뉴스 수집 실패", e);
+            return ResponseEntity.status(500).body(new CollectResponse(
+                    0,
+                    "수집 실패: " + e.getMessage(),
+                    LocalDateTime.now()
+            ));
+        }
+    }
+
+    /**
+     * 키워드 통계
+     * @return
+     */
+    @GetMapping("/statistics/keywords")
+    public ResponseEntity<Map<String, Long>> getKeywordStatistics() {
+        Map<String, Long> keywords = newsStatisticsService.getKeywordFrequency();
+        return ResponseEntity.ok(keywords);
+    }
+
+    // 트렌딩 키워드
+    @GetMapping("/statistics/trending")
+    public ResponseEntity<List<TrendingKeyword>> getTrendingKeywords(@RequestParam(defaultValue = "24") int hours) {
+        List<TrendingKeyword> trending = newsStatisticsService.calculateTrendingKeywords(hours);
+        return ResponseEntity.ok(trending);
+    }
+
+    /**
+     * 카테고리별 통계
+     * @param days
+     * @return
+     */
+    @GetMapping("/statistics/categories")
+    public ResponseEntity<Map<String, CategoryStats>> getCategoryStatistics(@RequestParam(defaultValue = "7") int days) {
+        LocalDateTime start = LocalDateTime.now().minusDays(days);
+        LocalDateTime end = LocalDateTime.now();
+
+        Map<String, CategoryStats> stats = newsStatisticsService.getCategoryDistribution(start, end);
+        return ResponseEntity.ok(stats);
     }
 }

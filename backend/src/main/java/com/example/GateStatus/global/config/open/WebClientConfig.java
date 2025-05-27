@@ -2,6 +2,8 @@ package com.example.GateStatus.global.config.open;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -17,8 +19,11 @@ import reactor.core.publisher.Mono;
 @Slf4j
 public class WebClientConfig {
 
+    @Value("${news.api.naver.base-url}")
+    private String naverBaseUrl;
+
     @Bean
-    public WebClient webClient() {
+    public WebClient assemblyWebClient() {
         return WebClient.builder()
                 .baseUrl("https://open.assembly.go.kr/portal/openapi")
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -35,6 +40,17 @@ public class WebClientConfig {
                             return Mono.just(clientRequest);
                         }
                 ))
+                .build();
+    }
+
+
+    @Bean
+    public WebClient naverWebClient(WebClient.Builder builder) {
+        return builder
+                .baseUrl(naverBaseUrl)
+                .codecs(configurer -> configurer
+                        .defaultCodecs()
+                        .maxInMemorySize(10 * 1024 * 1024)) // 10 MB
                 .build();
     }
 }

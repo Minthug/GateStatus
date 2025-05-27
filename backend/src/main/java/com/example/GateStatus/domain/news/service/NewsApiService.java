@@ -9,7 +9,10 @@ import com.example.GateStatus.global.config.exception.ApiServerException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -26,12 +29,10 @@ import static com.example.GateStatus.domain.common.HtmlUtils.truncate;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class NewsApiService {
 
-    private final WebClient webClient;
+    private final WebClient naverWebClient;
     private final NewsRepository newsRepository;
-    private final ObjectMapper objectMapper;
 
     @Value("${news.api.naver.client-id}")
     private String naverClientId;
@@ -39,11 +40,18 @@ public class NewsApiService {
     @Value("${news.api.naver.client-secret}")
     private String naverClientSecret;
 
-    @Value("${news.api.naver.base-url}")
-    private String naverBaseUrl;
-
     @Value("${news.api.naver.rate-limit}")
     private int rateLimitPerDay;
+
+    public NewsApiService(NewsRepository newsRepository, ObjectMapper objectMapper) {
+        this.newsRepository = newsRepository;
+
+        this.naverWebClient = WebClient.builder()
+                .baseUrl("https://openapi.naver.com")
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .build();
+        log.info("NewsApiService WebClient 직접 생성 완료");
+    }
 
     // 정치 관련 검색 키워드
     private static final List<String> POLITICAL_KEYWORDS = List.of(
@@ -67,7 +75,7 @@ public class NewsApiService {
         try {
             log.info("네이버 뉴스 검색 시작: query={}, display={}, start={}", query, display, start);
 
-            NaverNewsResponse response = webClient.get()
+            NaverNewsResponse response = naverWebClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/v1/search/news.json")
                             .queryParam("query", query)
