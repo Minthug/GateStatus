@@ -13,6 +13,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -286,6 +287,40 @@ public class IssueController {
 
         return ResponseEntity.ok(issues);
     }
+
+    /**
+     * 특정 뉴스와 연결된 이슈 목록 조회
+     * @param newsId
+     * @return
+     */
+    @GetMapping("/news/{newsId}")
+    public ResponseEntity<List<IssueResponse>> getIssuesByNews(@PathVariable String newsId) {
+        log.info("뉴스 관련 이슈 목록 조회: {}", newsId);
+        List<IssueResponse> issues = issueService.getIssuesByNews(newsId);
+        return ResponseEntity.ok(issues);
+    }
+
+    /**
+     * 이슈와 뉴스 연결
+     * @param issueId
+     * @param newsId
+     * @return
+     */
+    @PostMapping("/{issueId}/link/news/{newsId}")
+    public ResponseEntity<Map<String, String>> linkIssueToNews(@PathVariable String issueId,
+                                                               @PathVariable String newsId) {
+        log.info("이슈-뉴스 연결: {} - {}", issueId, newsId);
+        issueService.linkNewsToIssue(issueId, newsId);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "이슈와 뉴스가 성공적으로 연결되었습니다");
+        response.put("issueId", issueId);
+        response.put("newsId", newsId);
+        response.put("timestamp", LocalDateTime.now().toString());
+
+        return ResponseEntity.ok(response);
+    }
+
 }
 
 /**

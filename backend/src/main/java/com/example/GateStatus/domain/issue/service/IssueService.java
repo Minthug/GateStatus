@@ -480,5 +480,67 @@ public class IssueService {
         }
     }
 
+    /**
+     * 특정 뉴스와 연결된 이슈 목록 조회
+     * @param newsId
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<IssueResponse> getIssuesByNews(String newsId) {
+        log.debug("뉴스 관련 이슈 조회: newsId={}", newsId);
 
+        List<IssueDocument> issues = issueRepository.findByRelatedNewsIdsContaining(newsId);
+
+        return issues.stream()
+                .filter(issue -> issue.getIsActive())
+                .map(IssueResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @Async
+    @Transactional
+    public void autoLinkNewsToIssues(String newsId, String newsTitle, String newsContent) {
+        log.info("뉴스 자동 연결 시작: newsId={}", newsId);
+
+        String searchText = (newsTitle + " " + newsContent).toLowerCase();
+        List<IssueDocument> allActiveIssues = issueRepository.findByIsActiveTrueOrderByCreatedAtDesc(
+                PageRequest.of(0, 100)).getContent();
+
+        int linkedCount = 0;
+        for (IssueDocument issue : allActiveIssues) {
+            if (shouldLinkNewsToIssue(issue, searchText)) {
+                linkNewsToIssue(issue.getId(), newsId);
+                linkedCount++;
+            }
+        }
+        log.info("뉴스 자동 연결 완료: newsId={}, 연결된 이슈 수={}", newsId, linkedCount);
+    }
+
+    /**
+     * 뉴스와 이슈 연결 여부 판단 (내부용)
+     * 키워드와 태그를 기반으로 연관성 판단
+     */
+    private boolean shouldLinkNewsToIssue(IssueDocument issue, String newsText) {
+        if (issue.getKeywords() != null) {
+            for (String keyword : issue.getKeywords()) {
+                if (newsText.contains(keyword.toLowerCase())) {
+                    return true;
+                }
+            }
+        }
+
+        if (issue.getTags() != null) {
+            for (String tag : issue.getTags()) {
+                if (newsText.contains(tag.toLowerCase())) {
+                    return true;
+                }
+            }
+        }
+
+        if (issue.getName() != null && newsText.contains(issue.getName().toLowerCase())) {
+            return true;
+        }
+
+        return false;
+    }
 }
