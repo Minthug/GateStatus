@@ -44,5 +44,16 @@ public interface IssueRepository extends MongoRepository<IssueDocument, String> 
     // 쿼리 관련 및 ID 문제 변수명 문제 질문
     @Query("{'$or': [{'keywords': {'$in': ?0}}, {'tags': {'$in': ?0}}], 'id': {'$ne': ?1}, 'isActive': true}")
     List<IssueDocument> findRelatedIssuesByKeywordsOrTags(List<String> keywords, String currentIssueId, Pageable pageable);
+
+    /**
+     * 특정 뉴스 ID와 연결된 이슈 목록 조회
+     */
+    List<IssueDocument> findByRelatedNewsIdsContaining(String newsId);
+
+    /**
+     * 여러 뉴스 ID와 연결된 이슈 목록 조회
+     */
+    @Query("{'relatedNewsIds': {'$in': ?0}, 'isActive': true}")
+    List<IssueDocument> findByRelatedNewsIds(List<String> newsIds);
 }
 

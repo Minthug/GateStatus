@@ -441,14 +441,44 @@ public class IssueService {
      * @param issueId
      * @param newsId
      */
+    @Transactional
     public void linkNewsToIssue(String issueId, String newsId) {
+        log.info("이슈-뉴스 연결 시작: issueId={}, newsId={}", issueId, newsId);
+
         IssueDocument issue = findByIssueById(issueId);
-        issue.getRelatedNewsIds().add(newsId);
-        issueRepository.save(issue);
+
+        if (issue.getRelatedNewsIds() == null) {
+            issue.setRelatedNewsIds(new ArrayList<>());
+        }
+
+        if (!issue.getRelatedNewsIds().contains(newsId)) {
+            issue.getRelatedNewsIds().add(newsId);
+            issue.setUpdatedAt(LocalDateTime.now());
+            issueRepository.save(issue);
+            log.info("이슈-뉴스 연결 완료: issueId={}, newsId={}", issueId, newsId);
+
+        } else {
+            log.debug("이미 연결된 이슈-뉴스: issueId={}, newsId={}", issueId, newsId);
+        }
     }
 
-    @Async
-    public void autoLinkToRelatedIssues(String contentType, String contentId, String content) {
+    /**
+     * 뉴스와 이슈 연결 해제
+     */
+    @Transactional
+    public void unlinkNewsFromIssue(String issueId, String newsId) {
+        log.info("이슈-뉴스 연결 해제 시작: issueId={}, newsId={}", issueId, newsId);
 
+        IssueDocument issue = findByIssueById(issueId);
+
+        if (issue.getRelatedNewsIds() != null && issue.getRelatedNewsIds().contains(newsId)) {
+            issue.getRelatedNewsIds().remove(newsId);
+            issue.setUpdatedAt(LocalDateTime.now());
+            issueRepository.save(issue);
+
+            log.info("이슈-뉴스 연결 해제 완료: issueId={}, newsId={}", issueId, newsId);
+        }
     }
+
+
 }
