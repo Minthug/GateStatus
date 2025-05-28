@@ -2,6 +2,7 @@ package com.example.GateStatus.domain.news.controller;
 
 import com.example.GateStatus.domain.news.NewsDocument;
 import com.example.GateStatus.domain.news.dto.*;
+import com.example.GateStatus.domain.news.repository.NewsRepository;
 import com.example.GateStatus.domain.news.service.NewsApiService;
 import com.example.GateStatus.domain.news.service.NewsService;
 import com.example.GateStatus.domain.news.service.NewsStatisticsService;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,12 +29,13 @@ public class NewsController {
 
     private final NewsService newsService;
     private final NewsApiService newsApiService;
+    private final NewsRepository newsRepository;
     private final NewsStatisticsService newsStatisticsService;
 
     // 뉴스 조회
     @GetMapping
     public ResponseEntity<Page<NewsResponse>> getNews(@RequestParam(required = false) String category,
-                                      @PageableDefault(size = 10, sort = "pubDate", direction = Sort.Direction.DESC) Pageable pageable) {
+                                                      @PageableDefault(size = 10, sort = "pubDate", direction = Sort.Direction.DESC) Pageable pageable) {
 
         Page<NewsDocument> newsPage;
 
@@ -46,6 +49,35 @@ public class NewsController {
         return ResponseEntity.ok(responses);
     }
 
+    /**
+     * 디버깅용 컨트롤러 추가
+     * 실제 저장된 뉴스 데이터 구조 확인
+     */
+    @GetMapping("/debug/news-data")
+    public ResponseEntity<List<Map<String, Object>>> getNewsDataForDebug() {
+        List<NewsDocument> recentNews = newsRepository.findTop10ByOrderByCreatedAtDesc();
+
+        List<Map<String, Object>> debugData = recentNews.stream().map(news -> {
+            Map<String, Object> data = new HashMap<>();
+            data.put("id", news.getId());
+            data.put("title", news.getTitle());
+            data.put("category", news.getCategory());
+            data.put("source", news.getSource());
+            data.put("createdAt", news.getCreatedAt());
+            return data;
+        }).toList();
+
+        return ResponseEntity.ok(debugData);
+    }
+    
+    /**
+     * 저장된 모든 카테고리 목록 확인
+     */
+    @GetMapping("/debug/categories")
+    public ResponseEntity<List<String>> getAllCategories() {
+        List<String> categories = newsRepository.findDistinctCategories();
+        return ResponseEntity.ok(categories);
+    }
     /**
      * 뉴스 단건 조회
      * @param newsId

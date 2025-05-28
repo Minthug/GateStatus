@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.repository.Query;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 public interface NewsRepository extends MongoRepository<NewsDocument, String> {
@@ -83,4 +84,27 @@ public interface NewsRepository extends MongoRepository<NewsDocument, String> {
     long deleteByCreatedAtBeforeAndRelatedIssueIdIsNull(LocalDateTime cutoffDate);
 
     List<NewsDocument> findByPubDateAfterOrderByPubDateDesc(LocalDateTime cutoff);
+
+    List<NewsDocument> findTop10ByOrderByCreatedAtDesc();
+
+    /**
+     * 디버깅용: 저장된 모든 카테고리 목록 조회
+     */
+    @Query(value = "{}", fields = "{ 'category' : 1 }")
+    List<NewsDocument> findAllCategories();
+
+    default List<String> findDistinctCategories() {
+        return findAllCategories().stream()
+                .map(NewsDocument::getCategory)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+
+    /**
+     * 전체 뉴스 개수 확인
+     */
+    @Query(value = "{}")
+    long countAllNews();
 }
