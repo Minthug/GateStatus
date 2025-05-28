@@ -39,7 +39,7 @@ import java.util.List;
 @Slf4j
 public class VoteService {
 
-    private final WebClient webClient;
+    private final WebClient assemblyWebClient;
     private final FigureRepository figureRepository;
     private final VoteRepository voteRepository;
     private final ProposedBillRepository billRepository;
@@ -121,7 +121,7 @@ public class VoteService {
 
             log.info("국회 API 호출 시작: 정치인= {}", figure.getName());
 
-            AssemblyApiResponse<JsonNode> apiResponse = webClient.get()
+            AssemblyApiResponse<JsonNode> apiResponse = assemblyWebClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/ncocpgfiaoituanbr")
                             .queryParam("KEY", apiKey)
@@ -163,7 +163,7 @@ public class VoteService {
         try {
             log.info("법안 상세 정보 API 호출 시작: 법안번호 = {}", billNo);
 
-            AssemblyApiResponse<JsonNode> apiResponse = webClient.get()
+            AssemblyApiResponse<JsonNode> apiResponse = assemblyWebClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/ncocndinfopromain")
                             .queryParam("KEY", apiKey)

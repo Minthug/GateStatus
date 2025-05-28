@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ProposedBillApiService {
 
-    private final WebClient webClient;
+    private final WebClient assemblyWebClient;
     private final ProposedBillApiMapper apiMapper;
     private final ObjectMapper mapper;
     private final ProposedBillRepository billRepository;
@@ -135,7 +135,7 @@ public class ProposedBillApiService {
 
             String currentAge = "22";
 
-            String jsonResponse = webClient.get()
+            String jsonResponse = assemblyWebClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(proposedBillPath)
                             .queryParam("KEY", apiKey)

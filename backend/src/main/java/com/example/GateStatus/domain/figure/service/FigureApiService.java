@@ -17,6 +17,7 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -37,11 +38,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
+@RequiredArgsConstructor
 public class FigureApiService {
 
-    private final WebClient webClient;
+    private final WebClient assemblyWebClient;
     private final ObjectMapper mapper;
     private final FigureRepository figureRepository;
     private final FigureMapper figureMapper;
@@ -52,7 +53,6 @@ public class FigureApiService {
     private final EntityManager entityManager;
 
     private final ConcurrentMap<String, SyncJobStatus> syncJobStatusMap = new ConcurrentHashMap<>();
-
 
     @Autowired
     private PlatformTransactionManager transactionManager;
@@ -119,7 +119,7 @@ public class FigureApiService {
         log.info("국회의원 정보 API 호출 시작: {}", figureName);
 
         try {
-            String jsonResponse = webClient.get()
+            String jsonResponse = assemblyWebClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(figureApiPath)
                             .queryParam("KEY", apiKey)
@@ -270,7 +270,7 @@ public class FigureApiService {
             try {
                 log.info("국회의원 정보 API 호출: 페이지 {}", pageNo);
                 int finalPageNo = pageNo;
-                String jsonResponse = webClient.get()
+                String jsonResponse = assemblyWebClient.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path(figureApiPath)
                                 .queryParam("KEY", apiKey)
@@ -451,7 +451,7 @@ public class FigureApiService {
         try {
             log.info("{}당 소속 국회의원 정보 API 호출 시작", partyName);
 
-            String jsonResponse = webClient.get()
+            String jsonResponse = assemblyWebClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(figureApiPath)
                             .queryParam("KEY", apiKey)
