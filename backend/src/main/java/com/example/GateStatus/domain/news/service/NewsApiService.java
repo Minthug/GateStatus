@@ -207,6 +207,8 @@ public class NewsApiService {
 
         LocalDateTime pubDate = parsePubDate(item.pubDate());
         String contentHash = generateContentHash(cleanTitle, item.originalLink());
+        String category = categorizeNews(cleanTitle, cleanDescription);
+        List<String> keywords = extractEnhancedKeywords(cleanTitle, cleanDescription, searchQuery);
 
         return NewsDocument.builder()
                 .title(cleanTitle)
@@ -216,11 +218,38 @@ public class NewsApiService {
                 .pubDate(pubDate)
                 .source(NewsSource.NAVER.name())
                 .processed(false)
-                .extractedKeywords(extractKeywords(cleanTitle + " " + cleanDescription))
-                .category(categorizeNews(cleanTitle, cleanDescription))
+                .extractedKeywords(keywords)
+                .category(category)
                 .contentHash(contentHash)
                 .createdAt(LocalDateTime.now())
                 .build();
+    }
+
+    /**
+     * 키워드 추출 로직 개선
+     * 검색어와 카테고리 정보를 함께 고려
+     */
+    private List<String> extractEnhancedKeywords(String title, String description, String searchQuery) {
+        List<String> keywords = new ArrayList<>();
+
+        if (searchQuery != null && !searchQuery.trim().isEmpty()) {
+            keywords.add(searchQuery);
+        }
+
+        keywords.addAll(extractKeywords(title + " " + description));
+
+        String content = (title + " " + description).toLowerCase();
+        List<String> politicalKeywords = Arrays.asList(
+                "대선", "대통령선거", "국회", "의원", "정치", "선거", "법안",
+                "국정감사", "외교", "경제", "예산", "정부", "여당", "야당"
+        );
+
+        for (String keyword : politicalKeywords) {
+            if (content.contains(keyword) && !keywords.contains(keyword)) {
+                keywords.add(keyword);
+            }
+        }
+        return keywords.stream().distinct().toList();
     }
 
     /**
@@ -243,14 +272,37 @@ public class NewsApiService {
             return "선거";
         }
 
-        if (content.contains("국회") || content.contains("정상회담") ||
+        if (content.contains("국회") || content.contains("의원") ||
             content.contains("국정감사") || content.contains("법안") ||
             content.contains("입법") || content.contains("발언") ||
             content.contains("국정") || content.contains("의정")) {
             return "국회";
         }
 
+        if (content.contains("외교") || content.contains("정상회담") ||
+            content.contains("외교부") || content.contains("국제") ||
+            content.contains("미국") || content.contains("중국") ||
+            content.contains("일본") || content.contains("북한")) {
+            return "외교";
+        }
 
+        // 💰 경제 관련
+        if (content.contains("경제") || content.contains("예산") ||
+                content.contains("금리") || content.contains("주식") ||
+                content.contains("부동산") || content.contains("세금") ||
+                content.contains("재정") || content.contains("기업")) {
+            return "경제";
+        }
+
+        // 🏛️ 일반 정치 (정치 관련이지만 위 카테고리에 속하지 않는 것)
+        if (content.contains("정치") || content.contains("정부") ||
+                content.contains("청와대") || content.contains("대통령") ||
+                content.contains("총리") || content.contains("장관") ||
+                content.contains("정당") || content.contains("여당") ||
+                content.contains("야당")) {
+            return "정치";
+        }
+        return "기타";
     }
 
     /**
