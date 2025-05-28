@@ -22,6 +22,11 @@ public class WebClientConfig {
     @Value("${news.api.naver.base-url}")
     private String naverBaseUrl;
 
+    @Value("${news.api.naver.client-id}")
+    private String naverClientId;
+    @Value("${news.api.naver.client-secret}")
+    private String naverClientSecret;
+
     @Bean
     public WebClient assemblyWebClient() {
         return WebClient.builder()
@@ -46,11 +51,44 @@ public class WebClientConfig {
 
     @Bean
     public WebClient naverWebClient(WebClient.Builder builder) {
+        log.info("네이버 WebClient 설정 - ClientId: {}", naverClientId.substring(0, 4) + "****");
+
         return builder
                 .baseUrl(naverBaseUrl)
+                .defaultHeader("X-Naver-Client-Id", naverClientId)
+                .defaultHeader("X-Naver-Client-Secret", naverClientSecret)
+                .defaultHeader("Content-Type", "application/json")
                 .codecs(configurer -> configurer
                         .defaultCodecs()
                         .maxInMemorySize(10 * 1024 * 1024)) // 10 MB
+                .filter(logRequest())
+                .filter(logResponse())
                 .build();
+    }
+
+    private ExchangeFilterFunction logRequest() {
+        return ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
+            log.info("네이버 API 요청: {} {}", clientRequest.method(), clientRequest.url());
+            clientRequest.headers().forEach((name, values) -> {
+                if (name.startsWith("X-Naver")) {
+                    log.debug("헤더: {} = {}", name,
+                            name.contains("Secret") ? "****" : values.get(0).substring(0, 4) + "****");
+                }
+            });
+
+            return Mono.just(clientRequest);
+        });
+    }
+
+    private ExchangeFilterFunction logResponse() {
+        return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
+            log.info("네이버 API 응답: {}", clientResponse.statusCode());
+            if (clientResponse.statusCode().isError()) {
+                return clientResponse.bodyToMono(String.class)
+                        .doOnNext(body -> log.error("네이버 API 에러 응답: {}", body))
+                        .then(Mono.just(clientResponse));
+            }
+            return Mono.just(clientResponse);
+        });
     }
 }
