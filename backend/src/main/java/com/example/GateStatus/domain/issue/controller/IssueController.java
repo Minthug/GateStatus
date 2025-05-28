@@ -321,6 +321,34 @@ public class IssueController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * 뉴스 자동 연결 실행 (관리자용)
+     * @param newsId
+     * @param request
+     * @return
+     */
+    @PostMapping("/auto-link/news/{newsId}")
+    public ResponseEntity<Map<String, Object>> autoLinkNewsToIssues(@PathVariable String newsId,
+                                                                    @RequestBody Map<String, String> request) {
+        log.info("뉴스 자동 연결 요청: newsId={}", newsId);
+
+        String title = request.get("title");
+        String content = request.get("content");
+
+        if (title == null || content == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "title과 content가 필요합니다"));
+        }
+
+        issueService.autoLinkNewsToIssues(newsId, title, content);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "뉴스 자동 연결이 시작되었습니다");
+        response.put("newsId", newsId);
+        response.put("status", "PROCESSING");
+        response.put("timestamp", LocalDateTime.now());
+
+        return ResponseEntity.accepted().body(response);
+    }
 }
 
 /**
