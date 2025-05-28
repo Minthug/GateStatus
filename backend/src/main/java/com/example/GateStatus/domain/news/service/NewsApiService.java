@@ -223,20 +223,34 @@ public class NewsApiService {
                 .build();
     }
 
+    /**
+     * 뉴스 카테고리 자동 분류 (한글기반)
+     * 검색 시 사용하는 카테고리와 일치하도록 한글로 통일
+     *
+     */
     private String categorizeNews(String title, String description) {
         String content = (title + " " + description).toLowerCase();
 
-        if (content.contains("발언") || content.contains("입법")) {
-            return "LEGISLATION";
-        } else if (content.contains("선거") || content.contains("공천")) {
-            return "ELECTION";
-        } else if (content.contains("외교") || content.contains("정상회담")) {
-            return "DIPLOMACY";
-        } else if (content.contains("경제") || content.contains("예산")) {
-            return "ECONOMY";
-        } else {
-            return "GENERAL";
+        if (content.contains("대선") || content.contains("대통령선거") ||
+            content.contains("대통령 후보") || content.contains("대통력직") ||
+            content.contains("presidential") || content.contains("대통령 선거")) {
+            return "대선";
         }
+
+        if (content.contains("선거") || content.contains("공천") ||
+            content.contains("후보") || content.contains("당선") ||
+            content.contains("투표") || content.contains("개표")) {
+            return "선거";
+        }
+
+        if (content.contains("국회") || content.contains("정상회담") ||
+            content.contains("국정감사") || content.contains("법안") ||
+            content.contains("입법") || content.contains("발언") ||
+            content.contains("국정") || content.contains("의정")) {
+            return "국회";
+        }
+
+
     }
 
     /**
