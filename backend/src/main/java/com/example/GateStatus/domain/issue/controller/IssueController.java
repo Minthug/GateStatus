@@ -1,25 +1,20 @@
 package com.example.GateStatus.domain.issue.controller;
 
 import com.example.GateStatus.domain.category.service.CategoryService;
-import com.example.GateStatus.domain.issue.IssueCategory;
 import com.example.GateStatus.domain.issue.service.IssueService;
-import com.example.GateStatus.domain.issue.service.request.IssueRequest;
+import com.example.GateStatus.domain.issue.service.request.LinkRequest;
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
+import com.example.GateStatus.domain.issue.service.response.LinkResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import retrofit2.http.Path;
 
 import javax.naming.directory.SearchResult;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/v1/issues")
@@ -66,4 +61,83 @@ public class IssueController {
     }
 
 
+    // ============================================
+    // 🛠️ 개발자용 API (ID 기반) - 유지
+    // ============================================
+
+    /**
+     * 개발자용 - ID로 직접 조회 (빠름)
+     */
+    @GetMapping("/{issueId}")
+    public ResponseEntity<IssueResponse> getIssue(@PathVariable String issueId) {
+        log.info("이슈 ID로 조회: {}", issueId);
+
+        if (!isValidObjectId(issueId)) {
+            throw new IllegalArgumentException("잘못된 이슈 ID 형식입니다: " + issueId);
+        }
+
+        IssueResponse issue = issueService.getIssue(issueId);
+        return ResponseEntity.ok(issue);
+    }
+
+    /**
+     * 이슈와 리소스 연결
+     * POST /v1/issues/{issueId}/links
+     */
+    @PostMapping("/{issueId}/links")
+    public ResponseEntity<LinkResponse> linkIssueToResponse(@PathVariable String issueId,
+                                                                   @RequestBody LinkRequest request) {
+
+
+        log.info("이슈 ID로 연결: issueId={}, type={}, resourceId={}",
+                issueId, request.resourceType(), request.resourceId());
+
+        if (!request.isValid()) {
+            throw new IllegalArgumentException("잘못된 요청 데이터입니다");
+        }
+
+        String message = switch (request.resourceType()) {
+            case "BILL" -> {
+                issueService.linkIssuesToBill(issueId, request.resourceId());
+                yield "이슈와 법안이 연결되었습니다";
+            }
+
+            case "STATEMENT" -> {
+                issueService.linkIssueToStatement(issueId, request.resourceId());
+                yield "이슈와 발언이 연결되었습니다";
+            }
+
+            case "FIGURE" -> {
+                Long figureId = request.getFigureId();
+                issueService.linkIssuesToFigure(issueId, figureId);
+                yield "이슈와 정치인이 연결되었습니다";
+            }
+
+            case "NEWS" -> {
+                issueService.linkNewsToIssue(issueId, request.resourceId());
+                yield "이슈와 뉴스가 연결되었습니다";
+            }
+            default -> throw new IllegalArgumentException("지원하지 않는 리소스 타입: " + request.resourceType());
+        };
+        LinkResponse response = new LinkResponse(
+                message,
+                issueId,
+                request.resourceType(),
+                request.resourceId(),
+                LocalDateTime.now()
+        );
+        return ResponseEntity.ok(response);
+    }
+
+
+    // ============================================
+    // 🔧 유틸리티 메서드들
+    // ============================================
+
+    /**
+     * MongoDB ObjectID 형식 검증
+     */
+    private boolean isValidObjectId(String id) {
+        return id != null && id.matches("^[0-9a-fA-F]{24}$");
+    }
 }
