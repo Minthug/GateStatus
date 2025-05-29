@@ -65,12 +65,5 @@ public class IssueController {
         return ResponseEntity.ok(result);
     }
 
-    @GetMapping("/by-slug/{slug}")
-    public ResponseEntity<IssueResponse> getIssueBySlug(@PathVariable String slug) {
-        // 슬러그는 영문/숫자/하이픈만 사용하므로 인코딩 문제 없음
-        log.info("슬러그로 검색: {}", slug);
 
-        IssueResponse response = issueService.getIssueBySlug(slug);
-        return ResponseEntity.ok(response);
-    }
 }

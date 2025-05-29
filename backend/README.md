@@ -41,3 +41,14 @@ GET /v1/issues/budongsan-jeongchaek      // 의미 있고 깔끔!
 * 3. 공유하기 좋음 - 인코딩 문제 없음
 * 4. 브랜딩 효과 - 전문적으로 보임
      */
+
+
+    @GetMapping("/by-slug/{slug}")
+    public ResponseEntity<IssueResponse> getIssueBySlug(@PathVariable String slug) {
+        // 슬러그는 영문/숫자/하이픈만 사용하므로 인코딩 문제 없음
+        log.info("슬러그로 검색: {}", slug);
+
+        IssueResponse response = issueService.getIssueBySlug(slug);
+        return ResponseEntity.ok(response);
+    }
+해당 내용은 현 시점에선 오버엔지니어링으로 인하여 추후 사용을 할 예정
