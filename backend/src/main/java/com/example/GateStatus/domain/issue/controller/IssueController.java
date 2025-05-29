@@ -61,6 +61,12 @@ public class IssueController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * 카테고리별 이슈 목록 조회
+     * @param categoryCode
+     * @param pageable
+     * @return
+     */
     @GetMapping("/category/{categoryCode}")
     public ResponseEntity<Page<IssueResponse>> getIssuesByCategory(@PathVariable String categoryCode,
                                                                    @PageableDefault(size = 10) Pageable pageable) {
@@ -68,6 +74,19 @@ public class IssueController {
         Page<IssueResponse> issues = issueService.getIssuesByCategory(categoryCode, pageable);
         return ResponseEntity.ok(issues);
     }
+
+    /**
+     * 인기 이슈 목록 조회
+     * @param pageable
+     * @return
+     */
+    @GetMapping("/hot")
+    public ResponseEntity<Page<IssueResponse>> getHotIssues(@PageableDefault(size = 10) Pageable pageable) {
+        log.info("인기 이슈 조회 ");
+        Page<IssueResponse> issues = issueService.getHotIssues(pageable);
+        return ResponseEntity.ok(issues);
+    }
+
 
 
     // ============================================

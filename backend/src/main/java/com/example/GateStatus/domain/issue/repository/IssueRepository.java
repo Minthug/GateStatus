@@ -55,5 +55,12 @@ public interface IssueRepository extends MongoRepository<IssueDocument, String> 
      */
     @Query("{'relatedNewsIds': {'$in': ?0}, 'isActive': true}")
     List<IssueDocument> findByRelatedNewsIds(List<String> newsIds);
+
+    Optional<IssueDocument> findByNameAndIsActiveTrue(String normalizedName);
+
+    IssueDocument findActiveIssueById(String id);
+
+    Page<IssueDocument> findByNameIgnoreCaseAndIsActiveTrue(String normalizedQuery, Pageable pageable);
+
 }
 

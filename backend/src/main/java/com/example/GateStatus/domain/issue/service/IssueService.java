@@ -12,6 +12,7 @@ import com.example.GateStatus.global.config.EventListner.EventPublisher;
 import com.example.GateStatus.global.config.EventListner.IssueLinkedToStatementEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.aspectj.weaver.ast.Not;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -34,6 +35,10 @@ public class IssueService {
     private final CategoryService categoryService;
     private final EventPublisher eventPublisher;
 
+    // ============================================
+    // 📖 기본 조회 메서드들
+    // ============================================
+
     /**
      * 이슈 상세 조회
      * 이슈 조회하면서 조회수 1 증가
@@ -45,22 +50,72 @@ public class IssueService {
         IssueDocument issue = findByIssueById(id);
         issue.incrementViewCount();
         issueRepository.save(issue);
-        log.debug("이슈 조회 및 조회수 증가: ID={}, 현재 조회수={}", id, issue.getViewCount());
+
+        log.debug("이슈 조회: ID={}, 조회수={}", id, issue.getViewCount());
+        return IssueResponse.from(issue);
+    }
+
+    @Transactional
+    public IssueResponse getIssueByName(String name) {
+        String normalizedName = validateAndNormalizeName(name);
+
+        IssueDocument issue = issueRepository.findByNameAndIsActiveTrue(normalizedName)
+                .orElseThrow(() -> new NotFoundIssueException("이슈를 찾을 수 없습니다: " + normalizedName));
+
+        issue.incrementViewCount();
+        issueRepository.save(issue);
+
+        log.debug("이슈 이름 조회: name={}, ID={}", normalizedName, issue.getId());
         return IssueResponse.from(issue);
     }
 
     /**
-     * 활성화된 이슈만 찾기 ( 조회수 증가 없음)
-     * 관리자나 시스템에서 이슈 정보만 확인할 때 사용
+     * 시스템 내부용 이슈 조회 (조회수 증가 없음)
+     * 연결 작업 등에서 사용
      * @param id
      * @return
      */
     @Transactional(readOnly = true)
-    public IssueResponse getActiveIssue(String id) {
-        IssueDocument issue = issueRepository.findByIdAndIsActiveTrue(id)
-                .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + id));
+    public IssueResponse getIssuesForSystem(String id) {
+        IssueDocument issue = issueRepository.findActiveIssueById(id);
+        return IssueResponse.from(issue);
+    }
+
+    /**
+     * 이슈 이름으로 시스템 조회 (조회수 증가 없음)
+     * @param name
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public IssueResponse getIssuesByNameForSystem(String name) {
+        String normalizedName = validateAndNormalizeName(name);
+
+        IssueDocument issue = issueRepository.findByNameAndIsActiveTrue(normalizedName)
+                .orElseThrow(() -> new NotFoundIssueException("이슈를 찾을 수 없습니다: " + normalizedName));
 
         return IssueResponse.from(issue);
+    }
+
+    // ============================================
+    // 🔍 검색 및 목록 조회 메서드들
+    // ============================================
+
+    /**
+     * 키워드 검색
+     * exact, contains, fuzzy 검색을 하나로 통합
+     */
+    @Transactional(readOnly = true)
+    public Page<IssueResponse> searchIssues(String query, String searchType, Pageable pageable) {
+        String normalizedQuery = validateAndNormalizeName(query);
+
+        Page<IssueDocument> issues = switch (searchType.toLowerCase()) {
+            case "exact" -> issueRepository.findByNameIgnoreCaseAndIsActiveTrue(normalizedQuery, pageable);
+            case "fuzzy" -> searchWithFuzzyLogic(normalizedQuery, pageable);
+            default -> issueRepository.searchByKeyword(normalizedQuery, pageable);
+        };
+
+        log.debug("이슈 검색: query={}, type={}, 결과수={}", normalizedQuery, searchType, issues.getTotalElements());
+        return issues.map(IssueResponse::from);
     }
 
     /**
@@ -129,19 +184,6 @@ public class IssueService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 키워드 검색
-     * MongoDB의 full-text search를 활용하여 제목, 설명, 키워드에서 검색합니다.
-     * @param keyword
-     * @param pageable
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public Page<IssueResponse> searchIssues(String keyword, Pageable pageable) {
-        log.debug("이슈 키워드 검색: keyword={}", keyword);
-        return issueRepository.searchByKeyword(keyword, pageable)
-                .map(IssueResponse::from);
-    }
 
     /**
      * 특정 태그가 포함된 이슈 목록 조회
@@ -543,4 +585,15 @@ public class IssueService {
 
         return false;
     }
+
+
+    private String validateAndNormalizeName(String name) {
+        return null;
+    }
+
+
+    private Page<IssueDocument> searchWithFuzzyLogic(String normalizedQuery, Pageable pageable) {
+        return null;
+    }
+
 }
