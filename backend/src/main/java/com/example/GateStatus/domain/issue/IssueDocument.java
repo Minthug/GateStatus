@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.issue;
 
+import jakarta.persistence.PrePersist;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -75,6 +76,8 @@ public class IssueDocument {
     @LastModifiedDate
     private LocalDateTime updatedAt;
 
+    private String slug;
+
     public void incrementViewCount() {
         if (viewCount == null) {
             this.viewCount = 1;
@@ -124,4 +127,11 @@ public class IssueDocument {
         if (isActive != null) this.isActive = isActive;
         if (isHot != null) this.isHot = isHot;
     }
+
+//    @PrePersist
+//    public void generateSlug() {
+//        if (this.slug == null) {
+//            this.slug = SlugGenerator.generate(this.name);
+//        }
+//    }
 }

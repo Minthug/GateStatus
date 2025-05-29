@@ -12,7 +12,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import retrofit2.http.Path;
 
+import javax.naming.directory.SearchResult;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -28,329 +30,47 @@ public class IssueController {
     private final IssueService issueService;
     private final CategoryService categoryService;
 
+
+    // ============================================
+    // 🎯 사용자 친화적 API (이슈 이름으로 검색)
+    // ============================================
+
     /**
-     * 이슈 상세 조회
-     * @param issueId
-     * @return
+     * 이슈 이름으로 검색
+     * GET /v1/issues/search-by-name?name=부동산%20정책
+     *
+     * %20이란? 공백때문에 URL이 깨지기 때문에 공백을 %20으로 인코딩해야 전체 문자열 인식
      */
-    @GetMapping("/{issueId}")
-    public ResponseEntity<IssueResponse> getIssue(@PathVariable String issueId) {
-        log.info("이슈 상세 조회 요청: {}", issueId);
-        IssueResponse issue = issueService.getIssue(issueId);
+    @GetMapping("/search-by-name")
+    public ResponseEntity<IssueResponse> getIssueName(@RequestParam String name) {
+        log.info("이슈 이름으로 검색: {}", name);
+        IssueResponse issue = issueService.getIssueByName(name);
         return ResponseEntity.ok(issue);
     }
 
-    /**
-     * 카테고리별 이슈 목록 조회
-     * @param categoryCode
-     * @param pageable
-     * @return
-     */
-    @GetMapping("/category/{categoryCode}")
-    public ResponseEntity<Page<IssueResponse>> getIssuesByCategory(@PathVariable String categoryCode,
-                                                                   @PageableDefault(size = 10) Pageable pageable) {
-        log.info("카테고리별 이슈 목록 조회: {}", categoryCode);
-        Page<IssueResponse> issues = issueService.getIssuesByCategory(categoryCode, pageable);
-        return ResponseEntity.ok(issues);
-    }
 
-    /**
-     * 인기(핫) 이슈 목록 조회
-     * @param pageable
-     * @return
-     */
-    @GetMapping("/hot")
-    public ResponseEntity<Page<IssueResponse>> getHotIssues(@PageableDefault(size = 10) Pageable pageable) {
-        log.info("인기 이슈 목록 조회");
-        Page<IssueResponse> issues = issueService.getHotIssues(pageable);
-        return ResponseEntity.ok(issues);
-    }
-
-    /**
-     * 특정 정치인 관련 이슈 목록 조회
-     * @param figureId
-     * @param pageable
-     * @return
-     */
-    @GetMapping("/figure/{figureId}")
-    public ResponseEntity<Page<IssueResponse>> getIssuesByFigure(@PathVariable Long figureId,
-                                                                 @PageableDefault(size = 10) Pageable pageable) {
-        log.info("정치인 관련 이슈 목록 조회: {}", figureId);
-        Page<IssueResponse> issues = issueService.getIssuesByFigure(figureId, pageable);
-        return ResponseEntity.ok(issues);
-    }
-
-    /**
-     * 특정 법안 이슈 목록 조회
-     * @return
-     */
-    @GetMapping("/bill/{billId}")
-    public ResponseEntity<List<IssueResponse>> getIssuesByBill(@PathVariable String billId) {
-        log.info("법안 관련 이슈 목록 조회: {}", billId);
-        List<IssueResponse> issues = issueService.getIssuesByBill(billId);
-        return ResponseEntity.ok(issues);
-    }
-
-    /**
-     * 특정 발언 이슈 목록 조회
-     * @param statementId
-     * @return
-     */
-    @GetMapping("/statement{statementId}")
-    public ResponseEntity<List<IssueResponse>> getIssuesByStatement(@PathVariable String statementId) {
-        log.info("발언 관련 이슈 목록 조회: {}", statementId);
-        List<IssueResponse> issues = issueService.getIssuesByStatement(statementId);
-        return ResponseEntity.ok(issues);
-    }
-
-    /**
-     * 키워드 검색
-     * @param keyword
-     * @param pageable
-     * @return
-     */
     @GetMapping("/search")
-    public ResponseEntity<Page<IssueResponse>> searchIssues(@RequestParam String keyword,
-                                                            @PageableDefault(size = 10) Pageable pageable) {
-        log.info("이슈 검색: {}", keyword);
-        Page<IssueResponse> issues = issueService.searchIssues(keyword, pageable);
-        return ResponseEntity.ok(issues);
+    public ResponseEntity<SearchResult> searchIssues(@RequestParam String q,
+                                                     @RequestParam(defaultValue = "contains") String type,
+                                                     @PageableDefault(size = 10) Pageable pageable) {
+
+        log.info("이슈 검색: q={}, type={}", q, type);
+
+        SearchResult result = switch (type) {
+            case "exact" -> issueService.findByExactName(q, pageable);
+            case "contains" -> issueService.searchByKeyword(q, pageable);
+            case "fuzzy" -> issueService.fuzzySearch(q, pageable);
+            default -> issueService.searchByKeyword(q, pageable);
+        };
+        return ResponseEntity.ok(result);
     }
 
-    /**
-     * 태그로 이슈 검색
-     * @param tag
-     * @param pageable
-     * @return
-     */
-    @GetMapping("/tag/{tag}")
-    public ResponseEntity<Page<IssueResponse>> getIssuesByTag(@PathVariable String tag,
-                                                              @PageableDefault(size = 10) Pageable pageable) {
-        log.info("태그별 이슈 조회: {}", tag);
-        Page<IssueResponse> issues = issueService.getIssuesByTag(tag, pageable);
-        return ResponseEntity.ok(issues);
-    }
+    @GetMapping("/by-slug/{slug}")
+    public ResponseEntity<IssueResponse> getIssueBySlug(@PathVariable String slug) {
+        // 슬러그는 영문/숫자/하이픈만 사용하므로 인코딩 문제 없음
+        log.info("슬러그로 검색: {}", slug);
 
-    /**
-     * 최근 이슈 목록 조회
-     * @param pageable
-     * @return
-     */
-    @GetMapping("/recent")
-    public ResponseEntity<Page<IssueResponse>> getRecentIssues(@PageableDefault(size = 10) Pageable pageable) {
-        log.info("최근 이슈 목록 조회");
-        Page<IssueResponse> issues = issueService.getRecentIssues(pageable);
-        return ResponseEntity.ok(issues);
-    }
-
-    /**
-     *  새 이슈 생성
-     * @param request
-     * @return
-     */
-    @PostMapping
-    public ResponseEntity<IssueResponse> createIssue(@RequestBody IssueRequest request) {
-        log.info("이슈 생성 요청: {}", request.name());
-        IssueResponse issues = issueService.createIssue(request);
-        return ResponseEntity.ok(issues);
-    }
-
-    /**
-     * 이슈 정보 업데이트
-     * @param issueId
-     * @param request
-     * @return
-     */
-    @PatchMapping("/{issueId}")
-    public ResponseEntity<IssueResponse> updateIssue(@PathVariable String issueId,
-                                                     @RequestBody IssueRequest request) {
-        log.info("이슈 업데이트 요청: {}", issueId);
-        IssueResponse issue = issueService.updateIssue(issueId, request);
-        return ResponseEntity.ok(issue);
-    }
-
-    /**
-     * 이슈 삭제 (논리적 삭제)
-     * @param issueId
-     * @return
-     */
-    @DeleteMapping("/{issueId}")
-    public ResponseEntity<Void> deleteIssue(@PathVariable String issueId) {
-        log.info("이슈 삭제 요청: {}", issueId);
-        issueService.deleteIssue(issueId);
-        return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * 물리적 이슈 삭제 (관리자 전용)
-     * @param issueId
-     * @return
-     */
-    @DeleteMapping("/{issueId}/hard")
-    public ResponseEntity<Void> hardDeleteIssue(@PathVariable String issueId) {
-        log.info("이슈 영구 삭제 요청: {}", issueId);
-        issueService.hardDeleteIssue(issueId);
-        return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * 관련 이슈 찾기
-     * @param issueId
-     * @param limit
-     * @return
-     */
-    @GetMapping("/{issueId}/related")
-    public ResponseEntity<List<IssueResponse>> getRelatedIssue(@PathVariable String issueId,
-                                                               @RequestParam(defaultValue = "5") int limit) {
-        log.info("관련 이슈 조회: {}, 제한: {}", issueId, limit);
-        List<IssueResponse> issues = issueService.findRelatedIssue(issueId, limit);
-        return ResponseEntity.ok(issues);
-    }
-
-    /**
-     * 특정 법안에 관련된 이슈 연결
-     * @param issueId
-     * @param billId
-     * @return
-     */
-    @GetMapping("/{issueId}/link/{billId}")
-    public ResponseEntity<Void> linkIssueToBill(@PathVariable String issueId,
-                                                @PathVariable String billId) {
-        log.info("이슈-법안 연결: {} - {}", issueId, billId);
-        issueService.linkIssuesToBill(issueId, billId);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * 특정 발언에 관련된 이슈 연결
-     * @param issueId
-     * @param statementId
-     * @return
-     */
-    @GetMapping("/{issueId}/link/{statementId}")
-    public ResponseEntity<Void> linkIssueToStatement(@PathVariable String issueId,
-                                                     @PathVariable String statementId) {
-        log.info("이슈-발언 연결: {} - {}", issueId, statementId);
-        issueService.linkIssueToStatement(issueId, statementId);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * 특정 정치인에 관련된 이슈 연결
-     * @param issueId
-     * @param figureId
-     * @return
-     */
-    @GetMapping("/{issueId}/link/{figureId}")
-    public ResponseEntity<Void> linkIssueToFigure(@PathVariable String issueId,
-                                                  @PathVariable Long figureId) {
-        log.info("이슈-정치인 연결: {} - {}", issueId, figureId);
-        issueService.linkIssuesToFigure(issueId, figureId);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * 대분류 카테고리에 속한 이슈 카테고리 조회
-     * @param categoryId
-     * @return
-     */
-    @GetMapping("/categories/parent/{categoryId}")
-    public ResponseEntity<Map<String, Object>> getIssueCategoriesByParent(@PathVariable Long categoryId) {
-        List<IssueCategory> categories = categoryService.getIssueCategoriesByParentCategory(categoryId);
-
-        List<Map<String, String>> categoryList = categories.stream()
-                .map(cat -> Map.of(
-                        "code", cat.getCode(),
-                        "name", cat.getDisplayName()
-                ))
-                .collect(Collectors.toList());
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("categoryId", categoryId);
-        response.put("categories", categories);
-
+        IssueResponse response = issueService.getIssueBySlug(slug);
         return ResponseEntity.ok(response);
-    }
-
-    /**
-     * 대분류 카테고리에 속한 이슈 목록 조회
-     * @param categoryId
-     * @param page
-     * @param size
-     * @return
-     */
-    @GetMapping("/by-parent-category/{categoryId}")
-    public ResponseEntity<Page<IssueResponse>> getIssuesByParentCategory(@PathVariable Long categoryId,
-                                                                         @RequestParam(defaultValue = "0") int page,
-                                                                         @RequestParam(defaultValue = "10") int size) {
-        Page<IssueResponse> issues = issueService.getIssueByParentCategory(categoryId, page, size);
-
-        return ResponseEntity.ok(issues);
-    }
-
-    /**
-     * 특정 뉴스와 연결된 이슈 목록 조회
-     * @param newsId
-     * @return
-     */
-    @GetMapping("/news/{newsId}")
-    public ResponseEntity<List<IssueResponse>> getIssuesByNews(@PathVariable String newsId) {
-        log.info("뉴스 관련 이슈 목록 조회: {}", newsId);
-        List<IssueResponse> issues = issueService.getIssuesByNews(newsId);
-        return ResponseEntity.ok(issues);
-    }
-
-    /**
-     * 이슈와 뉴스 연결
-     * @param issueId
-     * @param newsId
-     * @return
-     */
-    @PostMapping("/{issueId}/link/news/{newsId}")
-    public ResponseEntity<Map<String, String>> linkIssueToNews(@PathVariable String issueId,
-                                                               @PathVariable String newsId) {
-        log.info("이슈-뉴스 연결: {} - {}", issueId, newsId);
-        issueService.linkNewsToIssue(issueId, newsId);
-
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "이슈와 뉴스가 성공적으로 연결되었습니다");
-        response.put("issueId", issueId);
-        response.put("newsId", newsId);
-        response.put("timestamp", LocalDateTime.now().toString());
-
-        return ResponseEntity.ok(response);
-    }
-
-    /**
-     * 뉴스 자동 연결 실행 (관리자용)it p
-     * @param newsId
-     * @param request
-     * @return
-     */
-    @PostMapping("/auto-link/news/{newsId}")
-    public ResponseEntity<Map<String, Object>> autoLinkNewsToIssues(@PathVariable String newsId,
-                                                                    @RequestBody Map<String, String> request) {
-        log.info("뉴스 자동 연결 요청: newsId={}", newsId);
-
-        String title = request.get("title");
-        String content = request.get("content");
-
-        if (title == null || content == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "title과 content가 필요합니다"));
-        }
-
-        issueService.autoLinkNewsToIssues(newsId, title, content);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "뉴스 자동 연결이 시작되었습니다");
-        response.put("newsId", newsId);
-        response.put("status", "PROCESSING");
-        response.put("timestamp", LocalDateTime.now());
-
-        return ResponseEntity.accepted().body(response);
     }
 }
-
-/**
- * Link 관련 3개의 메서드를 한개로 합치는 방법 구상하기
- */
