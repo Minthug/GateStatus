@@ -12,7 +12,6 @@ import com.example.GateStatus.global.config.EventListner.EventPublisher;
 import com.example.GateStatus.global.config.EventListner.IssueLinkedToStatementEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.aspectj.weaver.ast.Not;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -126,10 +125,12 @@ public class IssueService {
      */
     @Transactional(readOnly = true)
     public Page<IssueResponse> getIssuesByCategory(String categoryCode, Pageable pageable) {
-        log.debug("카테고리별 이슈 조회: categoryCode={}", categoryCode);
+        validateCategoryCode(categoryCode);
+
         return issueRepository.findByCategoryCodeAndIsActiveTrue(categoryCode, pageable)
                 .map(IssueResponse::from);
     }
+
 
     /**
      * 인기(핫) 이슈 목록 조회
@@ -208,41 +209,6 @@ public class IssueService {
     public Page<IssueResponse> getRecentIssues(Pageable pageable) {
         return issueRepository.findByIsActiveTrueOrderByCreatedAtDesc(pageable)
                 .map(IssueResponse::from);
-    }
-
-    /**
-     * 새 이슈 생성
-     * 카테고리 유효성 검증 후 이슈를 생성하고 저장
-     * @param request
-     * @return
-     */
-    @Transactional
-    public IssueResponse createIssue(IssueRequest request) {
-
-        log.info("새 이슈 생성 시작: name={}, categoryCode={}", request.name(), request.categoryCode());
-
-        IssueCategory category = validateCategory(request.categoryCode());
-
-        IssueDocument document = IssueDocument.builder()
-                .name(request.name())
-                .description(request.description())
-                .categoryCode(category.getCode())
-                .categoryName(category.getDisplayName())
-                .keywords(request.keywords())
-                .thumbnailUrl(request.thumbnailUrl())
-                .parentIssueId(request.parentIssueId())
-                .isActive(true)
-                .priority(request.priority())
-                .isHot(request.isHot() != null ? request.isHot() : false)
-                .tags(request.tags())
-                .viewCount(0)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        IssueDocument savedIssue = issueRepository.save(document);
-        log.info("새 이슈 생성 완료: id={}, name={}", savedIssue.getId(), savedIssue.getName());
-        return IssueResponse.from(savedIssue);
     }
 
     /**
@@ -329,45 +295,42 @@ public class IssueService {
      */
     @Transactional(readOnly = true)
     public List<IssueResponse> findRelatedIssue(String issueId, int limit) {
-        log.debug("관련 이슈 검색 시작: issueId={}, limit={}", issueId, limit);
-
-        IssueDocument issue = findByIssueById(issueId);
+        IssueDocument issue = findActiveIssuesById(issueId);
 
         // 1. 같은 카테고리 이슈 조회
-        List<IssueDocument> relatedByCategory = issueRepository.findRelatedIssuesByCategoryAndNotId(
+        List<IssueDocument> related = issueRepository.findByRelatedIssuesByCategoryAndNotId(
                 issue.getCategoryCode(), issueId, PageRequest.of(0, limit));
 
         // 2. 관련 이슈가 충분하지 않으면 키워드나 태그 기반으로 추가 조회
-        if (relatedByCategory.size() < limit) {
-            List<String> searchTerms = new ArrayList<>();
-            if (issue.getKeywords() != null) {
-                searchTerms.addAll(issue.getKeywords());
-            }
-            if (issue.getTags() != null) {
-                searchTerms.addAll(issue.getTags());
-            }
-
+        if (related.size() < limit) {
+            List<String> searchTerms = buildSearchTerms(issue);
             if (!searchTerms.isEmpty()) {
                 List<IssueDocument> relatedByKeywords = issueRepository.findRelatedIssuesByKeywordsOrTags(
-                        searchTerms, issueId, PageRequest.of(0, limit - relatedByCategory.size()));
+                        searchTerms, issueId, PageRequest.of(0, limit - related.size()));
 
-                // 중복 제거하며 추가
-                for (IssueDocument relatedIssue : relatedByKeywords) {
-                    if (relatedByCategory.stream().noneMatch(i -> i.getId().equals(relatedIssue.getId()))) {
-                        relatedByCategory.add(relatedIssue);
-                        if (relatedByCategory.size() >= limit) {
-                            break;
-                        }
-                    }
-                }
+                related.addAll(relatedByKeywords.stream()
+                        .filter(relatedIssue -> related.stream()
+                                .noneMatch(existing -> existing.getId().equals(relatedIssue.getId())))
+                        .limit(limit - related.size())
+                        .collect(Collectors.toList()));
             }
         }
-
-        log.debug("관련 이슈 검색 완료: issueId={}, 찾은 개수={}", issueId, relatedByCategory.size());
-        return relatedByCategory.stream()
+        return related.stream()
                 .map(IssueResponse::from)
                 .collect(Collectors.toList());
     }
+
+    private List<String> buildSearchTerms(IssueDocument issue) {
+        return null;
+    }
+
+    private IssueDocument findActiveIssuesById(String issueId) {
+        return null;
+    }
+
+    // ============================================
+    // 🔗 리소스 연결 메서드들 (통합)
+    // ============================================
 
     /**
      * 특정 법안에 관련된 이슈 연결
@@ -460,23 +423,6 @@ public class IssueService {
                 .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + id));
     }
 
-    /**
-     * 카테고리 코드 유효성 검증 (내부 전용)
-     * 입력받은 카테고리 코드가 유효한지 확인하고 IssueCategory 객체를 반환
-     * @param code
-     * @return
-     */
-    private IssueCategory validateCategory(String code) {
-        if (code == null || code.isEmpty()) {
-            throw new InvalidCategoryException("카테고리 코드가 필요합니다");
-        }
-
-        try {
-            return IssueCategory.fromCode(code);
-        } catch (IllegalArgumentException e) {
-            throw new InvalidCategoryException("유효하지 않은 카테고리 코드: " + code);
-        }
-    }
 
     /**
      * 뉴스와 이슈 연결
@@ -594,6 +540,22 @@ public class IssueService {
 
     private Page<IssueDocument> searchWithFuzzyLogic(String normalizedQuery, Pageable pageable) {
         return null;
+    }
+
+    /**
+     * 카테고리 코드 검증
+     * @param categoryCode
+     */
+    private void validateCategoryCode(String categoryCode) {
+        if (categoryCode == null || categoryCode.trim().isEmpty()) {
+            throw new InvalidCategoryException("카테고리 코드가 필요합니다");
+        }
+
+        try {
+            IssueCategory.fromCode(categoryCode);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidCategoryException("유효하지 않은 카테고리 코드: " + categoryCode);
+        }
     }
 
 }
