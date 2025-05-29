@@ -7,6 +7,7 @@ import com.example.GateStatus.domain.issue.service.response.IssueResponse;
 import com.example.GateStatus.domain.issue.service.response.LinkResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
@@ -58,6 +59,14 @@ public class IssueController {
             default -> issueService.searchByKeyword(q, pageable);
         };
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/category/{categoryCode}")
+    public ResponseEntity<Page<IssueResponse>> getIssuesByCategory(@PathVariable String categoryCode,
+                                                                   @PageableDefault(size = 10) Pageable pageable) {
+        log.info("카테고리별 이슈 조회: {}", categoryCode);
+        Page<IssueResponse> issues = issueService.getIssuesByCategory(categoryCode, pageable);
+        return ResponseEntity.ok(issues);
     }
 
 
