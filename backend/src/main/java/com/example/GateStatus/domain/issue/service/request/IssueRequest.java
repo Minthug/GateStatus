@@ -11,5 +11,9 @@ public record IssueRequest(String name,
                            Boolean isActive,
                            Integer priority,
                            Boolean isHot,
-                           List<String> tags ) {
+                           List<String> tags,
+                           List<String> relatedStatementIds,
+                           List<String> relatedBillIds,
+                           List<Long> relatedFigureIds,
+                           List<String> relatedNewsIds) {
 }

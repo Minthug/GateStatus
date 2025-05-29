@@ -322,7 +322,7 @@ public class IssueController {
     }
 
     /**
-     * 뉴스 자동 연결 실행 (관리자용)
+     * 뉴스 자동 연결 실행 (관리자용)it p
      * @param newsId
      * @param request
      * @return
