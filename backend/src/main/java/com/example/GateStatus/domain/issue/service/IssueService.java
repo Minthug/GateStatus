@@ -6,17 +6,14 @@ import com.example.GateStatus.domain.issue.IssueDocument;
 import com.example.GateStatus.domain.issue.exception.InvalidCategoryException;
 import com.example.GateStatus.domain.issue.exception.NotFoundIssueException;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
-import com.example.GateStatus.domain.issue.service.request.IssueRequest;
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
 import com.example.GateStatus.global.config.EventListner.EventPublisher;
 import com.example.GateStatus.global.config.EventListner.IssueLinkedToStatementEvent;
-import io.kubernetes.client.extended.pager.Pager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,7 +44,7 @@ public class IssueService {
      */
     @Transactional
     public IssueResponse getIssue(String id) {
-        IssueDocument issue = findByIssueById(id);
+        IssueDocument issue = findActiveIssuesById(id);
         issue.incrementViewCount();
         issueRepository.save(issue);
 
@@ -55,6 +52,11 @@ public class IssueService {
         return IssueResponse.from(issue);
     }
 
+
+    /**
+     * 이슈 이름으로 조회 (조회수 증가)
+     * 사용자가 이슈명으로 직접 접근할 때 사용
+     */
     @Transactional
     public IssueResponse getIssueByName(String name) {
         String normalizedName = validateAndNormalizeName(name);
@@ -77,7 +79,7 @@ public class IssueService {
      */
     @Transactional(readOnly = true)
     public IssueResponse getIssuesForSystem(String id) {
-        IssueDocument issue = issueRepository.findActiveIssueById(id);
+        IssueDocument issue = findActiveIssuesById(id);
         return IssueResponse.from(issue);
     }
 
@@ -146,61 +148,6 @@ public class IssueService {
     }
 
     /**
-     * 특정 정치인 관련 이슈 목록 조회
-     * @param figureId
-     * @param pageable
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public Page<IssueResponse> getIssuesByFigure(Long figureId, Pageable pageable) {
-        log.debug("정치인 관련 이슈 조회: figureId={}", figureId);
-        return issueRepository.findIssueByFigureId(figureId, pageable)
-                .map(IssueResponse::from);
-    }
-
-    /**
-     * 특정 법안 관련 이슈 목록 조회
-     * @param billId
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public List<IssueResponse> getIssuesByBill(String billId) {
-        log.debug("법안 관련 이슈 조회: billId={}", billId);
-        return issueRepository.findIssuesByBillId(billId)
-                .stream()
-                .map(IssueResponse::from)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 특정 발언 관련 이슈 목록 조회
-     * @param statementId
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public List<IssueResponse> getIssuesByStatement(String statementId) {
-        log.debug("발언 관련 이슈 조회: statementId={}", statementId);
-        return issueRepository.findByRelatedStatementIdsContaining(statementId)
-                .stream()
-                .map(IssueResponse::from)
-                .collect(Collectors.toList());
-    }
-
-
-    /**
-     * 특정 태그가 포함된 이슈 목록 조회
-     * @param tag
-     * @param pageable
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public Page<IssueResponse> getIssuesByTag(String tag, Pageable pageable) {
-        log.debug("태그별 이슈 조회: tag={}", tag);
-        return issueRepository.findByTagsContainingAndIsActiveTrue(tag, pageable)
-                .map(IssueResponse::from);
-    }
-
-    /**
      * 최근 이슈 목록 조회
      * 생성일시를 기준으로 내림차순 정렬하여 최신 이슈들을 반환
      * @param pageable
@@ -212,79 +159,30 @@ public class IssueService {
                 .map(IssueResponse::from);
     }
 
+
+    // ============================================
+    // 🔗 관련 데이터 조회 메서드들 (통합)
+    // ============================================
     /**
-     * 이슈 정보 업데이트
-     * 요청된 필드들만 선택적으로 업데이트
-     * @param id
-     * @param request
+     * 관련 리소스별 이슈 조회 - 통합 메서드
+     * @param resourceType
+     * @param resourceId
      * @return
      */
-    @Transactional
-    public IssueResponse updateIssue(String id, IssueRequest request) {
-        log.info("이슈 업데이트 시작: id={}", id);
+    public List<IssueResponse> getIssuesByResource(String resourceType, String resourceId) {
+        List<IssueDocument> issues = switch (resourceType.toUpperCase()) {
+            case "FIGURE" -> issueRepository.findIssueByFigureId(Long.parseLong(resourceId), Pageable.unpaged()).getContent();
+            case "BILL" -> issueRepository.findIssuesByBillId(resourceId);
+            case "STATEMENT" -> issueRepository.findByRelatedStatementIdsContaining(resourceId);
+            case "NEWS" -> issueRepository.findByRelatedNewsIdsContaining(resourceId);
+            default -> throw new IllegalArgumentException("지원하지 않는 리소스 타입: " + resourceType);
+        };
 
-        IssueDocument issue = findByIssueById(id);
-
-        issue.update(
-                request.name(),
-                request.description(),
-                request.categoryCode(),
-                request.keywords(),
-                request.thumbnailUrl(),
-                request.tags(),
-                request.isActive(),
-                request.isHot()
-        );
-
-        if (request.priority() != null) {
-            issue.setPriority(request.priority());
-        }
-
-        if (request.parentIssueId() != null) {
-            issue.setParentIssueId(request.parentIssueId());
-        }
-
-        issue.setUpdatedAt(LocalDateTime.now());
-        IssueDocument updatedIssue = issueRepository.save(issue);
-
-        log.info("이슈 업데이트 완료: id={}", id);
-        return IssueResponse.from(updatedIssue);
+        return issues.stream()
+                .filter(IssueDocument::getIsActive)
+                .map(IssueResponse::from)
+                .collect(Collectors.toList());
     }
-
-    /**
-     * 이슈 삭제 (논리적 삭제)
-     * 실제로 데이터를 삭제하지 않고 isActive를 false로 설정
-     * @param id
-     */
-    @Transactional
-    public void deleteIssue(String id) {
-        log.info("이슈 논리적 삭제 시작: id={}", id);
-
-        IssueDocument issue = findByIssueById(id);
-        issue.setIsActive(false);
-        issue.setUpdatedAt(LocalDateTime.now());
-        issueRepository.save(issue);
-
-        log.info("이슈 논리적 삭제 완료: id={}", id);
-    }
-
-    /**
-     * 물리적 이슈 삭제 (관리자 전용)
-     * 데이터베이스에서 완전히 삭제, 복구가 불가능하므로 주의해서 사용해야 합니다
-     * @param id
-     */
-    @Transactional
-    public void hardDeleteIssue(String id) {
-        log.warn("이슈 물리적 삭제 시작: id={} - 복구 불가능한 작업입니다", id);
-
-        if (!issueRepository.existsById(id)) {
-            throw new NotFoundIssueException("삭제할 이슈가 존재하지 않습니다: " + id);
-        }
-
-        issueRepository.deleteById(id);
-        log.warn("이슈 물리적 삭제 완료: id={}", id);
-    }
-
 
     /**
      * 관련 이슈 찾기
@@ -321,34 +219,6 @@ public class IssueService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 관련 리소스별 이슈 조회 - 통합 메서드
-     * @param resourceType
-     * @param resourceId
-     * @return
-     */
-    public List<IssueResponse> getIssuesByResource(String resourceType, String resourceId) {
-        List<IssueDocument> issues = switch (resourceType.toUpperCase()) {
-            case "FIGURE" -> issueRepository.findIssueByFigureId(Long.parseLong(resourceId), Pageable.unpaged()).getContent();
-            case "BILL" -> issueRepository.findIssuesByBillId(resourceId);
-            case "STATEMENT" -> issueRepository.findByRelatedStatementIdsContaining(resourceId);
-            case "NEWS" -> issueRepository.findByRelatedNewsIdsContaining(resourceId);
-            default -> throw new IllegalArgumentException("지원하지 않는 리소스 타입: " + resourceType);
-        };
-
-        return issues.stream()
-                .filter(IssueDocument::getIsActive)
-                .map(IssueResponse::from)
-                .collect(Collectors.toList());
-    }
-
-    private List<String> buildSearchTerms(IssueDocument issue) {
-        return null;
-    }
-
-    private IssueDocument findActiveIssuesById(String issueId) {
-        return null;
-    }
 
     // ============================================
     // 🔗 리소스 연결 메서드들 (통합)
@@ -401,143 +271,30 @@ public class IssueService {
         log.info("뉴스 자동 연결 완료: newsId={}, 연결수={}", newsId, linkedCount);
     }
 
-    /**
-     * 내부용 ID 찾기
-     * 다른 메서드들에서 공통으로 사용하는 이슈 조회 로직
-     * @param id
-     * @return
-     */
-    private IssueDocument findByIssueById(String id) {
-        return issueRepository.findById(id)
-                .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + id));
-    }
-
-
-    /**
-     * 뉴스와 이슈 연결
-     * @param issueId
-     * @param newsId
-     */
-    @Transactional
-    public void linkNewsToIssue(String issueId, String newsId) {
-        log.info("이슈-뉴스 연결 시작: issueId={}, newsId={}", issueId, newsId);
-
-        IssueDocument issue = findByIssueById(issueId);
-
-        if (issue.getRelatedNewsIds() == null) {
-            issue.setRelatedNewsIds(new ArrayList<>());
-        }
-
-        if (!issue.getRelatedNewsIds().contains(newsId)) {
-            issue.getRelatedNewsIds().add(newsId);
-            issue.setUpdatedAt(LocalDateTime.now());
-            issueRepository.save(issue);
-            log.info("이슈-뉴스 연결 완료: issueId={}, newsId={}", issueId, newsId);
-
-        } else {
-            log.debug("이미 연결된 이슈-뉴스: issueId={}, newsId={}", issueId, newsId);
-        }
-    }
-
-    /**
-     * 뉴스와 이슈 연결 해제
-     */
-    @Transactional
-    public void unlinkNewsFromIssue(String issueId, String newsId) {
-        log.info("이슈-뉴스 연결 해제 시작: issueId={}, newsId={}", issueId, newsId);
-
-        IssueDocument issue = findByIssueById(issueId);
-
-        if (issue.getRelatedNewsIds() != null && issue.getRelatedNewsIds().contains(newsId)) {
-            issue.getRelatedNewsIds().remove(newsId);
-            issue.setUpdatedAt(LocalDateTime.now());
-            issueRepository.save(issue);
-
-            log.info("이슈-뉴스 연결 해제 완료: issueId={}, newsId={}", issueId, newsId);
-        }
-    }
-
-    /**
-     * 특정 뉴스와 연결된 이슈 목록 조회
-     * @param newsId
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public List<IssueResponse> getIssuesByNews(String newsId) {
-        log.debug("뉴스 관련 이슈 조회: newsId={}", newsId);
-
-        List<IssueDocument> issues = issueRepository.findByRelatedNewsIdsContaining(newsId);
-
-        return issues.stream()
-                .filter(issue -> issue.getIsActive())
-                .map(IssueResponse::from)
-                .collect(Collectors.toList());
-    }
-
-    @Async
-    @Transactional
-    public void autoLinkNewsToIssues(String newsId, String newsTitle, String newsContent) {
-        log.info("뉴스 자동 연결 시작: newsId={}", newsId);
-
-        String searchText = (newsTitle + " " + newsContent).toLowerCase();
-        List<IssueDocument> allActiveIssues = issueRepository.findByIsActiveTrueOrderByCreatedAtDesc(
-                PageRequest.of(0, 100)).getContent();
-
-        int linkedCount = 0;
-        for (IssueDocument issue : allActiveIssues) {
-            if (shouldLinkNewsToIssue(issue, searchText)) {
-                linkNewsToIssue(issue.getId(), newsId);
-                linkedCount++;
-            }
-        }
-        log.info("뉴스 자동 연결 완료: newsId={}, 연결된 이슈 수={}", newsId, linkedCount);
-    }
-
-    /**
-     * 뉴스와 이슈 연결 여부 판단 (내부용)
-     * 키워드와 태그를 기반으로 연관성 판단
-     */
-    private boolean shouldLinkNewsToIssue(IssueDocument issue, String newsText) {
-        if (issue.getKeywords() != null) {
-            for (String keyword : issue.getKeywords()) {
-                if (newsText.contains(keyword.toLowerCase())) {
-                    return true;
-                }
-            }
-        }
-
-        if (issue.getTags() != null) {
-            for (String tag : issue.getTags()) {
-                if (newsText.contains(tag.toLowerCase())) {
-                    return true;
-                }
-            }
-        }
-
-        if (issue.getName() != null && newsText.contains(issue.getName().toLowerCase())) {
-            return true;
-        }
-
-        return false;
-    }
-
-
-    // ============================================
-    // 🔗 개별 리소스 연결 메서드들 (private)
-    // ============================================
-
-
-
     // ============================================
     // 🔧 내부 유틸리티 메서드들
     // ============================================
-    private String validateAndNormalizeName(String name) {
-        return null;
+
+    /**
+     * 활성 이슈 조회 (공통 로직)
+     */
+    private IssueDocument findActiveIssuesById(String id) {
+
+        return issueRepository.findById(id)
+                .filter(IssueDocument::getIsActive)
+                .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + id));
     }
 
-
-    private Page<IssueDocument> searchWithFuzzyLogic(String normalizedQuery, Pageable pageable) {
-        return null;
+    /**
+     * 이름 유효성 검증 및 정규화
+     * @param name
+     * @return
+     */
+    private String validateAndNormalizeName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("이슈 이름은 비어있을 수 없습니다");
+        }
+        return name.trim();
     }
 
     /**
@@ -556,4 +313,130 @@ public class IssueService {
         }
     }
 
+    /**
+     * 검색 키워드 구성
+     */
+    private List<String> buildSearchTerms(IssueDocument issue) {
+        List<String> terms = new ArrayList<>();
+
+        if (issue.getKeywords() != null) {
+            terms.addAll(issue.getKeywords());
+        }
+
+        if (issue.getTags() != null) {
+            terms.addAll(issue.getTags());
+        }
+
+        return terms;
+    }
+
+    /**
+     * 퍼지 검색 로직
+     */
+    private Page<IssueDocument> searchWithFuzzyLogic(String query, Pageable pageable) {
+        return issueRepository.searchByKeyword(query, pageable);
+    }
+
+    /**
+     * 자동 연결 여부 판단
+     */
+    private boolean shouldAutoLink(IssueDocument issue, String newsText) {
+
+        if (issue.getName() != null && newsText.contains(issue.getName().toLowerCase())) {
+            return true;
+        }
+
+        if (issue.getKeywords() != null) {
+            for (String keyword : issue.getKeywords()) {
+                if (newsText.contains(keyword.toLowerCase())) {
+                    return true;
+                }
+            }
+        }
+
+        if (issue.getTags() != null) {
+            for (String tag : issue.getTags()) {
+                if (newsText.contains(tag.toLowerCase())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // ============================================
+    // 🔗 개별 리소스 연결 메서드들 (private)
+    // ============================================
+
+    private void linkToNews(IssueDocument issue, String newsId) {
+        if (issue.getRelatedNewsIds() == null) {
+            issue.setRelatedNewsIds(new ArrayList<>());
+        }
+
+        if (!issue.getRelatedNewsIds().contains(newsId)) {
+            issue.getRelatedNewsIds().add(newsId);
+        }
+    }
+
+    private void linkToFigure(IssueDocument issue, long figureId) {
+        issue.addRelatedFigure(figureId);
+    }
+
+    private void linkToStatement(IssueDocument issue, String statementId) {
+        issue.addRelatedStatement(statementId);
+        eventPublisher.publish(new IssueLinkedToStatementEvent(statementId, statementId));
+    }
+
+    private void linkToBill(IssueDocument issue, String billId) {
+        issue.addRelatedBill(billId);
+    }
+
 }
+
+
+///**
+// * 뉴스와 이슈 연결 해제
+// */
+//@Transactional
+//public void unlinkNewsFromIssue(String issueId, String newsId) {
+//    log.info("이슈-뉴스 연결 해제 시작: issueId={}, newsId={}", issueId, newsId);
+//
+//    IssueDocument issue = findByIssueById(issueId);
+//
+//    if (issue.getRelatedNewsIds() != null && issue.getRelatedNewsIds().contains(newsId)) {
+//        issue.getRelatedNewsIds().remove(newsId);
+//        issue.setUpdatedAt(LocalDateTime.now());
+//        issueRepository.save(issue);
+//
+//        log.info("이슈-뉴스 연결 해제 완료: issueId={}, newsId={}", issueId, newsId);
+//    }
+//}
+//
+///**
+// * 특정 뉴스와 연결된 이슈 목록 조회
+// * @param newsId
+// * @return
+// */
+//@Transactional(readOnly = true)
+//public List<IssueResponse> getIssuesByNews(String newsId) {
+//    log.debug("뉴스 관련 이슈 조회: newsId={}", newsId);
+//
+//    List<IssueDocument> issues = issueRepository.findByRelatedNewsIdsContaining(newsId);
+//
+//    return issues.stream()
+//            .filter(issue -> issue.getIsActive())
+//            .map(IssueResponse::from)
+//            .collect(Collectors.toList());
+//}
+
+///**
+// * 내부용 ID 찾기
+// * 다른 메서드들에서 공통으로 사용하는 이슈 조회 로직
+// * @param id
+// * @return
+// */
+//private IssueDocument findByIssueById(String id) {
+//    return issueRepository.findById(id)
+//            .filter(IssueDocument::getIsActive)
+//            .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다" + id));
+//}
