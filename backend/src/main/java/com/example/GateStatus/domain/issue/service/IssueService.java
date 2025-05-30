@@ -294,7 +294,7 @@ public class IssueService {
      * @return
      */
     @Transactional(readOnly = true)
-    public List<IssueResponse> findRelatedIssue(String issueId, int limit) {
+    public List<IssueResponse> findRelatedIssues(String issueId, int limit) {
         IssueDocument issue = findActiveIssuesById(issueId);
 
         // 1. 같은 카테고리 이슈 조회
@@ -316,6 +316,27 @@ public class IssueService {
             }
         }
         return related.stream()
+                .map(IssueResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 관련 리소스별 이슈 조회 - 통합 메서드
+     * @param resourceType
+     * @param resourceId
+     * @return
+     */
+    public List<IssueResponse> getIssuesByResource(String resourceType, String resourceId) {
+        List<IssueDocument> issues = switch (resourceType.toUpperCase()) {
+            case "FIGURE" -> issueRepository.findIssueByFigureId(Long.parseLong(resourceId), Pageable.unpaged()).getContent();
+            case "BILL" -> issueRepository.findIssuesByBillId(resourceId);
+            case "STATEMENT" -> issueRepository.findByRelatedStatementIdsContaining(resourceId);
+            case "NEWS" -> issueRepository.findByRelatedNewsIdsContaining(resourceId);
+            default -> throw new IllegalArgumentException("지원하지 않는 리소스 타입: " + resourceType);
+        };
+
+        return issues.stream()
+                .filter(IssueDocument::getIsActive)
                 .map(IssueResponse::from)
                 .collect(Collectors.toList());
     }
