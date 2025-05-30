@@ -5,6 +5,7 @@ import com.example.GateStatus.domain.issue.service.IssueService;
 import com.example.GateStatus.domain.issue.service.request.LinkRequest;
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
 import com.example.GateStatus.domain.issue.service.response.LinkResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -12,10 +13,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import retrofit2.http.Path;
 
-import javax.naming.directory.SearchResult;
 import java.time.LocalDateTime;
-import java.util.Map;
+import java.util.List;
 
 @RestController
 @RequestMapping("/v1/issues")
@@ -46,18 +47,14 @@ public class IssueController {
 
 
     @GetMapping("/search")
-    public ResponseEntity<SearchResult> searchIssues(@RequestParam String q,
+    public ResponseEntity<Page<IssueResponse>> searchIssues(@RequestParam String q,
                                                      @RequestParam(defaultValue = "contains") String type,
                                                      @PageableDefault(size = 10) Pageable pageable) {
 
         log.info("이슈 검색: q={}, type={}", q, type);
 
-        SearchResult result = switch (type) {
-            case "exact" -> issueService.findByExactName(q, pageable);
-            case "contains" -> issueService.searchByKeyword(q, pageable);
-            case "fuzzy" -> issueService.fuzzySearch(q, pageable);
-            default -> issueService.searchByKeyword(q, pageable);
-        };
+        Page<IssueResponse> result = issueService.searchIssues(q, type, pageable);
+
         return ResponseEntity.ok(result);
     }
 
@@ -87,6 +84,12 @@ public class IssueController {
         return ResponseEntity.ok(issues);
     }
 
+    @GetMapping("/recent")
+    public ResponseEntity<Page<IssueResponse>> getRecentIssues(@PageableDefault(size = 10) Pageable pageable) {
+        log.info("최근 이슈 조회");
+        Page<IssueResponse> result = issueService.getRecentIssues(pageable);
+        return ResponseEntity.ok(result);
+    }
 
 
     // ============================================
@@ -114,38 +117,20 @@ public class IssueController {
      */
     @PostMapping("/{issueId}/links")
     public ResponseEntity<LinkResponse> linkIssueToResponse(@PathVariable String issueId,
-                                                                   @RequestBody LinkRequest request) {
+                                                            @Valid @RequestBody LinkRequest request) {
 
 
         log.info("이슈 ID로 연결: issueId={}, type={}, resourceId={}",
                 issueId, request.resourceType(), request.resourceId());
 
-        if (!request.isValid()) {
-            throw new IllegalArgumentException("잘못된 요청 데이터입니다");
-        }
+        issueService.linkIssueToResource(issueId, request.resourceType(), request.resourceId());
 
-        String message = switch (request.resourceType()) {
-            case "BILL" -> {
-                issueService.linkIssuesToBill(issueId, request.resourceId());
-                yield "이슈와 법안이 연결되었습니다";
-            }
-
-            case "STATEMENT" -> {
-                issueService.linkIssueToStatement(issueId, request.resourceId());
-                yield "이슈와 발언이 연결되었습니다";
-            }
-
-            case "FIGURE" -> {
-                Long figureId = request.getFigureId();
-                issueService.linkIssuesToFigure(issueId, figureId);
-                yield "이슈와 정치인이 연결되었습니다";
-            }
-
-            case "NEWS" -> {
-                issueService.link(issueId, request.resourceId());
-                yield "이슈와 뉴스가 연결되었습니다";
-            }
-            default -> throw new IllegalArgumentException("지원하지 않는 리소스 타입: " + request.resourceType());
+        String message = switch (request.resourceType().toUpperCase()) {
+            case "BILL" -> "이슈와 법안이 연결되었습니다";
+            case "STATEMENT" -> "이슈와 발언이 연결되었습니다";
+            case "FIGURE" -> "이슈와 정치인이 연결되었습니다";
+            case "NEWS" -> "이슈와 뉴스가 연결되었습니다";
+            default -> "리소스가 연결되었습니다";
         };
         LinkResponse response = new LinkResponse(
                 message,
@@ -156,6 +141,156 @@ public class IssueController {
         );
         return ResponseEntity.ok(response);
     }
+
+
+    // ============================================
+    // 🔗 관련 데이터 조회 API들
+    // ============================================
+
+
+    @RestController
+    @RequestMapping("/v1/issues")
+    @RequiredArgsConstructor
+    @Slf4j
+    public class IssueController {
+
+        private final IssueService issueService;
+
+        // ============================================
+        // 🎯 사용자 친화적 API (이슈 이름으로 검색)
+        // ============================================
+
+        /**
+         * 이슈 이름으로 정확 검색
+         * GET /v1/issues/search-by-name?name=부동산%20정책
+         */
+        @GetMapping("/search-by-name")
+        public ResponseEntity<IssueResponse> getIssueByName(@RequestParam String name) {
+            log.info("이슈 이름으로 검색: {}", name);
+            IssueResponse issue = issueService.getIssueByName(name);
+            return ResponseEntity.ok(issue);
+        }
+
+        /**
+         * ✅ 수정: Service의 통합 검색 메서드 사용
+         * GET /v1/issues/search?q=부동산&type=contains
+         */
+        @GetMapping("/search")
+        public ResponseEntity<Page<IssueResponse>> searchIssues(
+                @RequestParam String q,
+                @RequestParam(defaultValue = "contains") String type,
+                @PageableDefault(size = 10) Pageable pageable) {
+
+            log.info("이슈 검색: q={}, type={}", q, type);
+
+            // ✅ 수정: Service의 통합 메서드 사용
+            Page<IssueResponse> result = issueService.searchIssues(q, type, pageable);
+
+            return ResponseEntity.ok(result);
+        }
+
+        /**
+         * 카테고리별 이슈 목록 조회
+         */
+        @GetMapping("/category/{categoryCode}")
+        public ResponseEntity<Page<IssueResponse>> getIssuesByCategory(
+                @PathVariable String categoryCode,
+                @PageableDefault(size = 10) Pageable pageable) {
+
+            log.info("카테고리별 이슈 조회: {}", categoryCode);
+            Page<IssueResponse> issues = issueService.getIssuesByCategory(categoryCode, pageable);
+            return ResponseEntity.ok(issues);
+        }
+
+        /**
+         * 인기 이슈 목록 조회
+         */
+        @GetMapping("/hot")
+        public ResponseEntity<Page<IssueResponse>> getHotIssues(@PageableDefault(size = 10) Pageable pageable) {
+            log.info("인기 이슈 조회");
+            Page<IssueResponse> issues = issueService.getHotIssues(pageable);
+            return ResponseEntity.ok(issues);
+        }
+
+        /**
+         * ✅ 추가: 최근 이슈 조회
+         */
+        @GetMapping("/recent")
+        public ResponseEntity<Page<IssueResponse>> getRecentIssues(@PageableDefault(size = 10) Pageable pageable) {
+            log.info("최근 이슈 조회");
+            Page<IssueResponse> issues = issueService.getRecentIssues(pageable);
+            return ResponseEntity.ok(issues);
+        }
+
+        // ============================================
+        // 🛠️ 개발자용 API (ID 기반)
+        // ============================================
+
+        /**
+         * ID로 이슈 상세 조회
+         */
+        @GetMapping("/{issueId}")
+        public ResponseEntity<IssueResponse> getIssue(@PathVariable String issueId) {
+            log.info("이슈 ID로 조회: {}", issueId);
+
+            if (!isValidObjectId(issueId)) {
+                throw new IllegalArgumentException("잘못된 이슈 ID 형식입니다: " + issueId);
+            }
+
+            IssueResponse issue = issueService.getIssue(issueId);
+            return ResponseEntity.ok(issue);
+        }
+
+        /**
+         * ✅ 수정: Service의 통합 연결 메서드 사용
+         */
+        @PostMapping("/{issueId}/links")
+        public ResponseEntity<LinkResponse> linkIssueToResource(
+                @PathVariable String issueId,
+                @Valid @RequestBody LinkRequest request) {  // ✅ @Valid 추가
+
+            log.info("이슈 연결: issueId={}, type={}, resourceId={}",
+                    issueId, request.resourceType(), request.resourceId());
+
+            // ✅ 수정: Service의 통합 메서드 사용
+            issueService.linkIssueToResource(issueId, request.resourceType(), request.resourceId());
+
+            String message = switch (request.resourceType().toUpperCase()) {
+                case "BILL" -> "이슈와 법안이 연결되었습니다";
+                case "STATEMENT" -> "이슈와 발언이 연결되었습니다";
+                case "FIGURE" -> "이슈와 정치인이 연결되었습니다";
+                case "NEWS" -> "이슈와 뉴스가 연결되었습니다";
+                default -> "리소스가 연결되었습니다";
+            };
+
+            LinkResponse response = new LinkResponse(
+                    message,
+                    issueId,
+                    request.resourceType(),
+                    request.resourceId(),
+                    LocalDateTime.now()
+            );
+
+            return ResponseEntity.ok(response);
+        }
+
+        // ============================================
+        // 🔗 관련 데이터 조회 API들
+        // ============================================
+
+    /**
+     * 추가: 리소스별 이슈 조회 (통합 API)
+     */
+    @GetMapping("/by-{resourceType}/{resourceId}")
+    public ResponseEntity<List<IssueResponse>> getIssuesByResource(@PathVariable String resourceType,
+                                                                   @PathVariable String resourceId) {
+
+        log.info("리소스별 이슈 조회: type={}, id={}", resourceType, resourceId);
+
+        List<IssueResponse> issues = issueService.getIssuesByResource(resourceType.toUpperCase(), resourceId);
+        return ResponseEntity.ok(issues);
+    }
+
 
 
     // ============================================
