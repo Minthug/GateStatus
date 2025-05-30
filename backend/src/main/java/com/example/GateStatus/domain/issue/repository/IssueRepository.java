@@ -11,58 +11,31 @@ import java.util.List;
 import java.util.Optional;
 
 public interface IssueRepository extends MongoRepository<IssueDocument, String> {
+    // 이름 기반 조회
+    Optional<IssueDocument> findByNameAndIsActiveTrue(String name);
+    boolean existsByNameAndIsActiveTrue(String name);
 
+    // 검색 관련
+    @Query("{'name': {$regex: '^?0$', $options: 'i'}, 'isActive': true}")
+    Page<IssueDocument> findByNameIgnoreCaseAndIsActiveTrue(String name, Pageable pageable);
+
+    @Query("{'name': {$regex: ?0, $options: 'i'}, 'isActive': true}")
+    Page<IssueDocument> findByNameContainingAndIsActiveTrueOrderByViewCountDesc(String name, Pageable pageable);
+
+    // 기존 메서드들...
     Page<IssueDocument> findByCategoryCodeAndIsActiveTrue(String categoryCode, Pageable pageable);
-
-    List<IssueDocument> findByCategoryCodeAndIsActiveTrue(String categoryCode);
-
-    Page<IssueDocument> findByCategoryCodeInAndIsActiveTrueOrderByCreatedAtDesc(List<String> categoryCode, Pageable pageable);
-
     Page<IssueDocument> findByIsHotTrueAndIsActiveTrueOrderByPriorityDescViewCountDesc(Pageable pageable);
-
-    @Query("{'relatedFigureIds': ?0, 'isActive': true}")
-    Page<IssueDocument> findIssueByFigureId(Long figureId, Pageable pageable);
-
-    Page<IssueDocument> findByParentIssueIdAndIsActiveTrue(String parentIssueId, Pageable pageable);
-
-    Page<IssueDocument> findByTagsContainingAndIsActiveTrue(String tag, Pageable pageable);
-
-    @Query("{'$text': {'$search': ?0}, 'isActive': true}")
+    Page<IssueDocument> findByIsActiveTrueOrderByCreatedAtDesc(Pageable pageable);
     Page<IssueDocument> searchByKeyword(String keyword, Pageable pageable);
 
-    @Query("{'relatedBillIds': ?0, 'isActive': true}")
+    // 관련 리소스 조회
+    Page<IssueDocument> findIssueByFigureId(Long figureId, Pageable pageable);
     List<IssueDocument> findIssuesByBillId(String billId);
-
     List<IssueDocument> findByRelatedStatementIdsContaining(String statementId);
-
-    Page<IssueDocument> findByIsActiveTrueOrderByCreatedAtDesc(Pageable pageable);
-
-    Optional<IssueDocument> findByIdAndIsActiveTrue(String id);
-
-    @Query("{'categoryCode': ?0, 'id': {'$ne': ?1}, 'isActive': true}")
-    List<IssueDocument> findRelatedIssuesByCategoryAndNotId(String categoryCode, String currentIssueId, Pageable pageable);
-
-    // 쿼리 관련 및 ID 문제 변수명 문제 질문
-    @Query("{'$or': [{'keywords': {'$in': ?0}}, {'tags': {'$in': ?0}}], 'id': {'$ne': ?1}, 'isActive': true}")
-    List<IssueDocument> findRelatedIssuesByKeywordsOrTags(List<String> keywords, String currentIssueId, Pageable pageable);
-
-    /**
-     * 특정 뉴스 ID와 연결된 이슈 목록 조회
-     */
     List<IssueDocument> findByRelatedNewsIdsContaining(String newsId);
 
-    /**
-     * 여러 뉴스 ID와 연결된 이슈 목록 조회
-     */
-    @Query("{'relatedNewsIds': {'$in': ?0}, 'isActive': true}")
-    List<IssueDocument> findByRelatedNewsIds(List<String> newsIds);
-
-    Optional<IssueDocument> findByNameAndIsActiveTrue(String normalizedName);
-
-    IssueDocument findActiveIssueById(String id);
-
-    Page<IssueDocument> findByNameIgnoreCaseAndIsActiveTrue(String normalizedQuery, Pageable pageable);
-
-    List<IssueDocument> findByRelatedIssuesByCategoryAndNotId(String categoryCode, String issueId, PageRequest of);
+    // 관련 이슈 찾기
+    List<IssueDocument> findRelatedIssuesByCategoryAndNotId(String categoryCode, String currentIssueId, Pageable pageable);
+    List<IssueDocument> findRelatedIssuesByKeywordsOrTags(List<String> keywords, String currentIssueId, Pageable pageable);
 }
 

@@ -142,7 +142,7 @@ public class IssueController {
             }
 
             case "NEWS" -> {
-                issueService.linkNewsToIssue(issueId, request.resourceId());
+                issueService.link(issueId, request.resourceId());
                 yield "이슈와 뉴스가 연결되었습니다";
             }
             default -> throw new IllegalArgumentException("지원하지 않는 리소스 타입: " + request.resourceType());

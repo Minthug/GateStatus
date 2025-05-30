@@ -44,7 +44,7 @@ public class IssueService {
      */
     @Transactional
     public IssueResponse getIssue(String id) {
-        IssueDocument issue = findActiveIssuesById(id);
+        IssueDocument issue = findActiveIssueById(id);
         issue.incrementViewCount();
         issueRepository.save(issue);
 
@@ -78,8 +78,8 @@ public class IssueService {
      * @return
      */
     @Transactional(readOnly = true)
-    public IssueResponse getIssuesForSystem(String id) {
-        IssueDocument issue = findActiveIssuesById(id);
+    public IssueResponse getIssueForSystem(String id) {
+        IssueDocument issue = findActiveIssueById(id);
         return IssueResponse.from(issue);
     }
 
@@ -89,7 +89,7 @@ public class IssueService {
      * @return
      */
     @Transactional(readOnly = true)
-    public IssueResponse getIssuesByNameForSystem(String name) {
+    public IssueResponse getIssueByNameForSystem(String name) {
         String normalizedName = validateAndNormalizeName(name);
 
         IssueDocument issue = issueRepository.findByNameAndIsActiveTrue(normalizedName)
@@ -108,15 +108,16 @@ public class IssueService {
      */
     @Transactional(readOnly = true)
     public Page<IssueResponse> searchIssues(String query, String searchType, Pageable pageable) {
-        String normalizedQuery = validateAndNormalizeName(query);
+        String normalizedQuery = validateAndNormalizeQuery(query);
+        String validatedType = validateSearchType(searchType);
 
-        Page<IssueDocument> issues = switch (searchType.toLowerCase()) {
+        Page<IssueDocument> issues = switch (validatedType) {
             case "exact" -> issueRepository.findByNameIgnoreCaseAndIsActiveTrue(normalizedQuery, pageable);
             case "fuzzy" -> searchWithFuzzyLogic(normalizedQuery, pageable);
             default -> issueRepository.searchByKeyword(normalizedQuery, pageable);
         };
 
-        log.debug("이슈 검색: query={}, type={}, 결과수={}", normalizedQuery, searchType, issues.getTotalElements());
+        log.debug("이슈 검색: query={}, type={}, 결과수={}", normalizedQuery, validatedType, issues.getTotalElements());
         return issues.map(IssueResponse::from);
     }
 
@@ -169,6 +170,7 @@ public class IssueService {
      * @param resourceId
      * @return
      */
+    @Transactional
     public List<IssueResponse> getIssuesByResource(String resourceType, String resourceId) {
         List<IssueDocument> issues = switch (resourceType.toUpperCase()) {
             case "FIGURE" -> issueRepository.findIssueByFigureId(Long.parseLong(resourceId), Pageable.unpaged()).getContent();
@@ -194,10 +196,10 @@ public class IssueService {
      */
     @Transactional(readOnly = true)
     public List<IssueResponse> findRelatedIssues(String issueId, int limit) {
-        IssueDocument issue = findActiveIssuesById(issueId);
+        IssueDocument issue = findActiveIssueById(issueId);
 
         // 1. 같은 카테고리 이슈 조회
-        List<IssueDocument> related = issueRepository.findByRelatedIssuesByCategoryAndNotId(
+        List<IssueDocument> related = issueRepository.findRelatedIssuesByCategoryAndNotId(
                 issue.getCategoryCode(), issueId, PageRequest.of(0, limit));
 
         // 2. 관련 이슈가 충분하지 않으면 키워드나 태그 기반으로 추가 조회
@@ -233,14 +235,14 @@ public class IssueService {
      */
     @Transactional
     public void linkIssueToResource(String issueId, String resourceType, String resourceId) {
-        IssueDocument issue = findActiveIssuesById(issueId);
+        IssueDocument issue = findActiveIssueById(issueId);
 
         switch (resourceType.toUpperCase()) {
             case "BILL" -> linkToBill(issue, resourceId);
-            case "STATEMENT" -> linkToStatement(issue, resourceId);
+            case "STATEMENT" -> linkToStatement(issue, issueId, resourceId);
             case "FIGURE" -> linkToFigure(issue, Long.parseLong(resourceId));
             case "NEWS" -> linkToNews(issue, resourceId);
-            default -> throw new IllegalArgumentException("지원허지 않는 리소스 타입: " + resourceType);
+            default -> throw new IllegalArgumentException("지원하지 않는 리소스 타입: " + resourceType);
         }
 
         issue.setUpdatedAt(LocalDateTime.now());
@@ -254,10 +256,10 @@ public class IssueService {
      */
     @Async
     @Transactional
-    public void autoLinkNewsToIssues(String newsId, String newTitle, String newContent) {
+    public void autoLinkNewsToIssues(String newsId, String newsTitle, String newsContent) {
         log.info("뉴스 자동 연결 시작: newsId={}", newsId);
 
-        String searchText = (newTitle + " " + newContent).toLowerCase();
+        String searchText = (newsTitle + " " + newsContent).toLowerCase();
         List<IssueDocument> candidates = issueRepository.findByIsActiveTrueOrderByCreatedAtDesc(
                 PageRequest.of(0, 100)).getContent();
 
@@ -278,7 +280,7 @@ public class IssueService {
     /**
      * 활성 이슈 조회 (공통 로직)
      */
-    private IssueDocument findActiveIssuesById(String id) {
+    private IssueDocument findActiveIssueById(String id) {
 
         return issueRepository.findById(id)
                 .filter(IssueDocument::getIsActive)
@@ -295,6 +297,45 @@ public class IssueService {
             throw new IllegalArgumentException("이슈 이름은 비어있을 수 없습니다");
         }
         return name.trim();
+    }
+
+    /**
+     * 검색어 유효성 검증 (검색용)
+     * @param query
+     * @return
+     */
+    private String validateAndNormalizeQuery(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            throw new IllegalArgumentException("검색어는 비어있을 수 없습니다");
+        }
+
+        String normalized = query.trim();
+
+        if (normalized.length() > 100) {
+            throw new IllegalArgumentException("검색어는 100자를 초과할 수 없습니다");
+        }
+        return normalized;
+    }
+
+    /**
+     * 검색 타입 검증
+     * @param searchType
+     * @return
+     */
+    private String validateSearchType(String searchType) {
+        if (searchType == null) {
+            return "contains";
+        }
+
+        String normalized = searchType.toLowerCase().trim();
+
+        return switch (normalized) {
+            case "exact", "contains", "fuzzy" -> normalized;
+            default -> {
+                log.warn("지원하지 않는 검색 타입: {}. 기본값 사용", searchType);
+                yield "contains";
+            }
+        };
     }
 
     /**
@@ -382,15 +423,14 @@ public class IssueService {
         issue.addRelatedFigure(figureId);
     }
 
-    private void linkToStatement(IssueDocument issue, String statementId) {
+    private void linkToStatement(IssueDocument issue, String issueId, String statementId) {
         issue.addRelatedStatement(statementId);
-        eventPublisher.publish(new IssueLinkedToStatementEvent(statementId, statementId));
+        eventPublisher.publish(new IssueLinkedToStatementEvent(issueId, statementId));
     }
 
     private void linkToBill(IssueDocument issue, String billId) {
         issue.addRelatedBill(billId);
     }
-
 }
 
 
