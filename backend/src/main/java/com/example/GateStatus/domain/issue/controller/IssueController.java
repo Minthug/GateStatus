@@ -113,38 +113,6 @@ public class IssueController {
         return ResponseEntity.ok(issue);
     }
 
-    /**
-     * 이슈와 리소스 연결
-     * POST /v1/issues/{issueId}/links
-     */
-    @PostMapping("/{issueId}/links")
-    public ResponseEntity<LinkResponse> linkIssueToResponse(@PathVariable String issueId,
-                                                            @Valid @RequestBody LinkRequest request) {
-
-
-        log.info("이슈 ID로 연결: issueId={}, type={}, resourceId={}",
-                issueId, request.resourceType(), request.resourceId());
-
-        issueService.linkIssueToResource(issueId, request.resourceType(), request.resourceId());
-
-        String message = switch (request.resourceType().toUpperCase()) {
-            case "BILL" -> "이슈와 법안이 연결되었습니다";
-            case "STATEMENT" -> "이슈와 발언이 연결되었습니다";
-            case "FIGURE" -> "이슈와 정치인이 연결되었습니다";
-            case "NEWS" -> "이슈와 뉴스가 연결되었습니다";
-            default -> "리소스가 연결되었습니다";
-        };
-        LinkResponse response = new LinkResponse(
-                message,
-                issueId,
-                request.resourceType(),
-                request.resourceId(),
-                LocalDateTime.now()
-        );
-        return ResponseEntity.ok(response);
-    }
-
-
     // ============================================
     // 🔗 관련 데이터 조회 API들
     // ============================================

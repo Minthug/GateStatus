@@ -26,16 +26,24 @@ public interface IssueRepository extends MongoRepository<IssueDocument, String> 
     Page<IssueDocument> findByCategoryCodeAndIsActiveTrue(String categoryCode, Pageable pageable);
     Page<IssueDocument> findByIsHotTrueAndIsActiveTrueOrderByPriorityDescViewCountDesc(Pageable pageable);
     Page<IssueDocument> findByIsActiveTrueOrderByCreatedAtDesc(Pageable pageable);
+    @Query("{'$text': {'$search': ?0}, 'isActive': true}")
     Page<IssueDocument> searchByKeyword(String keyword, Pageable pageable);
 
     // 관련 리소스 조회
-    Page<IssueDocument> findIssueByFigureId(Long figureId, Pageable pageable);
-    List<IssueDocument> findIssuesByBillId(String billId);
+    @Query("{'relatedFigureIds': ?0, 'isActive': true}")
+    Page<IssueDocument> findByRelatedFigureIdsContaining(Long figureId, Pageable pageable);
+    @Query("{'relatedBillIds': ?0, 'isActive': true}")
+    List<IssueDocument> findByRelatedBillIdsContaining(String billId);
     List<IssueDocument> findByRelatedStatementIdsContaining(String statementId);
     List<IssueDocument> findByRelatedNewsIdsContaining(String newsId);
 
     // 관련 이슈 찾기
+    @Query("{'categoryCode': ?0, 'id': {'$ne': ?1}, 'isActive': true}")
     List<IssueDocument> findRelatedIssuesByCategoryAndNotId(String categoryCode, String currentIssueId, Pageable pageable);
+    @Query("{'$or': [{'keywords': {'$in': ?0}}, {'tags': {'$in': ?0}}], 'id': {'$ne': ?1}, 'isActive': true}")
     List<IssueDocument> findRelatedIssuesByKeywordsOrTags(List<String> keywords, String currentIssueId, Pageable pageable);
+
+
+
 }
 

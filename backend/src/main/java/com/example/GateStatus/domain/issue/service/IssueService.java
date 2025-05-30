@@ -173,8 +173,8 @@ public class IssueService {
     @Transactional
     public List<IssueResponse> getIssuesByResource(String resourceType, String resourceId) {
         List<IssueDocument> issues = switch (resourceType.toUpperCase()) {
-            case "FIGURE" -> issueRepository.findIssueByFigureId(Long.parseLong(resourceId), Pageable.unpaged()).getContent();
-            case "BILL" -> issueRepository.findIssuesByBillId(resourceId);
+            case "FIGURE" -> issueRepository.findByRelatedFigureIdsContaining(Long.parseLong(resourceId), Pageable.unpaged()).getContent();
+            case "BILL" -> issueRepository.findByRelatedBillIdsContaining(resourceId);
             case "STATEMENT" -> issueRepository.findByRelatedStatementIdsContaining(resourceId);
             case "NEWS" -> issueRepository.findByRelatedNewsIdsContaining(resourceId);
             default -> throw new IllegalArgumentException("지원하지 않는 리소스 타입: " + resourceType);
