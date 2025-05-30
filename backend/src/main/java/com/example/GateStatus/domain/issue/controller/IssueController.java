@@ -2,6 +2,7 @@ package com.example.GateStatus.domain.issue.controller;
 
 import com.example.GateStatus.domain.category.service.CategoryService;
 import com.example.GateStatus.domain.issue.service.IssueService;
+import com.example.GateStatus.domain.issue.service.request.AutoLinkRequest;
 import com.example.GateStatus.domain.issue.service.request.LinkRequest;
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
 import com.example.GateStatus.domain.issue.service.response.LinkResponse;
@@ -17,6 +18,7 @@ import retrofit2.http.Path;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/issues")
@@ -147,136 +149,38 @@ public class IssueController {
     // 🔗 관련 데이터 조회 API들
     // ============================================
 
+    /**
+     * ✅ 수정: Service의 통합 연결 메서드 사용
+     */
+    @PostMapping("/{issueId}/links")
+    public ResponseEntity<LinkResponse> linkIssueToResource(
+            @PathVariable String issueId,
+            @Valid @RequestBody LinkRequest request) {  // ✅ @Valid 추가
 
-    @RestController
-    @RequestMapping("/v1/issues")
-    @RequiredArgsConstructor
-    @Slf4j
-    public class IssueController {
+        log.info("이슈 연결: issueId={}, type={}, resourceId={}",
+                issueId, request.resourceType(), request.resourceId());
 
-        private final IssueService issueService;
+        // ✅ 수정: Service의 통합 메서드 사용
+        issueService.linkIssueToResource(issueId, request.resourceType(), request.resourceId());
 
-        // ============================================
-        // 🎯 사용자 친화적 API (이슈 이름으로 검색)
-        // ============================================
+        String message = switch (request.resourceType().toUpperCase()) {
+            case "BILL" -> "이슈와 법안이 연결되었습니다";
+            case "STATEMENT" -> "이슈와 발언이 연결되었습니다";
+            case "FIGURE" -> "이슈와 정치인이 연결되었습니다";
+            case "NEWS" -> "이슈와 뉴스가 연결되었습니다";
+            default -> "리소스가 연결되었습니다";
+        };
 
-        /**
-         * 이슈 이름으로 정확 검색
-         * GET /v1/issues/search-by-name?name=부동산%20정책
-         */
-        @GetMapping("/search-by-name")
-        public ResponseEntity<IssueResponse> getIssueByName(@RequestParam String name) {
-            log.info("이슈 이름으로 검색: {}", name);
-            IssueResponse issue = issueService.getIssueByName(name);
-            return ResponseEntity.ok(issue);
-        }
+        LinkResponse response = new LinkResponse(
+                message,
+                issueId,
+                request.resourceType(),
+                request.resourceId(),
+                LocalDateTime.now()
+        );
 
-        /**
-         * ✅ 수정: Service의 통합 검색 메서드 사용
-         * GET /v1/issues/search?q=부동산&type=contains
-         */
-        @GetMapping("/search")
-        public ResponseEntity<Page<IssueResponse>> searchIssues(
-                @RequestParam String q,
-                @RequestParam(defaultValue = "contains") String type,
-                @PageableDefault(size = 10) Pageable pageable) {
-
-            log.info("이슈 검색: q={}, type={}", q, type);
-
-            // ✅ 수정: Service의 통합 메서드 사용
-            Page<IssueResponse> result = issueService.searchIssues(q, type, pageable);
-
-            return ResponseEntity.ok(result);
-        }
-
-        /**
-         * 카테고리별 이슈 목록 조회
-         */
-        @GetMapping("/category/{categoryCode}")
-        public ResponseEntity<Page<IssueResponse>> getIssuesByCategory(
-                @PathVariable String categoryCode,
-                @PageableDefault(size = 10) Pageable pageable) {
-
-            log.info("카테고리별 이슈 조회: {}", categoryCode);
-            Page<IssueResponse> issues = issueService.getIssuesByCategory(categoryCode, pageable);
-            return ResponseEntity.ok(issues);
-        }
-
-        /**
-         * 인기 이슈 목록 조회
-         */
-        @GetMapping("/hot")
-        public ResponseEntity<Page<IssueResponse>> getHotIssues(@PageableDefault(size = 10) Pageable pageable) {
-            log.info("인기 이슈 조회");
-            Page<IssueResponse> issues = issueService.getHotIssues(pageable);
-            return ResponseEntity.ok(issues);
-        }
-
-        /**
-         * ✅ 추가: 최근 이슈 조회
-         */
-        @GetMapping("/recent")
-        public ResponseEntity<Page<IssueResponse>> getRecentIssues(@PageableDefault(size = 10) Pageable pageable) {
-            log.info("최근 이슈 조회");
-            Page<IssueResponse> issues = issueService.getRecentIssues(pageable);
-            return ResponseEntity.ok(issues);
-        }
-
-        // ============================================
-        // 🛠️ 개발자용 API (ID 기반)
-        // ============================================
-
-        /**
-         * ID로 이슈 상세 조회
-         */
-        @GetMapping("/{issueId}")
-        public ResponseEntity<IssueResponse> getIssue(@PathVariable String issueId) {
-            log.info("이슈 ID로 조회: {}", issueId);
-
-            if (!isValidObjectId(issueId)) {
-                throw new IllegalArgumentException("잘못된 이슈 ID 형식입니다: " + issueId);
-            }
-
-            IssueResponse issue = issueService.getIssue(issueId);
-            return ResponseEntity.ok(issue);
-        }
-
-        /**
-         * ✅ 수정: Service의 통합 연결 메서드 사용
-         */
-        @PostMapping("/{issueId}/links")
-        public ResponseEntity<LinkResponse> linkIssueToResource(
-                @PathVariable String issueId,
-                @Valid @RequestBody LinkRequest request) {  // ✅ @Valid 추가
-
-            log.info("이슈 연결: issueId={}, type={}, resourceId={}",
-                    issueId, request.resourceType(), request.resourceId());
-
-            // ✅ 수정: Service의 통합 메서드 사용
-            issueService.linkIssueToResource(issueId, request.resourceType(), request.resourceId());
-
-            String message = switch (request.resourceType().toUpperCase()) {
-                case "BILL" -> "이슈와 법안이 연결되었습니다";
-                case "STATEMENT" -> "이슈와 발언이 연결되었습니다";
-                case "FIGURE" -> "이슈와 정치인이 연결되었습니다";
-                case "NEWS" -> "이슈와 뉴스가 연결되었습니다";
-                default -> "리소스가 연결되었습니다";
-            };
-
-            LinkResponse response = new LinkResponse(
-                    message,
-                    issueId,
-                    request.resourceType(),
-                    request.resourceId(),
-                    LocalDateTime.now()
-            );
-
-            return ResponseEntity.ok(response);
-        }
-
-        // ============================================
-        // 🔗 관련 데이터 조회 API들
-        // ============================================
+        return ResponseEntity.ok(response);
+    }
 
     /**
      * 추가: 리소스별 이슈 조회 (통합 API)
@@ -291,6 +195,43 @@ public class IssueController {
         return ResponseEntity.ok(issues);
     }
 
+        /**
+         * 관련 이슈 조회
+         */
+    @GetMapping("/{issueId}/related")
+    public ResponseEntity<List<IssueResponse>> getRelatedIssues(@PathVariable String issueId,
+                                                                @RequestParam(defaultValue = "5") int limit) {
+        log.info("관련 이슈 조회: issueId={}, limit={}", issueId, limit);
+
+        List<IssueResponse> result = issueService.findRelatedIssues(issueId, limit);
+        return ResponseEntity.ok(result);
+    }
+
+    // ============================================
+    // 🤖 자동화 기능 (관리자용)
+    // ============================================
+
+    @PostMapping("/auto-link/news/{newsId}")
+    public ResponseEntity<Map<String, Object>> autoLinkNewsToIssues(@PathVariable String newsId,
+                                                                    @RequestBody AutoLinkRequest request) {
+
+        log.info("뉴스 자동 연결 요청: newsId={}", newsId);
+
+        if (request.title() == null || request.content() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "title과 content가 필요합니다"));
+        }
+
+        issueService.autoLinkNewsToIssues(newsId, request.title(), request.content());
+
+        Map<String, Object> response = Map.of(
+                "message", "뉴스 자동 연결이 시작되었습니다",
+                "newsId", newsId,
+                "status", "PROCESSING",
+                "timestamp", LocalDateTime.now()
+        );
+
+        return ResponseEntity.accepted().body(response);
+    }
 
 
     // ============================================
