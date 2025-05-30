@@ -10,6 +10,7 @@ import com.example.GateStatus.domain.issue.service.request.IssueRequest;
 import com.example.GateStatus.domain.issue.service.response.IssueResponse;
 import com.example.GateStatus.global.config.EventListner.EventPublisher;
 import com.example.GateStatus.global.config.EventListner.IssueLinkedToStatementEvent;
+import io.kubernetes.client.extended.pager.Pager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -354,83 +355,50 @@ public class IssueService {
     // ============================================
 
     /**
-     * 특정 법안에 관련된 이슈 연결
-     * 이슈의 relatedBillIds 목록에 법안 ID를 추가
+     * 통합 리소스 연결 메서드
+     * 모든 타입의 리소스 연결을 하나로 처리
      * @param issueId
-     * @param billId
+     * @param resourceType
+     * @param resourceId
      */
     @Transactional
-    public void linkIssuesToBill(String issueId, String billId) {
-        log.info("이슈-법안 연결 시작: issueId={}, billId={}", issueId, billId);
+    public void linkIssueToResource(String issueId, String resourceType, String resourceId) {
+        IssueDocument issue = findActiveIssuesById(issueId);
 
-        IssueDocument issue = findByIssueById(issueId);
-        issue.addRelatedBill(billId);
+        switch (resourceType.toUpperCase()) {
+            case "BILL" -> linkToBill(issue, resourceId);
+            case "STATEMENT" -> linkToStatement(issue, resourceId);
+            case "FIGURE" -> linkToFigure(issue, Long.parseLong(resourceId));
+            case "NEWS" -> linkToNews(issue, resourceId);
+            default -> throw new IllegalArgumentException("지원허지 않는 리소스 타입: " + resourceType);
+        }
+
+        issue.setUpdatedAt(LocalDateTime.now());
         issueRepository.save(issue);
 
-        log.info("이슈-법안 연결 완료: issueId={}, billId={}", issueId, billId);
+        log.info("이슈 연결 완료: issueId={}, type={}, resourceId={}", issueId, resourceType, resourceId);
     }
 
     /**
-     * 특정 정치인에 관련된 이슈 연결
-     * 이슈의 relatedFigureIds 목록에 정치인 ID를 추가
-     * @param issueId
-     * @param figureId
+     *  뉴스 자동 연결
      */
+    @Async
     @Transactional
-    public void linkIssuesToFigure(String issueId, Long figureId) {
-        log.info("이슈-정치인 연결 시작: issueId={}, figureId={}", issueId, figureId);
+    public void autoLinkNewsToIssues(String newsId, String newTitle, String newContent) {
+        log.info("뉴스 자동 연결 시작: newsId={}", newsId);
 
-        IssueDocument issue = findByIssueById(issueId);
-        issue.addRelatedFigure(figureId);
-        issueRepository.save(issue);
+        String searchText = (newTitle + " " + newContent).toLowerCase();
+        List<IssueDocument> candidates = issueRepository.findByIsActiveTrueOrderByCreatedAtDesc(
+                PageRequest.of(0, 100)).getContent();
 
-        log.info("이슈-정치인 연결 완료: issueId={}, figureId={}", issueId, figureId);
-    }
-
-
-    /**
-     * 특정 발언과 이슈 연결 (이벤트 발행 포함)
-     * 이슈의 relatedStatementIds 목록에 발언 ID를 추가하고 연결 이벤트를 발행
-     * @param issueId
-     * @param statementId
-     */
-    @Transactional
-    public void linkIssueToStatement(String issueId, String statementId) {
-        log.info("이슈-발언 연결 시작: issueId={}, statementId={}", issueId, statementId);
-
-        // 이슈에 발언 ID 추가
-        IssueDocument issue = findByIssueById(issueId);
-        issue.addRelatedStatement(statementId);
-        issueRepository.save(issue);
-
-        // 이벤트 발행
-        eventPublisher.publish(new IssueLinkedToStatementEvent(issueId, statementId));
-
-        log.info("이슈-발언 연결 완료 및 이벤트 발행: issueId={}, statementId={}", issueId, statementId);
-    }
-
-    /**
-     * 부모 카테고리에 속한 이슈 목록 조회
-     * 대분류 카테고리에 속하는 모든 하위 카테고리의 이슈들을 조회
-     * @param categoryId
-     * @param page
-     * @param size
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public Page<IssueResponse> getIssueByParentCategory(Long categoryId, int page, int size) {
-        log.debug("부모 카테고리별 이슈 조회: categoryId={}, page={}, size={}", categoryId, page, size);
-
-        List<IssueCategory> issueCategories = categoryService.getIssueCategoriesByParentCategory(categoryId);
-        List<String> categoryCodes = issueCategories.stream()
-                .map(IssueCategory::getCode)
-                .collect(Collectors.toList());
-
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<IssueDocument> issuePage =
-                issueRepository.findByCategoryCodeInAndIsActiveTrueOrderByCreatedAtDesc(categoryCodes, pageable);
-
-        return issuePage.map(IssueResponse::from);
+        int linkedCount = 0;
+        for (IssueDocument issue : candidates) {
+            if (shouldAutoLink(issue, searchText)) {
+                linkToNews(issue, newsId);
+                linkedCount++;
+            }
+        }
+        log.info("뉴스 자동 연결 완료: newsId={}, 연결수={}", newsId, linkedCount);
     }
 
     /**
@@ -554,6 +522,15 @@ public class IssueService {
     }
 
 
+    // ============================================
+    // 🔗 개별 리소스 연결 메서드들 (private)
+    // ============================================
+
+
+
+    // ============================================
+    // 🔧 내부 유틸리티 메서드들
+    // ============================================
     private String validateAndNormalizeName(String name) {
         return null;
     }
