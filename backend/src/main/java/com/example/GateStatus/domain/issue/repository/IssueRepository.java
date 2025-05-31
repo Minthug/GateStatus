@@ -2,7 +2,6 @@ package com.example.GateStatus.domain.issue.repository;
 
 import com.example.GateStatus.domain.issue.IssueDocument;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
@@ -26,7 +25,12 @@ public interface IssueRepository extends MongoRepository<IssueDocument, String> 
     Page<IssueDocument> findByCategoryCodeAndIsActiveTrue(String categoryCode, Pageable pageable);
     Page<IssueDocument> findByIsHotTrueAndIsActiveTrueOrderByPriorityDescViewCountDesc(Pageable pageable);
     Page<IssueDocument> findByIsActiveTrueOrderByCreatedAtDesc(Pageable pageable);
-    @Query("{'$text': {'$search': ?0}, 'isActive': true}")
+
+    @Query("{'$or': [" +
+            " {'name':  {$regex: ?0, $options: 'i'}}," +
+            " {'description': {$regex: ?0, $options: 'i'}}," +
+            " {'keywords': {$regex: ?0, $options: 'i'}}" +
+            "], 'isActive': true}")
     Page<IssueDocument> searchByKeyword(String keyword, Pageable pageable);
 
     // 관련 리소스 조회
