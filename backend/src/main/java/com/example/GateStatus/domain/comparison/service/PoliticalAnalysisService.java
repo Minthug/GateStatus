@@ -1,6 +1,11 @@
 package com.example.GateStatus.domain.comparison.service;
 
+import com.example.GateStatus.domain.comparison.service.response.BillPassStats;
+import com.example.GateStatus.domain.comparison.service.response.VoteResultStats;
+import com.example.GateStatus.domain.proposedBill.ProposedBill;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
+import com.example.GateStatus.domain.vote.Vote;
+import com.example.GateStatus.domain.vote.VoteResultType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -9,8 +14,6 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import static java.util.Map.Entry.comparingByValue;
 
 @Service
 @RequiredArgsConstructor
@@ -77,5 +80,126 @@ public class PoliticalAnalysisService {
         return analyzeKeywords(contents, limit);
     }
 
+    /**
+     * 기본 제한으로 키워드 분석
+     */
+    public Map<String, Integer> analyzeKeywords(List<StatementDocument> statements) {
+        return analyzeKeywords(statements, DEFAULT_KEYWORD_LIMIT);
+    }
 
+
+    /**
+     * 텍스트를 지정된 길이로 요약
+     * @param text 요약할 텍스트
+     * @param maxLength 최대 길이
+     * @return 요약된 텍스트
+     */
+    public String summarizeText(String text, int maxLength) {
+        if (text  == null || text.trim().isEmpty()) {
+            return "";
+        }
+
+        text = text.trim();
+        if (text.length() <= maxLength) {
+            return text;
+        }
+
+        int lastSentenceEnd = findLastSentenceEnd(text, maxLength);
+        if (lastSentenceEnd > maxLength / 2) {
+            return text.substring(0, lastSentenceEnd + 1) + "...";
+        }
+
+        int lastSpace = text.lastIndexOf(" ", maxLength - 3);
+        if (lastSpace > 0) {
+            return text.substring(0, lastSpace) + "...";
+        }
+
+        return text.substring(0, maxLength - 3) + "...";
+    }
+
+    public VoteResultStats calculateVoteStats(List<Vote> votes) {
+        if (votes == null || votes.isEmpty()) {
+            return new VoteResultStats(0, 0, 0, 0, 0.0, 0.0);
+        }
+
+        Map<VoteResultType, Long> resultCounts = votes.stream()
+                .filter(vote -> vote.getVoteResult() != null)
+                .collect(Collectors.groupingBy(
+                        Vote::getVoteResult,
+                        Collectors.counting()
+                ));
+
+        int agree = resultCounts.getOrDefault(VoteResultType.AGREE, 0L).intValue();
+        int disagree = resultCounts.getOrDefault(VoteResultType.DISAGREE, 0L).intValue();
+        int abstain = resultCounts.getOrDefault(VoteResultType.ABSTAIN, 0L).intValue();
+        int absent = resultCounts.getOrDefault(VoteResultType.ABSENT, 0L).intValue();
+
+        int total = agree + disagree + abstain + absent;
+        double agreeRate = total > 0 ? (double) agree / total * 100 : 0.0;
+        double participationRate = total > 0 ? (double) (agree + disagree + abstain) / total * 100 : 0.0;
+        return new VoteResultStats(agree, disagree, abstain, absent, agreeRate, participationRate);
+    }
+
+
+    /**
+     * 법안 통과율 계산
+     * @param bills 법안 리스트
+     * @return 법안 통계 정보
+     */
+    public BillPassStats calculateBillStats(List<ProposedBill> bills) {
+        if (bills == null || bills.isEmpty()) {
+            return new BillPassStats(0, 0, 0.0);
+        }
+
+        int total = bills.size();
+        int passed = (int) bills.stream()
+                .filter(bill -> bill.getBillStatus() != null)
+                .filter(bill -> bill.getBillStatus().isPassed())
+                .count();
+
+        double passRate = (double) passed / total * 100;
+        return new BillPassStats(total, passed, passRate);
+    }
+
+    public String analyzeMainStance(List<StatementDocument> statements) {
+        if (statements == null || statements.isEmpty()) {
+            return "입장 정보 없음";
+        }
+
+        List<String> importantSentences = statements.stream()
+                .filter(s -> s.getContent() != null && !s.getContent().trim().isEmpty())
+                .sorted(Comparator.comparing(StatementDocument::getStatementDate).reversed())
+                .limit(3)
+                .map(StatementDocument::getContent)
+                .map(this::extractImportantSentence)
+                .filter(sentence -> !sentence.isEmpty())
+                .collect(Collectors.toList());
+
+
+        if (importantSentences.isEmpty()) {
+            return "입장 정보 없음";
+        }
+
+        String combinedStance = String.join(" ", importantSentences);
+        return summarizeText(combinedStance, 150);
+    }
+
+    private String extractImportantSentence(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return "";
+        }
+
+        String[] sentences = text.split("[.!?]\\s+");
+
+        for (String sentence : sentences) {
+            if (containsImportantKeywords(sentence)) {
+                return sentence.trim() + ".";
+            }
+        }
+        return sentences.length > 0 ? sentences[0].trim() + "." : "";
+    }
+
+    private int findLastSentenceEnd(String text, int maxLength) {
+        return 0;
+    }
 }
