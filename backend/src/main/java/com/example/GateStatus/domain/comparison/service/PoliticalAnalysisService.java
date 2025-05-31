@@ -80,6 +80,7 @@ public class PoliticalAnalysisService {
         return analyzeKeywords(contents, limit);
     }
 
+
     /**
      * 기본 제한으로 키워드 분석
      */
@@ -161,6 +162,12 @@ public class PoliticalAnalysisService {
         return new BillPassStats(total, passed, passRate);
     }
 
+
+    /**
+     * 발언에서 주요 입장 분석
+     * @param statements 발언 리스트
+     * @return 주요 입장 요약
+     */
     public String analyzeMainStance(List<StatementDocument> statements) {
         if (statements == null || statements.isEmpty()) {
             return "입장 정보 없음";
@@ -184,6 +191,12 @@ public class PoliticalAnalysisService {
         return summarizeText(combinedStance, 150);
     }
 
+
+    /**
+     * 텍스트에서 중요한 문장 추출
+     * @param text 원본 텍스트
+     * @return 중요 문장
+     */
     private String extractImportantSentence(String text) {
         if (text == null || text.trim().isEmpty()) {
             return "";
@@ -199,7 +212,40 @@ public class PoliticalAnalysisService {
         return sentences.length > 0 ? sentences[0].trim() + "." : "";
     }
 
+
+    /**
+     * 문장에 중요 키워드가 포함되어 있는지 확인
+     * @param sentence 검사할 문장
+     * @return 중요 키워드 포함 여부
+     */
+    private boolean containsImportantKeywords(String sentence) {
+
+        Set<String> importantKeywords = Set.of(
+                "주장", "입장", "생각", "의견", "제안", "해결", "방안",
+                "정책", "개선", "필요", "중요", "반대", "찬성"
+        );
+
+        return importantKeywords.stream()
+                .anyMatch(sentence::contains);
+    }
+
+
+    /**
+     * 마지막 완전한 문장의 끝 위치 찾기
+     * @param text 텍스트
+     * @param maxLength 최대 길이
+     * @return 문장 끝 위치
+     */
     private int findLastSentenceEnd(String text, int maxLength) {
-        return 0;
+        int lastSentenceEnd = -1;
+        String[] sentenceEnders = {".","!","?"};
+
+        for (String ender : sentenceEnders) {
+            int pos = text.lastIndexOf(ender, maxLength - 3);
+            if (pos > lastSentenceEnd) {
+                lastSentenceEnd = pos;
+            }
+        }
+        return lastSentenceEnd;
     }
 }
