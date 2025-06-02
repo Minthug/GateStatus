@@ -7,14 +7,19 @@ import com.example.GateStatus.domain.comparison.service.response.ComparisonResul
 import com.example.GateStatus.domain.comparison.service.response.IssueInfo;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.issue.IssueCategory;
+import com.example.GateStatus.domain.issue.IssueDocument;
+import com.example.GateStatus.domain.issue.exception.NotFoundIssueException;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.vote.Vote;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -93,8 +98,61 @@ public class ComparisonService {
         }
     }
 
+    private ComparisonContext createComparisonContext(ComparisonRequest request) {
+        ComparisonContext.ComparisonContextBuilder contextBuilder = ComparisonContext.builder();
+
+        if (request.issueId() != null && !request.issueId().trim().isEmpty()) {
+            IssueInfo issueInfo = getIssueInfo(request.issueId());
+            contextBuilder.issueInfo(issueInfo);
+        }
+
+        if (request.category() != null && !request.category().trim().isEmpty()) {
+            CategoryInfo categoryInfo = getCategoryInfo(request.category());
+            contextBuilder.categoryInfo(categoryInfo);
+        }
+
+        return contextBuilder.build();
+    }
+
+    /**
+     * 카테고리 정보 조회
+     * @param categoryCode 카테고리 코드
+     * @return 카테고리 정보
+     */
+    private CategoryInfo getCategoryInfo(String categoryCode) {
+        try {
+            IssueCategory category = IssueCategory.fromCode(categoryCode);
+            List<IssueDocument> categoryIssues = issueRepository
+                    .findByCategoryCodeAndIsActiveTrue(categoryCode, PageRequest.of(0, 100))
+                    .getContent();
+
+            return new CategoryInfo(category, categoryIssues);
+        } catch (IllegalArgumentException e) {
+            log.warn("유효하지 않은 카테고리 코드: {}", categoryCode);
+            throw new IllegalArgumentException("유효하지 않은 카테고리 코드: " + categoryCode);
+        }
+    }
+
+    /**
+     * 이슈 정보 조회
+     * @param issueId 이슈 ID
+     * @return 이슈 정보
+     */
+    private IssueInfo getIssueInfo(String issueId) {
+        IssueDocument issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new NotFoundIssueException("해당 이슈가 존재하지 않습니다: " + issueId));
+
+        return new IssueInfo(
+                issue.getId(),
+                issue.getName(),
+                issue.getDescription(),
+                issue.getCategoryName()
+        );
+    }
+
     @Builder
     @Value
+    @AllArgsConstructor
     public static class ComparisonContext {
         IssueInfo issueInfo;
         CategoryInfo categoryInfo;
