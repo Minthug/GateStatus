@@ -1,9 +1,11 @@
 package com.example.GateStatus.domain.comparison.service;
 
+import com.example.GateStatus.domain.common.DateRange;
 import com.example.GateStatus.domain.comparison.ComparisonType;
 import com.example.GateStatus.domain.comparison.service.response.CategoryInfo;
 import com.example.GateStatus.domain.comparison.service.response.ComparisonResult;
 import com.example.GateStatus.domain.comparison.service.response.FigureComparisonData;
+import com.example.GateStatus.domain.comparison.service.response.IssueInfo;
 import com.example.GateStatus.domain.figure.Figure;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,7 +58,22 @@ public class ComparisonResultBuilder {
     }
 
     private void addBasicAnalysisInfo(Map<String, Object> summary, ComparisonService.ComparisonRawData rawData) {
+        DateRange dateRange = rawData.getDateRange();
 
+        summary.put("analysisStartDate", dateRange.getStartDate().toString());
+        summary.put("analysisEndDate", dateRange.getEndDate().toString());
+        summary.put("analysisPeriodDays", dateRange.getDays());
+        summary.put("analysisPeriodDescription", dateRange.getShortDescription());
+        summary.put("comparedFiguresCount", rawData.getFigures().size());
+
+        IssueInfo issueInfo = rawData.getContext().getIssueInfo();
+        if (issueInfo != null) {
+            summary.put("targetIssue", Map.of(
+                    "id", issueInfo.issueId(),
+                    "name", issueInfo.name(),
+                    "description", issueInfo.description()
+            ));
+        }
     }
 
     private void addCategoryInfo(Map<String, Object> summary, CategoryInfo categoryInfo) {
