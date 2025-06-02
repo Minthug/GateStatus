@@ -35,11 +35,13 @@ public class PoliticalAnalysisService {
      * @param limit 반환할 키워드 개수 제한
      * @return 키워드별 빈도수 맵 (빈도순 정렬)
      */
-    @Cacheable(value = "keywordAnalysis", key = "#contents.hashCode() + '_' + #limit")
-    public Map<String, Integer> analyzeKeywords(List<String> contents, int limit) {
+    @Cacheable(value = "keywordAnalysis", key = "'contents_' + #contents.size() + '_' + #contents.hashCode() + '_' + #limit")
+    public Map<String, Integer> analyzeKeywordsFromText(List<String> contents, int limit) {
         if (contents == null || contents.isEmpty()) {
             return new LinkedHashMap<>();
         }
+
+        log.debug("텍스트 키워드 분석 시작: 문서 수={}, 제한={}", contents.size(), limit);
 
         return contents.stream()
                 .filter(Objects::nonNull)
@@ -71,23 +73,56 @@ public class PoliticalAnalysisService {
      * @param limit 키워드 개수 제한
      * @return 키워드별 빈도수 맵
      */
-    public Map<String, Integer> analyzeKeywords(List<StatementDocument> statements, int limit) {
+    @Cacheable(value = "keywordAnalysis", key = "'statements_' + #statements.size() + '_' + #statements.hashCode() + '_' + #limit")
+    public Map<String, Integer> analyzeKeywordsFromStatements(List<StatementDocument> statements, int limit) {
+        if (statements == null || statements.isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+
+        log.debug("발언 문서 키워드 분석 시작: 문서 수={}, 제한={}", statements.size(), limit);
+
         List<String> contents = statements.stream()
                 .map(StatementDocument::getContent)
                 .filter(Objects::nonNull)
+                .filter(content -> !content.trim().isEmpty())
                 .collect(Collectors.toList());
 
-        return analyzeKeywords(contents, limit);
+        return analyzeKeywordsFromText(contents, limit);
     }
 
 
     /**
-     * 기본 제한으로 키워드 분석
+     * 발언 문서에서 기본 제한으로 키워드 분석
+     * @param statements 발언 문서 리스트
+     * @return 키워드별 빈도수 맵 (기본 10개 제한)
      */
-    public Map<String, Integer> analyzeKeywords(List<StatementDocument> statements) {
-        return analyzeKeywords(statements, DEFAULT_KEYWORD_LIMIT);
+    public Map<String, Integer> analyzeKeywordsFromStatements(List<StatementDocument> statements) {
+        return analyzeKeywordsFromStatements(statements, DEFAULT_KEYWORD_LIMIT);
     }
 
+    public Map<String, Integer> analyzeKeywordsFromSingleText(String text, int limit) {
+        if (text == null || text.trim().isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+
+        return analyzeKeywordsFromText(List.of(text), limit);
+    }
+
+    @Cacheable(value = "keywordAnalysis", key = "'figureStatements_' + #statementsByFigure.keySet().toString() + '_' + #limit")
+    public Map<Long, Map<String, Integer>> analyzeKeywordsByFigure(Map<Long, List<StatementDocument>> statementsByFigure, int limit) {
+
+        if (statementsByFigure == null || statementsByFigure.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        log.debug("정치인별 키워드 분석 시작: 정치인 수={}, 제한={}", statementsByFigure.size(), limit);
+
+        return statementsByFigure.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> analyzeKeywordsFromStatements(entry.getValue(), limit)
+                ));
+    }
 
     /**
      * 텍스트를 지정된 길이로 요약
