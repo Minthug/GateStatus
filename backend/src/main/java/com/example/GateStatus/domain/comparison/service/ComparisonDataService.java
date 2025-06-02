@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.comparison.service;
 
+import com.example.GateStatus.domain.common.DateRange;
 import com.example.GateStatus.domain.comparison.service.response.FigureComparisonData;
 import com.example.GateStatus.domain.comparison.service.response.IssueInfo;
 import com.example.GateStatus.domain.comparison.service.response.StatementComparisonData;
@@ -30,19 +31,4 @@ public class ComparisonDataService {
     private final PoliticalAnalysisService analysisService;
 
 
-    public List<FigureComparisonData> createFigureComparisonData(List<Figure> figures, IssueInfo issueInfo, ComparisonService.DateRange dateRange) {
-        if (figures == null || figures.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<Long> figureIds = figures.stream()
-                .map(Figure::getId)
-                .collect(Collectors.toList());
-
-
-        log.info("정치인별 비교 데이터 생성 시작: 대상 {}명, 기간 {}~{}",
-                figureIds.size(), dateRange.startDate(), dateRange.endDate());
-
-
-    }
 }
