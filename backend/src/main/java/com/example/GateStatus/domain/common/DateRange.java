@@ -9,7 +9,6 @@ import lombok.With;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 @Value
@@ -116,6 +115,47 @@ public class DateRange {
         return ranges;
     }
 
+    public double calculateActivityDensity(int activeDays) {
+        long totalDays = getDays();
+        if (totalDays == 0) return 0.0;
+        return Math.min(1.0, (double) activeDays / totalDays);
+    }
+
+    public double calculateMonthlyAverage(int totalActivity) {
+        long months = Math.max(1, getMonths());
+        return (double) totalActivity / months;
+    }
+
+    public DateRange extend(long amount, ChronoUnit unit) {
+        return DateRange.of(
+                startDate.minus(amount, unit),
+                endDate.plus(amount, unit)
+        );
+    }
+
+    public String getDescription() {
+        return String.format("%s ~ %s (%d일)", startDate, endDate, getDays());
+    }
+
+    public String getShortDescription() {
+        if (getYears() >= 1) {
+            return String.format("%d년 %d월 ~ %d년 %d월",
+                    startDate.getYear(), startDate.getMonthValue(),
+                    endDate.getYear(), endDate.getMonthValue());
+        } else {
+            return String.format("%d월 ~ %d월 (%d일)",
+                    startDate.getMonthValue(), endDate.getMonthValue(), getDays());
+        }
+    }
+
+    /**
+     * 디버깅 및 로깅용 상세 정보
+     */
+    @Override
+    public String toString() {
+        return String.format("DateRange{start=%s, end=%s, days=%d, valid=%s}",
+                startDate, endDate, getDays(), isValid());
+    }
 
     // === Private Helper Methods ===
     private LocalDate getQuarterEnd(LocalDate date) {
@@ -125,7 +165,27 @@ public class DateRange {
                 .withDayOfMonth(LocalDate.of(date.getYear(), endMonth, 1).lengthOfMonth());
     }
 
+    // === Validation Methods ===
 
+    /**
+     * 생성자에서 호출되는 유효성 검증
+     */
+    @Builder
+    private DateRange(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null) {
+            throw new IllegalArgumentException("시작 날짜는 null일 수 없습니다");
+        }
+        if (endDate == null) {
+            throw new IllegalArgumentException("종료 날짜는 null일 수 없습니다");
+        }
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException(
+                    String.format("시작 날짜(%s)는 종료 날짜(%s)보다 이전이어야 합니다", startDate, endDate));
+        }
+
+        this.startDate = startDate;
+        this.endDate = endDate;
+    }
 
 }
 
