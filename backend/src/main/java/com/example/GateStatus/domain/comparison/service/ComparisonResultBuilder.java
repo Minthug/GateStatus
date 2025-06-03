@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -155,9 +156,6 @@ public class ComparisonResultBuilder {
         return null;
     }
 
-    private Object createFigureInfo(FigureComparisonData figure) {
-        return null;
-    }
     /**
      * 단일 정치인의 비교 데이터 생성
      */
@@ -204,16 +202,88 @@ public class ComparisonResultBuilder {
     }
 
     private Map<String, Object> createAdditionalData(Long figureId, List<StatementDocument> statements, List<Vote> votes, List<ProposedBill> bills, DateRange dateRange) {
-        return null;
+        Map<String, Object> additionalData = new HashMap<>();
+
+        Set<LocalDate> allActivityDates = new HashSet<>();
+
+        statements.stream()
+                .map(StatementDocument::getStatementDate)
+                .forEach(allActivityDates::add);
+
+        votes.stream()
+                .map(Vote::getVoteDate)
+                .forEach(allActivityDates::add);
+
+        bills.stream()
+                .map(ProposedBill::getProposeDate)
+                .forEach(allActivityDates::add);
+
+        int activeDays = allActivityDates.size();
+        additionalData.put("activeDays", activeDays);
+        
+        double activeDensity = dateRange.calculateActivityDensity(activeDays);
+        additionalData.put("activityDensity", Math.round(activeDensity * 10000) / 100.0);
+
+        int totalActivities = statements.size() + votes.size() + bills.size();
+        double monthlyAverage = dateRange.calculateMonthlyAverage(totalActivities);
+        additionalData.put("monthlyAverageActivity", Math.round(monthlyAverage * 100) / 100.0);
+
+        String mainActivityType = determineMainActivityType(
+                statements.size(), votes.size(), bills.size());
+        additionalData.put("mainActivityType", mainActivityType);
+
+        Map<String, Integer> activityDistribution = Map.of(
+                "statements", statements.size(),
+                "votes", votes.size(),
+                "bills", bills.size()
+        );
+        additionalData.put("activityDistribution", activityDistribution);
+        return additionalData;
     }
+
 
     private VoteComparisonData createVoteComparisonData(List<Vote> votes) {
-        return null;
+        if (votes.isEmpty()) {
+            return new VoteComparisonData(Collections.emptyList(), 0, 0, 0, 0.0);
+        }
+
+        VoteResultStats stats = analysisService.calculateVoteStats(votes);
+
+        List<VoteInfo> voteInfos = votes.stream()
+                .limit(20)
+                .map(this::convertToVoteInfo)
+                .collect(Collectors.toList());
+
+        return new VoteComparisonData(
+                voteInfos,
+                stats.agree(),
+                stats.disagree(),
+                stats.abstain(),
+                stats.agreeRate()
+        );
     }
 
+
     private BillComparisonData createBillComparisonData(List<ProposedBill> bills) {
-        return null;
+        if (bills.isEmpty()) {
+            return new BillComparisonData(Collections.emptyList(), 0, 0, 0.0);
+        }
+
+        BillPassStats stats = analysisService.calculateBillStats(bills);
+
+        List<BillInfo> billInfos = bills.stream()
+                .limit(20)
+                .map(this::convertToBillInfo)
+                .collect(Collectors.toList());
+
+        return new BillComparisonData(
+                billInfos,
+                stats.total(),
+                stats.passed(),
+                stats.passRate()
+        );
     }
+
 
     private StatementComparisonData createStatementComparisonData(List<StatementDocument> statements) {
         if (statements.isEmpty()) {
@@ -237,15 +307,59 @@ public class ComparisonResultBuilder {
         );
     }
 
+    // === Helper Methods ===
 
-    private boolean shouldIncludeType(List<ComparisonType> comparisonTypes, ComparisonType comparisonType) {
-        return false;
+    private String determineMainActivityType(int statementCount, int voteCount, int billCount) {
+        if (statementCount >= voteCount && statementCount >= billCount) {
+            return "발언 중심";
+        } else if (voteCount >= billCount) {
+            return "투표 참여 중심";
+        } else {
+            return "법안 발의 중심";
+        }
+    }
+
+    private boolean shouldIncludeType(List<ComparisonType> types, ComparisonType targetType) {
+        return types == null || types.contains(targetType);
+    }
+
+
+    private Map<String, Object> createFigureInfo(FigureComparisonData figure) {
+        return Map.of(
+                "id", figure.figureId(),
+                "name", figure.figureName(),
+                "party", figure.partyName()
+        );
     }
 
     // === Entity to DTO 변환 메서드들 ===
 
     private StatementInfo convertToStatementInfo(StatementDocument document) {
-
+        return new StatementInfo(
+                document.getId(),
+                document.getTitle(),
+                analysisService.summarizeText(document.getContent(), 100),
+                document.getStatementDate(),
+                document.getSource()
+        );
     }
 
+    private VoteInfo convertToVoteInfo(Vote vote) {
+        return new VoteInfo(
+                vote.getId().toString(),
+                vote.getBill() != null ? vote.getBill().getBillName() : "알 수 없음",
+                vote.getVoteDate(),
+                vote.getVoteResult().name()
+        );
+    }
+
+    private BillInfo convertToBillInfo(ProposedBill bill) {
+        return new BillInfo(
+                bill.getId(),
+                bill.getBillName(),
+                bill.getProposeDate(),
+                bill.getBillStatus() != null ? bill.getBillStatus().name() : "처리상태 알 수 없음",
+                bill.getBillStatus() != null && bill.getBillStatus().isPassed()
+        );
+    }
 }
