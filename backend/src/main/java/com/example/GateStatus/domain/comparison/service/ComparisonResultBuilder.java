@@ -2,19 +2,16 @@ package com.example.GateStatus.domain.comparison.service;
 
 import com.example.GateStatus.domain.common.DateRange;
 import com.example.GateStatus.domain.comparison.ComparisonType;
-import com.example.GateStatus.domain.comparison.service.response.CategoryInfo;
-import com.example.GateStatus.domain.comparison.service.response.ComparisonResult;
-import com.example.GateStatus.domain.comparison.service.response.FigureComparisonData;
-import com.example.GateStatus.domain.comparison.service.response.IssueInfo;
+import com.example.GateStatus.domain.comparison.service.response.*;
 import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.proposedBill.ProposedBill;
+import com.example.GateStatus.domain.statement.mongo.StatementDocument;
+import com.example.GateStatus.domain.vote.Vote;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -168,8 +165,87 @@ public class ComparisonResultBuilder {
             Figure figure,
             ComparisonService.ComparisonRawData rawData,
             List<ComparisonType> comparisonTypes) {
-        return ;
+
+        Long figureId = figure.getId();
+
+        List<StatementDocument> statements = rawData.getStatements().getOrDefault(figureId, Collections.emptyList());
+        List<Vote> votes = rawData.getVotes().getOrDefault(figureId, Collections.emptyList());
+        List<ProposedBill> bills = rawData.getBills().getOrDefault(figureId, Collections.emptyList());
+
+        StatementComparisonData statementData = null;
+        VoteComparisonData voteData = null;
+        BillComparisonData billData = null;
+
+        if (shouldIncludeType(comparisonTypes, ComparisonType.STATEMENT)) {
+            statementData = createStatementComparisonData(statements);
+        }
+
+        if (shouldIncludeType(comparisonTypes, ComparisonType.VOTE)) {
+            voteData = createVoteComparisonData(votes);
+        }
+
+        if (shouldIncludeType(comparisonTypes, ComparisonType.BILL)) {
+            billData = createBillComparisonData(bills);
+        }
+
+        Map<String, Object> additionalData = createAdditionalData(
+                figureId, statements, votes, bills, rawData.getDateRange());
+
+        return new FigureComparisonData(
+                figure.getId(),
+                figure.getName(),
+                figure.getFigureParty() != null ? figure.getFigureParty().getPartyName() : "무소속",
+                statementData,
+                voteData,
+                billData,
+                additionalData
+        );
+
     }
 
+    private Map<String, Object> createAdditionalData(Long figureId, List<StatementDocument> statements, List<Vote> votes, List<ProposedBill> bills, DateRange dateRange) {
+        return null;
+    }
+
+    private VoteComparisonData createVoteComparisonData(List<Vote> votes) {
+        return null;
+    }
+
+    private BillComparisonData createBillComparisonData(List<ProposedBill> bills) {
+        return null;
+    }
+
+    private StatementComparisonData createStatementComparisonData(List<StatementDocument> statements) {
+        if (statements.isEmpty()) {
+            return new StatementComparisonData(
+                    Collections.emptyList(), 0, "입장 정보 없음", Collections.emptyMap());
+        }
+
+        List<StatementInfo> statementInfos = statements.stream()
+                .limit(20)
+                .map(this::convertToStatementInfo)
+                .collect(Collectors.toList());
+
+        Map<String, Integer> keywordCounts = analysisService.analyzeKeywordsFromStatements(statements, 10);
+        String mainStance = analysisService.analyzeMainStance(statements);
+
+        return new StatementComparisonData(
+                statementInfos,
+                statements.size(),
+                mainStance,
+                keywordCounts
+        );
+    }
+
+
+    private boolean shouldIncludeType(List<ComparisonType> comparisonTypes, ComparisonType comparisonType) {
+        return false;
+    }
+
+    // === Entity to DTO 변환 메서드들 ===
+
+    private StatementInfo convertToStatementInfo(StatementDocument document) {
+
+    }
 
 }
