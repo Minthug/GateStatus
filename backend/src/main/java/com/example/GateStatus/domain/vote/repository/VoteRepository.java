@@ -64,13 +64,24 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
      */
     List<Vote> findByFigureFigurePartyAndVoteDateBetween(FigureParty party, LocalDate start, LocalDate end);
 
+   /*
+    * 여러 정치인의 투표를 한번에 조회
+    */
+    @Query("SELECT v FROM Vote v WHERE v.figure.id IN :figureIds AND v.voteDate BETWEEN :startDate AND :endDate")
+    List<Vote> findByFigureIdInAndVoteDateBetween(
+            @Param("figureIds") List<Long> figureIds,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
     /**
-     * 특정 정치인의 특정 법안들에 대한 기간별 투표 내역 조회
-     * billIds 파라미터 타입 확인 필요 (String인지 Long인지)
+     * 특정 법안들에 대한 여러 정치인의 투표 조회
      */
-    List<Vote> findByFigureIdAndBillBillNoInAndVoteDateBetween(Long figureId, List<String> billNos, LocalDate startDate, LocalDate endDate);
-    // 또는 Long 타입이라면:
-    // List<Vote> findByFigureIdAndBillIdInAndVoteDateBetween(Long figureId, List<Long> billIds, LocalDate startDate, LocalDate endDate);
+    @Query("SELECT v FROM Vote v WHERE v.figure.id IN :figureIds AND v.bill.billNo IN :billIds AND v.voteDate BETWEEN :startDate AND :endDate")
+    List<Vote> findByFigureIdInAndBillBillNoInAndVoteDateBetween(
+            @Param("figureIds") List<Long> figureIds,
+            @Param("billIds") List<String> billIds,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 
     /**
      * 법안명 키워드로 투표 내역 검색

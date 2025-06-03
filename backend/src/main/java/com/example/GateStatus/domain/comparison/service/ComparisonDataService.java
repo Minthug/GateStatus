@@ -102,12 +102,44 @@ public class ComparisonDataService {
 
     private Map<Long, List<ProposedBill>> fetchBillsBatch(List<Long> figureIds, ComparisonService.ComparisonContext context, DateRange dateRange) {
 
-
     }
 
-    private Map<Long, List<Vote>> fetchVotesBatch(List<Long> figureIds, ComparisonService.ComparisonContext context, DateRange dateRange) {
+    private Map<Long, List<Vote>> fetchVotesBatch(
+            List<Long> figureIds, ComparisonService.ComparisonContext context, DateRange dateRange) {
+
+        List<Vote> allVotes;
+
+        if (context.hasTargetIssue()) {
+            // 특정 이슈 관련 투표 조회
+            List<String> relatedBillIds = getRelatedBillIds(context.getIssueId());
+            if (!relatedBillIds.isEmpty()) {
+                allVotes = voteRepository.findByFigureIdInAndBillBillNoInAndVoteDateBetween(
+                        figureIds, relatedBillIds, dateRange.getStartDate(), dateRange.getEndDate());
+            } else {
+                allVotes = voteRepository.findByFigureIdInAndVoteDateBetween(
+                        figureIds, dateRange.getStartDate(), dateRange.getEndDate());
+            }
+        } else {
+            // 전체 투표 조회
+            allVotes = voteRepository.findByFigureIdInAndVoteDateBetween(
+                    figureIds, dateRange.getStartDate(), dateRange.getEndDate());
+        }
+
+        Map<Long, List<Vote>> votesMap = allVotes.stream()
+                .collect(Collectors.groupingBy(vote -> vote.getFigure().getId()));
+
+        figureIds.forEach(figureId -> votesMap.putIfAbsent(figureId, new ArrayList<>()));
 
 
+        log.debug("투표 데이터 조회: 총 {}건, 정치인별 평균 {}건",
+                allVotes.size(), allVotes.size() / (double) figureIds.size());
+
+        return votesMap;
+    }
+
+
+    private List<String> getRelatedBillIds(String issueId) {
+        return null;
     }
 
     private Map<Long, Figure> getFiguresMap(List<Long> figureIds) {
