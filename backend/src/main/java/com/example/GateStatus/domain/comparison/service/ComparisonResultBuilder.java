@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.Serializable;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -84,7 +85,7 @@ public class ComparisonResultBuilder {
         categoryData.put("name", categoryInfo.category().getDisplayName());
         categoryData.put("totalIssueCount", categoryInfo.issues().size());
 
-        List<Map<String, Object>> topIssues = categoryInfo.issues().stream()
+        List<Map<String, ? extends Serializable>> topIssues = categoryInfo.issues().stream()
                 .limit(5)
                 .map(issue -> Map.of(
                         "id", issue.getId(),

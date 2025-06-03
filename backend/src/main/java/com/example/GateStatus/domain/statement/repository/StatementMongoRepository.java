@@ -39,10 +39,20 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     // 특정 정치인의 특정 기간 내 모든 발언 조회(페이징없음)
     List<StatementDocument> findByFigureIdAndStatementDateBetween(Long figureId, LocalDate startDate, LocalDate endDate);
 
-    // 특정 정치인의 특정 이슈에 관한 특정 기간 내 발언 조회
+    // 특정 정치인의 특정 이슈에 관한 특정 기간 내 발언 조회 (단일 정치인용)
     @Query("{'figureId': ?0, 'issueIds': ?1, 'statementDate': {$gte: ?2, $lte: ?3}}")
     List<StatementDocument> findByFigureIdAndIssueIdsContainingAndStatementDateBetween(
             Long figureId, String issueId, LocalDate startDate, LocalDate endDate);
+
+    // 여러 정치인용 (배치 처리)
+    @Query("{'figureId': {$in: ?0}, 'issueIds': ?1, 'statementDate': {$gte: ?2, $lte: ?3}}")
+    List<StatementDocument> findByFigureIdInAndIssueIdsContainingAndStatementDateBetween(
+            List<Long> figureIds, String issueId, LocalDate startDate, LocalDate endDate);
+
+    // 여러 정치인용 + 페이징 (전체 조회용)
+    @Query("{'figureId': {$in: ?0}, 'statementDate': {$gte: ?1, $lte: ?2}}")
+    List<StatementDocument> findByFigureIdInAndStatementDateBetween(
+            List<Long> figureIds, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     // 발언 내용만 검색
     @Query("{ 'content': { $regex: ?0, $options:  'i' } }")
