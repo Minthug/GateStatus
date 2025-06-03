@@ -33,9 +33,24 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
     @Query("SELECT p FROM ProposedBill p ORDER BY p.viewCount DESC")
     List<ProposedBill> findTopByOrderByViewCountDesc(Pageable pageable);
 
-    List<ProposedBill> findByProposerIdAndProposeDateBetween(Long proposerId, LocalDate startDate, LocalDate endDate);
+    /**
+     * 여러 정치인이 발의한 법안을 한번에 조회
+     */
+    @Query("SELECT b FROM ProposedBill b WHERE b.proposer.id IN :proposerIds AND b.proposeDate BETWEEN :startDate AND :endDate")
+    List<ProposedBill> findByProposerIdInAndProposeDateBetween(
+            @Param("proposerIds") List<Long> proposerIds,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 
-    List<ProposedBill> findByProposerIdAndIdInAndProposeDateBetween(Long proposerId, List<String> billIds, LocalDate startDate, LocalDate endDae);
+    /**
+     * 특정 법안 ID들에 해당하는 여러 정치인의 법안 조회
+     */
+    @Query("SELECT b FROM ProposedBill b WHERE b.proposer.id IN :proposerIds AND b.id IN :billIds AND b.proposeDate BETWEEN :startDate AND :endDate")
+    List<ProposedBill> findByProposerIdInAndIdInAndProposeDateBetween(
+            @Param("proposerIds") List<Long> proposerIds,
+            @Param("billIds") List<Long> billIds,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 
 
     @Query("SELECT p.billStatus as status, COUNT (p) as count " +

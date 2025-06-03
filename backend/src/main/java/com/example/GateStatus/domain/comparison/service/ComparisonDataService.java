@@ -1,10 +1,13 @@
 package com.example.GateStatus.domain.comparison.service;
 
 import com.example.GateStatus.domain.common.DateRange;
+import com.example.GateStatus.domain.comparison.exception.NotFoundCompareException;
 import com.example.GateStatus.domain.comparison.service.response.FigureComparisonData;
 import com.example.GateStatus.domain.comparison.service.response.IssueInfo;
 import com.example.GateStatus.domain.comparison.service.response.StatementComparisonData;
 import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.issue.IssueDocument;
 import com.example.GateStatus.domain.issue.repository.IssueRepository;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
@@ -19,10 +22,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,6 +36,7 @@ public class ComparisonDataService {
     private final ProposedBillRepository billRepository;
     private final IssueRepository issueRepository;
     private final PoliticalAnalysisService analysisService;
+    private final FigureRepository figureRepository;
 
 
     public ComparisonService.ComparisonRawData fetchAllComparisonData(List<Long> figureIds,
@@ -100,9 +102,35 @@ public class ComparisonDataService {
     }
 
 
-    private Map<Long, List<ProposedBill>> fetchBillsBatch(List<Long> figureIds, ComparisonService.ComparisonContext context, DateRange dateRange) {
+    private Map<Long, List<ProposedBill>> fetchBillsBatch(
+            List<Long> figureIds, ComparisonService.ComparisonContext context, DateRange dateRange) {
 
+        List<ProposedBill> allBills;
+
+        if (context.hasTargetIssue()) {
+            List<Long> relatedBillIds = getRelatedBillIdsAsLong(context.getIssueId());
+            if (!relatedBillIds.isEmpty()) {
+                allBills = billRepository.findByProposerIdInAndIdInAndProposeDateBetween(
+                        figureIds, relatedBillIds, dateRange.getStartDate(), dateRange.getEndDate());
+            } else {
+                allBills = billRepository.findByProposerIdInAndProposeDateBetween(
+                        figureIds, dateRange.getStartDate(), dateRange.getEndDate());
+            }
+        } else {
+            allBills = billRepository.findByProposerIdInAndProposeDateBetween(
+                    figureIds, dateRange.getStartDate(), dateRange.getEndDate());
+        }
+        Map<Long, List<ProposedBill>> billsMap = allBills.stream()
+                .collect(Collectors.groupingBy(ProposedBill::getId));
+
+        figureIds.forEach(figureId ->
+                billsMap.putIfAbsent(figureId, new ArrayList<>()));
+
+        log.debug("법안 데이터 조회: 총 {}건, 정치인별 평균 {}건",
+                allBills.size(), allBills.size() / (double) figureIds.size());
+        return billsMap;
     }
+
 
     private Map<Long, List<Vote>> fetchVotesBatch(
             List<Long> figureIds, ComparisonService.ComparisonContext context, DateRange dateRange) {
@@ -139,14 +167,47 @@ public class ComparisonDataService {
 
 
     private List<String> getRelatedBillIds(String issueId) {
-        return null;
+        return issueRepository.findById(issueId)
+                .map(IssueDocument::getRelatedBillIds)
+                .orElse(Collections.emptyList());
     }
 
     private Map<Long, Figure> getFiguresMap(List<Long> figureIds) {
-        return null;
+        List<Figure> figures = figureRepository.findAllById(figureIds);
+
+        if (figures.size() != figureIds.size()) {
+            Set<Long> foundIds = figures.stream()
+                    .map(Figure::getId)
+                    .collect(Collectors.toSet());
+
+            List<Long> missingIds = figureIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .collect(Collectors.toList());
+
+            throw new NotFoundCompareException("존재하지 않는 정치인: " + missingIds);
+        }
+        return figures.stream()
+                .collect(Collectors.toMap(Figure::getId, Function.identity()));
     }
 
-    private int calculateOptimalPageSize(int size) {
+    private List<Long> getRelatedBillIdsAsLong(String issueId) {
+        return getRelatedBillIds(issueId).stream()
+                .map(this::safelyParseLong)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
 
+    private Long safelyParseLong(String value) {
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            log.warn("법안 ID Long 변환 실패: {}", value);
+            return null;
+        }
+    }
+
+    private int calculateOptimalPageSize(int figureCount) {
+        int baseSize = figureCount * 100;
+        return Math.max(500, Math.min(5000, baseSize));
     }
 }
