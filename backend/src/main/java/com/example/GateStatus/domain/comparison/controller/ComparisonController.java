@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -43,20 +44,28 @@ public class ComparisonController {
      * 쿼리 파라미터로 간단 비교
      */
     @GetMapping
-    public ResponseEntity<ComparisonResult> getComparison(@RequestParam Long figureId1,
-                                                          @RequestParam Long figureId2,
+    public ResponseEntity<ComparisonResult> getComparison(@RequestParam(required = false) Long figureId1,
+                                                          @RequestParam(required = false) Long figureId2,
+                                                          @RequestParam(required = false) String figureName1,
+                                                          @RequestParam(required = false) String figureName2,
                                                           @RequestParam(required = false) String issueId,
-                                                          @RequestParam(required = false) String category,
-                                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-                                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        log.info("간단 비교 요청: {} vs {}", figureId1, figureId2);
+                                                          @RequestParam(required = false) String category) {
+
+        List<Long> ids = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+
+        if (figureId1 != null) ids.add(figureId1);
+        if (figureId2 != null) ids.add(figureId2);
+        if (figureName1 != null && !figureName1.trim().isEmpty()) names.add(figureName1.trim());
+        if (figureName2 != null && !figureName2.trim().isEmpty()) names.add(figureName2.trim());
 
         ComparisonRequest request = new ComparisonRequest(
-                List.of(figureId1, figureId2),
+                ids.isEmpty() ? null : ids,
+                names.isEmpty() ? null : names,
                 issueId,
                 category,
-                startDate,
-                endDate,
+                null,
+                null,
                 null
         );
 
