@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -47,7 +48,15 @@ public class ComparisonRequestValidator {
 
     private void validateDateRange(LocalDate startDate, LocalDate endDate) {
         if (startDate != null && endDate != null) {
-            if ()
+            if (startDate.isAfter(endDate)) {
+                throw new IllegalArgumentException("시작날짜는 종료날짜보다 이전이여야 합니다");
+            }
+            if (startDate.isAfter(LocalDate.now())) {
+                throw new IllegalArgumentException("시작날짜는 현재날짜보다 이전이여야 합니다");
+            }
+            if (ChronoUnit.YEARS.between(startDate, endDate) > 5) {
+                throw new IllegalArgumentException("비교 기간은 최대 5년까지 입니다");
+            }
         }
     }
 
