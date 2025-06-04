@@ -76,4 +76,5 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
     boolean existsByFigureId(String figureId);
 
 
+    List<Figure> findByNameIn(List<String> cleanNames);
 }

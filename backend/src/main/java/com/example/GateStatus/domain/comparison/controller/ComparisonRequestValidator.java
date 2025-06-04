@@ -3,6 +3,7 @@ package com.example.GateStatus.domain.comparison.controller;
 import com.example.GateStatus.domain.comparison.service.request.ComparisonRequest;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.issue.IssueCategory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -60,8 +61,14 @@ public class ComparisonRequestValidator {
         }
     }
 
-    private void validateCategory(String category) {
-
+    private void validateCategory(String categoryCode) {
+        if (categoryCode != null && !categoryCode.trim().isEmpty()) {
+            try {
+                IssueCategory.fromCode(categoryCode);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("유효하지 않은 카테코리 코드: " + categoryCode);
+            }
+        }
     }
 
 

@@ -1,6 +1,7 @@
 package com.example.GateStatus.domain.comparison.service;
 
 import com.example.GateStatus.domain.common.DateRange;
+import com.example.GateStatus.domain.comparison.exception.NotFoundCompareException;
 import com.example.GateStatus.domain.comparison.service.request.ComparisonRequest;
 import com.example.GateStatus.domain.comparison.service.response.CategoryInfo;
 import com.example.GateStatus.domain.comparison.service.response.ComparisonResult;
@@ -23,9 +24,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -48,13 +48,26 @@ public class ComparisonService {
     @Transactional(readOnly = true)
     public ComparisonResult compareByIssue(ComparisonRequest request) {
 
-        log.info("정치인 비교 요청 시작: figureIds={}, issueId={}",
-                request.figureIds(), request.issueId());
+        log.info("정치인 비교 요청 시작: ID {}개, 이름 {}개",
+                request.hasIds() ? request.figureIds().size() : 0,
+                request.hasNames() ? request.figureNames().size() : 0);
 
         long startTime = System.currentTimeMillis();
 
         try {
             validateRequest(request);
+
+            List<Long> unifiedFigureIds = resolveAllFigureIds(request);
+
+            ComparisonRequest normalizedRequest = new ComparisonRequest(
+                    unifiedFigureIds,
+                    null,
+                    request.issueId(),
+                    request.category(),
+                    request.startDate(),
+                    request.endDate(),
+                    request.comparisonTypes()
+            );
 
             ComparisonContext context = createComparisonContext(request);
             DateRange dateRange = DateRange.fromRequest(request);
@@ -77,6 +90,55 @@ public class ComparisonService {
 
             throw e;
         }
+    }
+
+    private List<Long> resolveAllFigureIds(ComparisonRequest request) {
+        Set<Long> allIds = new HashSet<>();
+
+        if (request.hasIds()) {
+            allIds.addAll(request.figureIds());
+            log.debug("ID로 지정된 정치인: {}", request.figureIds());
+        }
+
+        if (request.hasNames()) {
+            List<Long> convertedIds = convertNamesToIds(request.figureNames());
+            allIds.addAll(convertedIds);
+            log.debug("이름으로 지정된 정치인: {} → {}", request.figureNames(), convertedIds);
+        }
+
+        List<Long> result = new ArrayList<>(allIds);
+        log.info("통합된 정치인 ID 목록: {} (총 {}명)", result, result.size());
+        return result;
+    }
+
+    private List<Long> convertNamesToIds(List<String> names) {
+        if (names == null || names.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> cleanNames = names.stream()
+                .map(String::trim)
+                .filter(name -> !name.isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (cleanNames.isEmpty()) {
+            throw new IllegalArgumentException("유효한 정치인 이름이 없습니다");
+        }
+
+        List<Figure> figures = figureRepository.findByNameIn(cleanNames);
+
+        if (figures.size() != cleanNames.size()) {
+            Set<String> notFoundNames = figures.stream()
+                    .map(Figure::getName)
+                    .collect(Collectors.toSet());
+
+            throw new NotFoundCompareException("찾을 수 없는 정치인: " + notFoundNames);
+        }
+
+        return figures.stream()
+                .map(Figure::getId)
+                .collect(Collectors.toList());
     }
 
     private void validateRequest(ComparisonRequest request) {
