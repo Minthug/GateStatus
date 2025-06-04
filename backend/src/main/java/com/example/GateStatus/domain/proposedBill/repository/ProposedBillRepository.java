@@ -1,5 +1,7 @@
 package com.example.GateStatus.domain.proposedBill.repository;
 
+import com.example.GateStatus.domain.dashboard.dto.internal.CategoryCount;
+import com.example.GateStatus.domain.dashboard.dto.internal.KeywordCount;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.proposedBill.BillStatus;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;
@@ -68,4 +70,14 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
     List<Object[]> countBillsByMonth(@Param("proposerId") Long proposerId,
                                      @Param("startDate") LocalDate startDate,
                                      @Param("endDate") LocalDate endDate);
+
+
+    List<CategoryCount> countByCategoryAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
+    List<KeywordCount> findTopKeywordsByDateRange(Long figureId, List<String> stopwords, LocalDate startDate, LocalDate endDate);
+
+    // VoteRepository에 추가
+    List<Object[]> countVotesByResultAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
+
+    // ProposedBillRepository에 추가
+    List<Object[]> countBillsByStatusAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
 }

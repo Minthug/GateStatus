@@ -116,4 +116,11 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     // 배치 처리용 메서드 추가
     @Query("{'statementDate': {$gte: ?0, $lte: ?1}}")
     List<StatementDocument> findByStatementDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
+
+    long countByFigureIdAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
+
+    List<CategoryCount> countByCategoryAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
+
+    List<KeywordCount> findTopKeywordsByDateRange(Long figureId, List<String> stopwords, LocalDate startDate, LocalDate endDate);
+
 }

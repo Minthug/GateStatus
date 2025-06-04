@@ -122,4 +122,6 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
      * 특정 정치인의 특정 투표 결과만 페이징 조회
      */
     Page<Vote> findByFigureIdAndVoteResult(Long figureId, VoteResultType voteResult, Pageable pageable);
+
+    List<Object[]> countVotesByResultAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
 }
