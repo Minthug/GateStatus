@@ -79,5 +79,39 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
     List<Object[]> countVotesByResultAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
 
     // ProposedBillRepository에 추가
+    @Query("SELECT p.billStatus, COUNT(p) FROM ProposedBill p " +
+            "WHERE p.proposer.id = :figureId AND p.proposeDate BETWEEN :startDate AND :endDate " +
+            "GROUP BY p.billStatus")
     List<Object[]> countBillsByStatusAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
+
+
+    @Query("SELECT COUNT(p) FROM ProposedBill p " +
+            "WHERE p.proposer.id = :figureId AND p.proposeDate BETWEEN :startDate AND :endDate")
+    long countByProposerIdAndDateRange(@Param("figureId") Long figureId,
+                                       @Param("startDate") LocalDate startDate,
+                                       @Param("endDate") LocalDate endDate);
+
+
+    @Query("SELECT " +
+            "CONCAT(YEAR(p.proposeDate), '-', LPAD(MONTH(p.proposeDate), 2, '0')) as month, " +
+            "COUNT(p) as total, " +
+            "COUNT(CASE WHEN p.billStatus = 'PASSED' THEN 1 END) as passed " +
+            "FROM ProposedBill p " +
+            "WHERE p.proposer.id = :figureId AND p.proposeDate BETWEEN :startDate AND :endDate " +
+            "GROUP BY YEAR(p.proposeDate), MONTH(p.proposeDate) " +
+            "ORDER BY YEAR(p.proposeDate), MONTH(p.proposeDate)")
+    List<Object[]> countBillsByMonthDetailed(@Param("figureId") Long figureId,
+                                             @Param("startDate") LocalDate startDate,
+                                             @Param("endDate") LocalDate endDate);
+
+
+    @Query("SELECT p FROM ProposedBill p " +
+            "WHERE p.proposer.id = :figureId AND p.proposeDate BETWEEN :startDate AND :endDate " +
+            "AND (p.billName LIKE %:keyword1% OR p.billName LIKE %:keyword2% OR p.summary LIKE %:keyword1%)")
+    List<ProposedBill> findByCategoryKeywords(@Param("figureId") Long figureId,
+                                              @Param("keyword1") String keyword1,
+                                              @Param("keyword2") String keyword2,
+                                              @Param("startDate") LocalDate startDate,
+                                              @Param("endDate") LocalDate endDate);
+
 }

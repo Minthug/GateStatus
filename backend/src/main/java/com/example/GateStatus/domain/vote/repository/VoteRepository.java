@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -123,5 +124,26 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
      */
     Page<Vote> findByFigureIdAndVoteResult(Long figureId, VoteResultType voteResult, Pageable pageable);
 
-    List<Object[]> countVotesByResultAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
+
+    @Query("SELECT v.voteResult, COUNT(v) FROM Vote v " +
+            "WHERE v.figure.id = :figureId AND v.voteDate BETWEEN :startDate AND :endDate " +
+            "GROUP BY v.voteResult")
+    List<Object[]> countVotesByResultAndDateRange(@Param("figureId") Long figureId,
+                                                  @Param("startDate") LocalDate startDate,
+                                                  @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT COUNT(v) FROM Vote v " +
+            "WHERE v.figure.id = :figureId AND v.voteDate BETWEEN :startDate AND :endDate")
+    long countByFigureIdAndDateRange(@Param("figureId") Long figureId,
+                                     @Param("startDate") LocalDate startDate,
+                                     @Param("endDate") LocalDate endDate);
+
+
+    @Query("SELECT v FROM Vote v " +
+            "WHERE v.figure.id = :figureId AND v.bill.id IN :billIds " +
+            "AND v.voteDate BETWEEN :startDate AND :endDate")
+    List<Vote> findByFigureIdAndBillIdsAndDateRange(@Param("figureId") Long figureId,
+                                                    @Param("billIds") List<String> billIds,
+                                                    @Param("startDate") LocalDate startDate,
+                                                    @Param("endDate") LocalDate endDate);
 }
