@@ -34,6 +34,7 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     boolean existsByOriginalUrl(String originalUrl);
 
     // 특정 정치인의 특정 기간 내 발언 조회
+    @Query("{'figureId': ?0, 'statementDate': {$gte: ?1, $lte: ?2}}")
     List<StatementDocument> findByFigureIdAndStatementDateBetween(Long figureId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     // 특정 정치인의 특정 기간 내 모든 발언 조회(페이징없음)
@@ -117,10 +118,27 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     @Query("{'statementDate': {$gte: ?0, $lte: ?1}}")
     List<StatementDocument> findByStatementDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
 
+    @Query("{'figureId': ?0, 'statementDate': {$gte: ?1, $lte: ?2}}")
     long countByFigureIdAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
 
+
+    @Aggregation(pipeline = {
+            "{ '$match': { 'figureId': ?0, 'statementDate': { '$gte': ?1, '$lte': ?2 } } }",
+            "{ '$group': { '_id': '$category', 'count': { '$sum': 1 } } }",
+            "{ '$sort': { 'count': -1 } }",
+            "{ '$limit': 10 }"
+    })
     List<CategoryCount> countByCategoryAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
 
+    @Aggregation(pipeline = {
+            "{ '$match': { 'figureId': ?0, 'statementDate': { '$gte': ?2, '$lte': ?3 } } }",
+            "{ '$project': { 'words': { '$split': ['$content', ' '] } } }",
+            "{ '$unwind': '$words' }",
+            "{ '$match': { 'words': { '$nin': ?1, '$regex': '^[가-힣]{2,}$' } } }",
+            "{ '$group': { '_id': '$words', 'count': { '$sum': 1 } } }",
+            "{ '$sort': { 'count': -1 } }",
+            "{ '$limit': 20 }"
+    })
     List<KeywordCount> findTopKeywordsByDateRange(Long figureId, List<String> stopwords, LocalDate startDate, LocalDate endDate);
 
 }
