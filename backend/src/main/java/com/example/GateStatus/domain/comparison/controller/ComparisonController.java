@@ -5,11 +5,9 @@ import com.example.GateStatus.domain.comparison.service.request.ComparisonReques
 import com.example.GateStatus.domain.comparison.service.response.ComparisonResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,9 +31,19 @@ public class ComparisonController {
         return ResponseEntity.ok(result);
     }
 
-    @PostMapping("by-names")
-    public ResponseEntity<ComparisonResult> createComparisonByNames(@RequestBody ComparisonRequest request) {
-        log.info("이름 기반 정치인 비교 요청: {}", request.figureNames());
+    /**
+     * 통합 정치인 비교 API
+     * ID, 이름, 혼합 모든 방식을 하나의 API로 처리
+     */
+    @PostMapping
+    public ResponseEntity<ComparisonResult> compare(@RequestBody ComparisonRequest request) {
+        String requestType = request.isMixed() ? "혼합" :
+                request.hasNames() ? "이름" : "ID";
+
+        log.info("{} 기반 정치인 비교 요청: 총 {}명", requestType, request.getTotalFigureCount());
+
+        ComparisonResult result = comparisonService.compareByIssue(request);
+        return ResponseEntity.ok(result);
     }
 
 
