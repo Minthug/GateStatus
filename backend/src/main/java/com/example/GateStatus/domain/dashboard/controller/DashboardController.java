@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/v1/dashboard")
@@ -66,5 +67,21 @@ public class DashboardController {
         return ResponseEntity.ok(responses);
     }
 
+    @GetMapping("/figures/compare/period")
+    public ResponseEntity<List<DashboardResponse>> getMultipleFigureDashboardsByPeriod(
+            @RequestParam List<Long> figureIds,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDate endDate) {
 
+        log.info("다중 정치인 기간별 대시보드 조회 요청: figureIds={}, period={} ~ {}", figureIds, startDate, endDate);
+
+        validationService.validateDashboardFigureIds(figureIds);
+        validationService.validateDashboardDateRange(startDate, endDate);
+
+        List<DashboardResponse> responses = figureIds.stream()
+                .map(figureId -> dashboardService.getDashboardDataByPeriod(figureId, startDate, endDate))
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(responses);
+    }
 }
