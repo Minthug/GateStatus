@@ -4,6 +4,7 @@ import com.example.GateStatus.domain.comparison.ComparisonType;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public record ComparisonRequest(
         List<Long> figureIds,
@@ -38,6 +39,11 @@ public record ComparisonRequest(
         return new ComparisonRequest(figureIds, figureNames, issueId, category, startDate, endDate, types);
     }
 
+
+    public boolean hasFigures() {
+        return hasIds() || hasNames();
+    }
+
     /**
      * 요청 타입 확인 메서드들
      */
@@ -69,4 +75,39 @@ public record ComparisonRequest(
         if (hasNames()) count += figureNames.size();
         return count;
     }
+
+    public boolean hasDateRange() {
+        return startDate != null && endDate != null;
+    }
+
+    /**
+     * 특정 이슈 비교인지 확인
+     *
+     * @return 이슈 ID가 있으면 true
+     */
+    public boolean isIssueComparison() {
+        return issueId != null && !issueId.trim().isEmpty();
+    }
+
+    /**
+     * 특정 카테고리 비교인지 확인
+     *
+     * @return 카테고리 코드가 있으면 true
+     */
+    public boolean isCategoryComparison() {
+        return category != null && !category.trim().isEmpty();
+    }
+
+
+    public List<String> getCleanedNames() {
+        if (!hasNames()) {
+            return List.of();
+        }
+
+        return figureNames.stream()
+                .filter(name -> name != null && !name.trim().isEmpty())
+                .map(String::trim)
+                .collect(Collectors.toList());
+    }
+
 }
