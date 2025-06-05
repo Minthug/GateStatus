@@ -5,11 +5,12 @@ import com.example.GateStatus.domain.dashboard.dto.response.DashboardResponse;
 import com.example.GateStatus.domain.dashboard.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/v1/dashboard")
@@ -39,4 +40,31 @@ public class DashboardController {
         DashboardResponse response = dashboardService.getDashboardDataByName(name);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/figure/{figureId}/period")
+    public ResponseEntity<DashboardResponse> getFigureDashboardByPeriod(
+            @PathVariable Long figureId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDate endDate
+            ) {
+
+        log.info("기간별 대시보드 조회 요청: figureId={}, period={} ~ {}", figureId, startDate, endDate);
+
+        validationService.validateDashboardRequest(figureId, null, startDate, endDate);
+        DashboardResponse response = dashboardService.getDashboardDataByPeriod(figureId, startDate, endDate);
+        return ResponseEntity.ok(response);
+
+    }
+
+    @GetMapping("/figures/compare")
+    public ResponseEntity<List<DashboardResponse>> getMultipleFigureDashboards(@RequestParam List<Long> figureIds) {
+        log.info("다중 정치인 대시보드 조회 요청: figureIds={}", figureIds);
+
+        validationService.validateDashboardFigureIds(figureIds);
+
+        List<DashboardResponse> responses = dashboardService.getMultipleDashboardData(figureIds);
+        return ResponseEntity.ok(responses);
+    }
+
+
 }

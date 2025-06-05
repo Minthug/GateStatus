@@ -86,6 +86,16 @@ public class ValidationService {
         log.debug("{}: 정치인 ID 목록 검증 완료 - {}명", context, figureIds.size());
     }
 
+    /**
+     * 대시보드용 정치인 ID 목록 검증 (2-5명, DB 체크 안함)
+     */
+    public void validateDashboardFigureIds(List<Long> figureIds) {
+        validateFigureIdList(figureIds, 2, 5, "대시보드 비교", false);
+    }
+
+    /**
+     * 비교분석용 정치인 ID 목록 검증 (1-10명, DB 체크 함)
+     */
     public void validateComparisonFigureIds(List<Long> figureIds) {
         validateFigureIdList(figureIds, 1, 10, "비교분석", true);
     }
