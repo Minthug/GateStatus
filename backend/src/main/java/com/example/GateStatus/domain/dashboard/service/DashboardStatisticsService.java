@@ -6,7 +6,6 @@ import com.example.GateStatus.domain.dashboard.dto.response.*;
 import com.example.GateStatus.domain.proposedBill.BillStatus;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
-import com.example.GateStatus.domain.vote.Vote;
 import com.example.GateStatus.domain.vote.VoteResultType;
 import com.example.GateStatus.domain.vote.repository.VoteRepository;
 import lombok.RequiredArgsConstructor;
