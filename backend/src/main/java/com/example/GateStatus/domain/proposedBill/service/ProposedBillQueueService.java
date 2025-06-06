@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.proposedBill.service;
 
+import com.example.GateStatus.domain.common.SyncJobStatus;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
@@ -7,16 +8,14 @@ import com.example.GateStatus.domain.proposedBill.ProposedBillApiService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class ProposedBillQueueService {
 
@@ -31,7 +31,7 @@ public class ProposedBillQueueService {
     private final FigureRepository figureRepository;
     private final ProposedBillApiService proposedBillApiService;
 
-    private final ConcurrentMap<String, JobStatus> jobStatusMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, SyncJobStatus> jobStatusMap = new ConcurrentHashMap<>();
 
     @Value("${app.queue.exchange}")
     private String exchange;
@@ -39,35 +39,42 @@ public class ProposedBillQueueService {
     @Value("${app.queue.routing-key}")
     private String routingKey;
 
-    @Value("${app.queue.batch-size}")
+    @Value("${app.queue.batch-size:10}")
     private int batchSize;
-
-    public ProposedBillQueueService(RabbitTemplate rabbitTemplate, FigureRepository figureRepository, ProposedBillApiService proposedBillApiService) {
-        this.rabbitTemplate = rabbitTemplate;
-        this.figureRepository = figureRepository;
-        this.proposedBillApiService = proposedBillApiService;
-    }
 
     /**
      * 단일 국회의원의 법안 동기화 작업을 큐에 추가합니다.
      * @param proposerName
      * @param jobId
      */
-    public void queueBillsSyncTask(String proposerName, String jobId) {
+    public String queueBillsSyncTask(String proposerName, String jobId) {
+
+        validateProposerName(proposerName);
+
+        if (jobId == null) {
+            jobId = UUID.randomUUID().toString();
+        }
+
         SyncTask task = new SyncTask(jobId, proposerName);
-        rabbitTemplate.convertAndSend(exchange, routingKey, task);
-        log.info("국회의원 {} 법안 동기화 작업을 큐에 추가했습니다. (작업 ID: {})", proposerName, jobId);
+
+        try {
+            rabbitTemplate.convertAndSend(exchange, routingKey, task);
+            log.info("국회의원 {} 법안 동기화 작업을 큐에 추가했습니다. (작업 ID: {})", proposerName, jobId);
+            return jobId;
+        } catch (Exception e) {
+            log.error("큐에 작업 추가 실패: 국회의원={}, jobId={}", proposerName, jobId, e);
+            throw new RuntimeException("동기화 작업 큐 추가 실패", e);
+        }
     }
-
-
     /**
      * 모든 국회의원의 법안 동기화 작업을 큐에 추가하고 작업 ID를 반환합니다.
      */
     public String queueAllBillsSyncTask() {
         String jobId = UUID.randomUUID().toString();
+
         List<Figure> figures = figureRepository.findByFigureType(FigureType.POLITICIAN);
 
-        JobStatus status = new JobStatus(jobId, figures.size());
+        SyncJobStatus status = new SyncJobStatus(jobId);
         jobStatusMap.put(jobId, status);
 
         List<List<Figure>> batches = splitIntoBatches(figures, batchSize);
@@ -92,7 +99,7 @@ public class ProposedBillQueueService {
             int count = proposedBillApiService.syncBillByProposer(proposerName);
 
             if (jobId != null && jobStatusMap.containsKey(jobId)) {
-                JobStatus status = jobStatusMap.get(jobId);
+                SyncJobStatus status = jobStatusMap.get(jobId);
                 status.incrementCompleted();
                 status.addSyncCount(count);
 
@@ -103,15 +110,6 @@ public class ProposedBillQueueService {
             log.error("국회의원 {} 법안 동기화 실패: {}", proposerName, e.getMessage(), e);
             // 실패 시 재시도 로직 추가 가능
         }
-    }
-
-    /**
-     * 작업 상태를 조회
-     * @param jobId
-     * @return
-     */
-    public JobStatus getJobStatus(String jobId) {
-        return jobStatusMap.get(jobId);
     }
 
     /**
@@ -129,42 +127,21 @@ public class ProposedBillQueueService {
         return batches;
     }
 
-    /**
-     * 작업 상태를 저장하는 클래스
-     */
-    @Data
-    public static class JobStatus {
-        private final String jobId;
-        private final int totalTasks;
-        private int completedTasks;
-        private int syncCount;
-        private LocalDateTime startTime = LocalDateTime.now();
-        private LocalDateTime endTime;
 
-        public void incrementCompleted() {
-            completedTasks++;
-            if (completedTasks >= totalTasks) {
-                endTime = LocalDateTime.now();
-            }
-        }
+    // === Validation Methods ===
 
-        public void addSyncCount(int count) {
-            syncCount += count;
-        }
-
-        public int getProgressPercentage() {
-            return (int) ((completedTasks * 100.0) / totalTasks);
-        }
-
-        public boolean isCompleted() {
-            return completedTasks >= totalTasks;
-        }
-
-        public Duration getElapsedTime() {
-            LocalDateTime end = endTime != null ? endTime : LocalDateTime.now();
-            return Duration.between(startTime, end);
+    private void validateProposerName(String proposerName) {
+        if (proposerName == null || proposerName.trim().isEmpty()) {
+            throw new IllegalArgumentException("국회의원 이름은 필수입니다");
         }
     }
+
+    private void validateJobId(String jobId) {
+        if (jobId == null || jobId.trim().isEmpty()) {
+            throw new IllegalArgumentException("작업 ID는 필수입니다");
+        }
+    }
+
 
     @Data
     @AllArgsConstructor

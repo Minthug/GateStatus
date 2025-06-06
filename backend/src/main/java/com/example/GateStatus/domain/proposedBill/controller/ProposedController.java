@@ -136,9 +136,9 @@ public class ProposedController {
         try {
             CompletableFuture<Integer> future;
             if (proposerName != null && !proposerName.isEmpty()) {
-                future = proposedBillService.syncBillsByProposerAsync(proposerName);
+                future = billSyncService.syncBillsByProposerAsync(proposerName);
             } else {
-                future = proposedBillService.syncAllBillsAsync();
+                future = billSyncService.syncAllBillsAsync();
             }
 
             return ResponseEntity.ok(ApiResponse.success( "비동기 법안 동기화 작업이 시작되었습니다. 결과는 백그라운드에서 처리됩니다.",
@@ -154,9 +154,9 @@ public class ProposedController {
         try {
             String jobId;
             if (proposerName != null && !proposerName.isEmpty()) {
-                jobId = proposedBillService.queueBillSyncTask(proposerName);
+                jobId = billSyncService.queueBillSyncTask(proposerName);
             } else {
-                jobId = proposedBillService.queueAllBillsSyncTask();
+                jobId = billSyncService.queueAllBillsSyncTask();
             }
 
             return ResponseEntity.ok(ApiResponse.success("비동기 법안 동기화 작업이 큐에 추가되었습니다.", jobId));
