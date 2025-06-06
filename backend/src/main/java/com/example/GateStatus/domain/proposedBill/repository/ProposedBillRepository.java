@@ -93,6 +93,7 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
                                        @Param("endDate") LocalDate endDate);
 
 
+
 //    @Query("SELECT " +
 //            "FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m') as month, " +
 //            "COUNT(p) as total, " +

@@ -13,15 +13,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+
+import static com.example.GateStatus.domain.common.BillUtils.determineBillStatus;
+import static com.example.GateStatus.domain.common.BillUtils.parseDate;
 
 @Service
 @RequiredArgsConstructor
@@ -35,18 +36,28 @@ public class ProposedBillService {
     private final BillAsyncService billAsyncService;
 
     /**
-     * 법안 ID로 법안 상세 정보 조회
-     * @param id
-     * @return
+     * 법안 ID로 법안 상세 정보 조회 (조회수 증가)
      */
     @Transactional
     public ProposedBillResponse findBillById(String id) {
-        ProposedBill bill = billRepository.findByBillId(id)
-                .orElseThrow(() -> new EntityNotFoundException("해당 법안이 존재하지 않습니다: " + id));
-//        bill.incrementViewCount();
+        ProposedBill bill = getBillByIdOrThrow(id);
+        bill.incrementViewCount();
+        billRepository.save(bill);
 
+        log.debug("법안 조회 및 조회수 증가: ID={}, 현재 조회수={}", id, bill.getViewCount());
         return ProposedBillResponse.from(bill);
     }
+
+    /**
+     * 법안 ID로 법안 상세 정보 조회 (조회수 증가 없음)
+     * 시스템 내부 사용
+     */
+    @Transactional(readOnly = true)
+    public ProposedBillResponse getBillById(String id) {
+        ProposedBill bill = getBillByIdOrThrow(id);
+        return ProposedBillResponse.from(bill);
+    }
+
 
     /**
      * 특정 국회의원이 발의한 법안 목록 조회
@@ -56,9 +67,7 @@ public class ProposedBillService {
      */
     @Transactional
     public Page<ProposedBillResponse> findBillsByProposer(Long proposerId, Pageable pageable) {
-        Figure proposer = figureRepository.findById(proposerId)
-                .orElseThrow(() -> new EntityNotFoundException("해당 국회의원이 존재하지 않습니다: " + proposerId));
-
+        Figure proposer = getFigureByIdOrThrow(proposerId);
         Page<ProposedBill> bills = billRepository.findByProposer(proposer, pageable);
         return bills.map(ProposedBillResponse::from);
     }
@@ -70,6 +79,8 @@ public class ProposedBillService {
      */
     @Transactional(readOnly = true)
     public List<ProposedBillResponse> findPopularBills(int limit) {
+        validateLimit(limit);
+
         return billRepository.findTopByOrderByViewCountDesc(PageRequest.of(0, limit))
                 .stream()
                 .map(ProposedBillResponse::from)
@@ -84,6 +95,8 @@ public class ProposedBillService {
      */
     @Transactional(readOnly = true)
     public Page<ProposedBillResponse> searchBills(String keyword, Pageable pageable) {
+        validateKeyword(keyword);
+
         Page<ProposedBill> bills = billRepository.findByBillNameContaining(keyword, pageable);
         return bills.map(ProposedBillResponse::from);
     }
@@ -95,6 +108,8 @@ public class ProposedBillService {
      */
     @Transactional(readOnly = true)
     public List<ProposedBillResponse> findBillByStatus(BillStatus status) {
+        validateStatus(status);
+
         return billRepository.findByBillStatus(status)
                 .stream()
                 .map(ProposedBillResponse::from)
@@ -109,140 +124,154 @@ public class ProposedBillService {
      */
     @Transactional(readOnly = true)
     public List<ProposedBillResponse> findBillsByPeriod(LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+
         return billRepository.findByPeriod(startDate, endDate)
                 .stream()
                 .map(ProposedBillResponse::from)
                 .collect(Collectors.toList());
     }
+//
+//    /**
+//     * API 데이터 동기화 메서드(퍼사드 패턴)
+//     * @param proposerName
+//     * @return
+//     */
+//    @Transactional
+//    public int syncBillsByProposer(String proposerName) {
+//
+//        log.info("발의자 {}의 법안 동기화 시작", proposerName);
+//
+//        int syncCount = proposedBillApiService.syncAllBills();
+//        log.info("발의자 {}의 법안 동기화 완료: {}건", proposerName, syncCount);
+//        return syncCount;
+//    }
+//
+//    /**
+//     * 비동기 법안 동기화 메서드(@Async 활용)
+//     * @param proposerName
+//     * @return
+//     */
+//    public CompletableFuture<Integer> syncBillsByProposerAsync(String proposerName) {
+//        log.info("발의자 {}의 법안 비동기(@Async) 동기화 시작", proposerName);
+//        return billAsyncService.syncBillsByProposerAsync(proposerName);
+//    }
+//
+//    /**
+//     * 모든 국회의원 법안 비동기 동기화 메서드 (@Async 활용)
+//     * @return
+//     */
+//    public CompletableFuture<Integer> syncAllBillsAsync() {
+//        log.info("모든 국회의원의 법안 비동기(@Async) 동기화 시작");
+//        return billAsyncService.syncAllBillsAsync();
+//    }
+//
+//    /**
+//     * 비동기 법안 동기화 메서드 (메시지 큐 활용)
+//     * @param proposerName
+//     * @return
+//     */
+//    public String queueBillSyncTask(String proposerName) {
+//        String jobId = UUID.randomUUID().toString();
+//        log.info("발의자 {}의 법안 비동기(큐) 동기화 작업({}) 시작", proposerName, jobId);
+//        proposedBillQueueService.queueBillsSyncTask(proposerName, jobId);
+//        return jobId;
+//    }
+//
+//    /**
+//     * 모든 국회의원 법안 비동기 동기화 메서드 (메시지 큐 활용)
+//     * @return
+//     */
+//    public String queueAllBillsSyncTask() {
+//        log.info("모든 국회의원의 법안 비동기(큐) 동기화 작업 시작");
+//        return proposedBillQueueService.queueAllBillsSyncTask();
+//    }
+//
+//    /**
+//     * 작업 상태 조회 메서드
+//     * @param jobId
+//     * @return
+//     */
+//    public ProposedBillQueueService.JobStatus getJobStatus(String jobId) {
+//        return proposedBillQueueService.getJobStatus(jobId);
+//    }
+//
+//    @Transactional
+//    public ProposedBill updateFromApiData(String billId, ProposedBillApiDTO apiData) {
+//        ProposedBill bill = billRepository.findByBillId(billId)
+//                .orElseGet(() -> ProposedBill.builder()
+//                        .billId(billId)
+//                        .billName(apiData.billName())
+//                        .billNo(apiData.billNo())
+//                        .build());
+//
+//        if (apiData.proposer() != null && !apiData.proposer().isEmpty()) {
+//            Figure proposer = figureRepository.findByName(apiData.proposer()).orElse(null);
+//            bill.setProposer(proposer);
+//        }
+//
+//        LocalDate proposeDate = parseDate(apiData.proposedDate());
+//        LocalDate processDate = parseDate(apiData.processDate());
+//
+//        ProposedBill updateBill = ProposedBill.builder()
+//                .billId(billId)
+//                .billNo(apiData.billNo())
+//                .billName(apiData.billName())
+//                .proposeDate(proposeDate)
+//                .summary(apiData.summary())
+//                .billUrl(apiData.linkUrl())
+//                .processDate(processDate)
+//                .processResult(apiData.processResult())
+//                .processResultCode(apiData.processResultCode())
+//                .committee(apiData.committeeName())
+//                .billStatus(determineBillStatus(apiData.processResult()))
+//                .build();
+//
+//        updateBill.setCoProposers(apiData.coProposers());
+//        return billRepository.save(updateBill);
+//    }
 
-    /**
-     * API 데이터 동기화 메서드(퍼사드 패턴)
-     * @param proposerName
-     * @return
-     */
-    @Transactional
-    public int syncBillsByProposer(String proposerName) {
 
-        log.info("발의자 {}의 법안 동기화 시작", proposerName);
+    // === Private Helper Methods ===
 
-        int syncCount = proposedBillApiService.syncAllBills();
-        log.info("발의자 {}의 법안 동기화 완료: {}건", proposerName, syncCount);
-        return syncCount;
+    private ProposedBill getBillByIdOrThrow(String id) {
+        return billRepository.findByBillId(id)
+                .orElseThrow(() -> new EntityNotFoundException("해당 법안이 존재하지 않습니다: " + id));
     }
 
-    /**
-     * 비동기 법안 동기화 메서드(@Async 활용)
-     * @param proposerName
-     * @return
-     */
-    public CompletableFuture<Integer> syncBillsByProposerAsync(String proposerName) {
-        log.info("발의자 {}의 법안 비동기(@Async) 동기화 시작", proposerName);
-        return billAsyncService.syncBillsByProposerAsync(proposerName);
+    private Figure getFigureByIdOrThrow(Long proposerId) {
+        return figureRepository.findById(proposerId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 국회의원이 존재하지 않습니다 " + proposerId));
     }
 
-    /**
-     * 모든 국회의원 법안 비동기 동기화 메서드 (@Async 활용)
-     * @return
-     */
-    public CompletableFuture<Integer> syncAllBillsAsync() {
-        log.info("모든 국회의원의 법안 비동기(@Async) 동기화 시작");
-        return billAsyncService.syncAllBillsAsync();
-    }
 
-    /**
-     * 비동기 법안 동기화 메서드 (메시지 큐 활용)
-     * @param proposerName
-     * @return
-     */
-    public String queueBillSyncTask(String proposerName) {
-        String jobId = UUID.randomUUID().toString();
-        log.info("발의자 {}의 법안 비동기(큐) 동기화 작업({}) 시작", proposerName, jobId);
-        proposedBillQueueService.queueBillsSyncTask(proposerName, jobId);
-        return jobId;
-    }
-
-    /**
-     * 모든 국회의원 법안 비동기 동기화 메서드 (메시지 큐 활용)
-     * @return
-     */
-    public String queueAllBillsSyncTask() {
-        log.info("모든 국회의원의 법안 비동기(큐) 동기화 작업 시작");
-        return proposedBillQueueService.queueAllBillsSyncTask();
-    }
-
-    /**
-     * 작업 상태 조회 메서드
-     * @param jobId
-     * @return
-     */
-    public ProposedBillQueueService.JobStatus getJobStatus(String jobId) {
-        return proposedBillQueueService.getJobStatus(jobId);
-    }
-
-    @Transactional
-    public ProposedBill updateFromApiData(String billId, ProposedBillApiDTO apiData) {
-        ProposedBill bill = billRepository.findByBillId(billId)
-                .orElseGet(() -> ProposedBill.builder()
-                        .billId(billId)
-                        .billName(apiData.billName())
-                        .billNo(apiData.billNo())
-                        .build());
-
-        if (apiData.proposer() != null && !apiData.proposer().isEmpty()) {
-            Figure proposer = figureRepository.findByName(apiData.proposer()).orElse(null);
-            bill.setProposer(proposer);
+    private void validateLimit(int limit) {
+        if (limit <= 0 || limit > 100) {
+            throw new IllegalArgumentException("조회 개수는 1~100 사이여야 합니다: " + limit);
         }
-
-        LocalDate proposeDate = parseDate(apiData.proposedDate());
-        LocalDate processDate = parseDate(apiData.processDate());
-
-        ProposedBill updateBill = ProposedBill.builder()
-                .billId(billId)
-                .billNo(apiData.billNo())
-                .billName(apiData.billName())
-                .proposeDate(proposeDate)
-                .summary(apiData.summary())
-                .billUrl(apiData.linkUrl())
-                .processDate(processDate)
-                .processResult(apiData.processResult())
-                .processResultCode(apiData.processResultCode())
-                .committee(apiData.committeeName())
-                .billStatus(determineBillStatus(apiData.processResult()))
-                .build();
-
-        updateBill.setCoProposers(apiData.coProposers());
-        return billRepository.save(updateBill);
     }
 
-    private BillStatus determineBillStatus(String processResult) {
-        if (processResult == null || processResult.isEmpty()) {
-            return BillStatus.PROPOSED;
-        } else if (processResult.contains("원안가결") || processResult.contains("수정가결")) {
-            return BillStatus.PASSED;
-        } else if (processResult.contains("폐기") || processResult.contains("부결")) {
-            return BillStatus.REJECTED;
-        } else if (processResult.contains("대안반영")) {
-            return BillStatus.ALTERNATIVE;
-        } else if (processResult.contains("철회")) {
-            return BillStatus.WITHDRAWN;
-        } else {
-            return BillStatus.PROCESSING;
+    private void validateKeyword(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            throw new IllegalArgumentException("검색 키워드는 필수 입니다");
+        }
+        if (keyword.length() < 2) {
+            throw new IllegalArgumentException("검색 키워드는 2자 이상 이어야 합니다");
         }
     }
 
-    /**
-     * 날짜 문자열 파싱
-     */
-    private LocalDate parseDate(String dateStr) {
-        if (dateStr == null || dateStr.isEmpty()) {
-            return null;
+    private void validateStatus(BillStatus status) {
+        if (status == null) {
+            throw new IllegalArgumentException("법안 상태는 필수입니다");
         }
+    }
 
-        try {
-            return LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        } catch (Exception e) {
-            log.warn("날짜 변환 실패: {}", dateStr);
-            return null;
+    private void validateDateRange(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("시작일과 종료일은 필수입니다");
+        }
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("시작일은 종료일보다 늦을 수 없습니다");
         }
     }
 }
