@@ -4,6 +4,8 @@ import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.proposedBill.ProposedBillApiService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -12,15 +14,14 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class BillAsyncService {
 
-    private final ProposedBillApiService proposedBillApiService;
+    private final ProposedBillApiService billApiService;
+    private final ProposedBillQueueService billQueueService;
     private final FigureRepository figureRepository;
 
-    public BillAsyncService(ProposedBillApiService proposedBillApiService, FigureRepository figureRepository) {
-        this.proposedBillApiService = proposedBillApiService;
-        this.figureRepository = figureRepository;
-    }
 
     /**
      * 특정 제안자(국회의원)의 법안을 비동기적으로 동기화합니다.

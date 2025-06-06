@@ -5,6 +5,7 @@ import com.example.GateStatus.domain.proposedBill.ProposedBillApiService;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillQueueService;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillResponse;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillService;
+import com.example.GateStatus.domain.proposedBill.service.ProposedBillSyncService;
 import com.example.GateStatus.global.config.open.ApiResponse;
 import com.google.protobuf.Api;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +32,8 @@ public class ProposedController {
 
     private final ProposedBillService proposedBillService;
     private final ProposedBillApiService apiService;
-    private final ProposedBillQueueService proposedBillQueueService;
+    private final ProposedBillQueueService billQueueService;
+    private final ProposedBillSyncService billSyncService;
 
     /**
      * 법안 ID로 법안 상세 정보 조회
@@ -121,7 +123,7 @@ public class ProposedController {
         log.info("법안 데이터 동기화 요청: 발의자 = {}", proposerName);
 
         try {
-            int syncCount = proposedBillService.syncBillsByProposer(proposerName);
+            int syncCount = billSyncService.syncBillsByProposer(proposerName);
             return ResponseEntity.ok(ApiResponse.success("법안 동기화 완료", syncCount));
         } catch (Exception e) {
             log.error("법안 동기화 중 오류 발생: {}", e.getMessage(), e);
