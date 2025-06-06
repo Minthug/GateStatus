@@ -72,98 +72,118 @@ public class ComparisonResultBuilder {
     }
 
     private void addBasicAnalysisInfo(Map<String, Object> summary, ComparisonService.ComparisonRawData rawData) {
-        DateRange dateRange = rawData.getDateRange();
+        try {
+            DateRange dateRange = rawData.getDateRange();
 
-        summary.put("analysisStartDate", dateRange.getStartDate().toString());
-        summary.put("analysisEndDate", dateRange.getEndDate().toString());
-        summary.put("analysisPeriodDays", dateRange.getDays());
-        summary.put("analysisPeriodDescription", dateRange.getShortDescription());
-        summary.put("comparedFiguresCount", rawData.getFigures().size());
+            summary.put("analysisStartDate", dateRange.getStartDate().toString());
+            summary.put("analysisEndDate", dateRange.getEndDate().toString());
+            summary.put("analysisPeriodDays", dateRange.getDays());
+            summary.put("analysisPeriodDescription", dateRange.getShortDescription());
+            summary.put("comparedFiguresCount", rawData.getFigures().size());
 
-        IssueInfo issueInfo = rawData.getContext().getIssueInfo();
-        if (issueInfo != null) {
-            summary.put("targetIssue", Map.of(
-                    "id", issueInfo.issueId(),
-                    "name", issueInfo.name(),
-                    "description", issueInfo.description()
-            ));
+            IssueInfo issueInfo = rawData.getContext().getIssueInfo();
+            if (issueInfo != null) {
+                summary.put("targetIssue", Map.of(
+                        "id", issueInfo.issueId(),
+                        "name", issueInfo.name(),
+                        "description", issueInfo.description()
+                ));
+            }
+        } catch (Exception e) {
+            log.error("기본 분석 정보 추가 실패: {}", e.getMessage());
         }
     }
 
     private void addCategoryInfo(Map<String, Object> summary, CategoryInfo categoryInfo) {
         if (categoryInfo == null) return;
 
-        Map<String, Object> categoryData = new HashMap<>();
-        categoryData.put("code", categoryInfo.category().getCode());
-        categoryData.put("name", categoryInfo.category().getDisplayName());
-        categoryData.put("totalIssueCount", categoryInfo.issues().size());
+        try {
+            Map<String, Object> categoryData = new HashMap<>();
+            categoryData.put("code", categoryInfo.category().getCode());
+            categoryData.put("name", categoryInfo.category().getDisplayName());
+            categoryData.put("totalIssueCount", categoryInfo.issues().size());
 
-        List<Map<String, ? extends Serializable>> topIssues = categoryInfo.issues().stream()
-                .limit(5)
-                .map(issue -> Map.of(
-                        "id", issue.getId(),
-                        "name", issue.getName(),
-                        "viewCount", issue.getViewCount() != null ? issue.getViewCount() : 0
-                ))
-                .collect(Collectors.toList());
+            List<Map<String, ? extends Serializable>> topIssues = categoryInfo.issues().stream()
+                    .limit(5)
+                    .map(issue -> Map.of(
+                            "id", issue.getId(),
+                            "name", issue.getName(),
+                            "viewCount", issue.getViewCount() != null ? issue.getViewCount() : 0
+                    ))
+                    .collect(Collectors.toList());
 
-        categoryData.put("topIssues", topIssues);
-        summary.put("categoryInfo", categoryData);
+            categoryData.put("topIssues", topIssues);
+            summary.put("categoryInfo", categoryData);
+        } catch (Exception e) {
+            log.error("카테고리 정보 추가 실패: {}", e.getMessage());
+        }
     }
 
     private void addTopPerformersInfo(Map<String, Object> summary, List<FigureComparisonData> figureDataList) {
-        figureDataList.stream()
-                .max(Comparator.comparingInt(f -> (Integer) f.additionalData().get("activeDays")))
-                .ifPresent(figure -> summary.put("mostActiveFigure", createFigureInfo(figure)));
+       if (figureDataList == null || figureDataList.isEmpty()) {
+           log.warn("정치인 데이터 리스트가 비어있어 최고 성과자 정보를 추가할 수 없습니다.");
+           return;
+       }
 
-        figureDataList.stream()
-                .filter(f -> f.statements() != null)
-                .max(Comparator.comparingInt(f -> f.statements().statementCount()))
-                .ifPresent(figure -> summary.put("mostActiveInStatements", createFigureInfo(figure)));
+       try {
+           figureDataList.stream()
+                   .max(Comparator.comparingInt(f -> (Integer) f.additionalData().get("activeDays")))
+                   .ifPresent(figure -> summary.put("mostActiveFigure", createFigureInfo(figure)));
 
-        figureDataList.stream()
-                .filter(f -> f.votes() != null)
-                .max(Comparator.comparingInt(f ->
-                        f.votes().agreeCount() + f.votes().disagreeCount() + f.votes().abstainCount()))
-                .ifPresent(figure -> summary.put("mostActiveInVoting", createFigureInfo(figure)));
+           figureDataList.stream()
+                   .filter(f -> f.statements() != null)
+                   .max(Comparator.comparingInt(f -> f.statements().statementCount()))
+                   .ifPresent(figure -> summary.put("mostActiveInStatements", createFigureInfo(figure)));
 
-        figureDataList.stream()
-                .filter(f -> f.bills() != null)
-                .max(Comparator.comparingInt(f -> f.bills().proposedCount()))
-                .ifPresent(figure -> summary.put("mostActiveInBills", createFigureInfo(figure)));
+           figureDataList.stream()
+                   .filter(f -> f.votes() != null)
+                   .max(Comparator.comparingInt(f ->
+                           f.votes().agreeCount() + f.votes().disagreeCount() + f.votes().abstainCount()))
+                   .ifPresent(figure -> summary.put("mostActiveInVoting", createFigureInfo(figure)));
 
+           figureDataList.stream()
+                   .filter(f -> f.bills() != null)
+                   .max(Comparator.comparingInt(f -> f.bills().proposedCount()))
+                   .ifPresent(figure -> summary.put("mostActiveInBills", createFigureInfo(figure)));
+       } catch (Exception e) {
+           log.error("최고 성과자 정보 추가 중 오류: {}", e.getMessage());
+       }
     }
 
 
     private void addOverallStatistics(Map<String, Object> summary, List<FigureComparisonData> figureDataList) {
-        int totalStatements = figureDataList.stream()
-                .mapToInt(f -> f.statements() != null ? f.statements().statementCount() : 0)
-                .sum();
+        try {
+            int totalStatements = figureDataList.stream()
+                    .mapToInt(f -> f.statements() != null ? f.statements().statementCount() : 0)
+                    .sum();
 
-        int totalVotes = figureDataList.stream()
-                .mapToInt(f -> f.votes() != null ?
-                        f.votes().agreeCount() + f.votes().disagreeCount() + f.votes().abstainCount() : 0)
-                .sum();
+            int totalVotes = figureDataList.stream()
+                    .mapToInt(f -> f.votes() != null ?
+                            f.votes().agreeCount() + f.votes().disagreeCount() + f.votes().abstainCount() : 0)
+                    .sum();
 
-        int totalBills = figureDataList.stream()
-                .mapToInt(f -> f.bills() != null ? f.bills().proposedCount() : 0)
-                .sum();
+            int totalBills = figureDataList.stream()
+                    .mapToInt(f -> f.bills() != null ? f.bills().proposedCount() : 0)
+                    .sum();
 
-        summary.put("overallStatistics", Map.of(
-                "totalStatements", totalStatements,
-                "totalVotes", totalVotes,
-                "totalBills", totalBills,
-                "averageStatementsPerFigure", figureDataList.isEmpty() ? 0 : totalStatements / figureDataList.size(),
-                "averageVotesPerFigure", figureDataList.isEmpty() ? 0 : totalVotes / figureDataList.size(),
-                "averageBillsPerFigure", figureDataList.isEmpty() ? 0 : totalBills / figureDataList.size()
-        ));
+            summary.put("overallStatistics", Map.of(
+                    "totalStatements", totalStatements,
+                    "totalVotes", totalVotes,
+                    "totalBills", totalBills,
+                    "averageStatementsPerFigure", figureDataList.isEmpty() ? 0 : totalStatements / figureDataList.size(),
+                    "averageVotesPerFigure", figureDataList.isEmpty() ? 0 : totalVotes / figureDataList.size(),
+                    "averageBillsPerFigure", figureDataList.isEmpty() ? 0 : totalBills / figureDataList.size()
+            ));
 
-        Map<String, Long> partyDistribution = figureDataList.stream()
-                .collect(Collectors.groupingBy(
-                        FigureComparisonData::partyName,
-                        Collectors.counting()
-                ));
-        summary.put("partyDistribution", partyDistribution);
+            Map<String, Long> partyDistribution = figureDataList.stream()
+                    .collect(Collectors.groupingBy(
+                            FigureComparisonData::partyName,
+                            Collectors.counting()
+                    ));
+            summary.put("partyDistribution", partyDistribution);
+        } catch (Exception e) {
+            log.error("전체 통계 추가 실패: {}", e.getMessage());
+        }
     }
 
     /**
@@ -179,7 +199,7 @@ public class ComparisonResultBuilder {
                 return figureDataList;
             }
 
-            for (Figure figure : rawData.getFigures()) {
+            for (Figure figure : rawData.getFigures().values()) {
                 try {
                     FigureComparisonData data = createSingleFigureComparisonData(figure, rawData, comparisonTypes);
                     if (data != null) {
@@ -327,68 +347,83 @@ public class ComparisonResultBuilder {
 
 
     private VoteComparisonData createVoteComparisonData(List<Vote> votes) {
-        if (votes.isEmpty()) {
+        if (votes.isEmpty() || votes == null) {
             return new VoteComparisonData(Collections.emptyList(), 0, 0, 0, 0.0);
         }
 
-        VoteResultStats stats = analysisService.calculateVoteStats(votes);
+        try {
+            VoteResultStats stats = analysisService.calculateVoteStats(votes);
 
-        List<VoteInfo> voteInfos = votes.stream()
-                .limit(20)
-                .map(this::convertToVoteInfo)
-                .collect(Collectors.toList());
+            List<VoteInfo> voteInfos = votes.stream()
+                    .limit(20)
+                    .map(this::convertToVoteInfo)
+                    .collect(Collectors.toList());
 
-        return new VoteComparisonData(
-                voteInfos,
-                stats.agree(),
-                stats.disagree(),
-                stats.abstain(),
-                stats.agreeRate()
-        );
+            return new VoteComparisonData(
+                    voteInfos,
+                    stats.agree(),
+                    stats.disagree(),
+                    stats.abstain(),
+                    stats.agreeRate()
+            );
+        } catch (Exception e) {
+            log.error("투표 비교 데이터 생성 실패: {}", e.getMessage());
+            return new VoteComparisonData(Collections.emptyList(), 0, 0, 0, 0.0);
+        }
     }
 
 
     private BillComparisonData createBillComparisonData(List<ProposedBill> bills) {
-        if (bills.isEmpty()) {
+        if (bills.isEmpty() || bills == null) {
             return new BillComparisonData(Collections.emptyList(), 0, 0, 0.0);
         }
 
-        BillPassStats stats = analysisService.calculateBillStats(bills);
+        try {
+            BillPassStats stats = analysisService.calculateBillStats(bills);
 
-        List<BillInfo> billInfos = bills.stream()
-                .limit(20)
-                .map(this::convertToBillInfo)
-                .collect(Collectors.toList());
+            List<BillInfo> billInfos = bills.stream()
+                    .limit(20)
+                    .map(this::convertToBillInfo)
+                    .collect(Collectors.toList());
 
-        return new BillComparisonData(
-                billInfos,
-                stats.total(),
-                stats.passed(),
-                stats.passRate()
-        );
+            return new BillComparisonData(
+                    billInfos,
+                    stats.total(),
+                    stats.passed(),
+                    stats.passRate()
+            );
+        } catch (Exception e) {
+            log.error("법안 비교 데이터 생성 실패: {}", e.getMessage());
+            return new BillComparisonData(Collections.emptyList(), 0, 0, 0.0);
+        }
     }
 
 
     private StatementComparisonData createStatementComparisonData(List<StatementDocument> statements) {
-        if (statements.isEmpty()) {
+        if (statements.isEmpty() || statements == null) {
             return new StatementComparisonData(
                     Collections.emptyList(), 0, "입장 정보 없음", Collections.emptyMap());
         }
 
-        List<StatementInfo> statementInfos = statements.stream()
-                .limit(20)
-                .map(this::convertToStatementInfo)
-                .collect(Collectors.toList());
+        try {
+            List<StatementInfo> statementInfos = statements.stream()
+                    .limit(20)
+                    .map(this::convertToStatementInfo)
+                    .collect(Collectors.toList());
 
-        Map<String, Integer> keywordCounts = analysisService.analyzeKeywordsFromStatements(statements, 10);
-        String mainStance = analysisService.analyzeMainStance(statements);
+            Map<String, Integer> keywordCounts = analysisService.analyzeKeywordsFromStatements(statements, 10);
+            String mainStance = analysisService.analyzeMainStance(statements);
 
-        return new StatementComparisonData(
-                statementInfos,
-                statements.size(),
-                mainStance,
-                keywordCounts
-        );
+            return new StatementComparisonData(
+                    statementInfos,
+                    statements.size(),
+                    mainStance,
+                    keywordCounts
+            );
+        } catch (Exception e) {
+            log.error("발언 비교 데이터 생성 실패: {}", e.getMessage());
+            return new StatementComparisonData(Collections.emptyList(), 0, "분석 실패", Collections.emptyMap());
+        }
     }
 
     // === Helper Methods ===
