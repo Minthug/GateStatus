@@ -30,15 +30,15 @@ public class ComparisonController {
      * 정치인 비교 실행 ID 기반
      * 비교 요청을 받아 결과 반환
      */
-    @PostMapping
-    public ResponseEntity<ComparisonResult> createComparison(@RequestBody ComparisonRequest request) {
-        log.info("정치인 비교 요청: 정치인 {}명", request.figureIds().size());
-
-        validationService.validateComparisonRequest(request);
-
-        ComparisonResult result = comparisonService.compareByIssue(request);
-        return ResponseEntity.ok(result);
-    }
+//    @PostMapping
+//    public ResponseEntity<ComparisonResult> createComparison(@RequestBody ComparisonRequest request) {
+//        log.info("정치인 비교 요청: 정치인 {}명", request.figureIds().size());
+//
+//        validationService.validateComparisonRequest(request);
+//
+//        ComparisonResult result = comparisonService.compareByIssue(request);
+//        return ResponseEntity.ok(result);
+//    }
 
     /**
      * 통합 정치인 비교 API

@@ -1,6 +1,5 @@
 package com.example.GateStatus.domain.proposedBill.repository;
 
-import com.example.GateStatus.domain.dashboard.dto.internal.CategoryCount;
 import com.example.GateStatus.domain.dashboard.dto.internal.KeywordCount;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.proposedBill.BillStatus;
@@ -72,13 +71,15 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
                                      @Param("endDate") LocalDate endDate);
 
 
-    List<CategoryCount> countByCategoryAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
-    List<KeywordCount> findTopKeywordsByDateRange(Long figureId, List<String> stopwords, LocalDate startDate, LocalDate endDate);
+//    List<KeywordCount> findTopKeywordsByDateRange(Long figureId, List<String> stopwords, LocalDate startDate, LocalDate endDate);
 
-    // VoteRepository에 추가
-    List<Object[]> countVotesByResultAndDateRange(Long figureId, LocalDate startDate, LocalDate endDate);
 
-    // ProposedBillRepository에 추가
+//    @Query("SELECT p FROM ProposedBill p WHERE p.categoryCode = :categoryCode AND p.proposeDate BETWEEN :startDate AND :endDate")
+//    List countByCategoryAndDateRange(@Param("categoryId") String categoryId,
+//                                     @Param("startDate") LocalDate startDate,
+//                                     @Param("endDate") LocalDate endDate);
+
+
     @Query("SELECT p.billStatus, COUNT(p) FROM ProposedBill p " +
             "WHERE p.proposer.id = :figureId AND p.proposeDate BETWEEN :startDate AND :endDate " +
             "GROUP BY p.billStatus")
@@ -92,26 +93,26 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
                                        @Param("endDate") LocalDate endDate);
 
 
-    @Query("SELECT " +
-            "CONCAT(YEAR(p.proposeDate), '-', LPAD(MONTH(p.proposeDate), 2, '0')) as month, " +
-            "COUNT(p) as total, " +
-            "COUNT(CASE WHEN p.billStatus = 'PASSED' THEN 1 END) as passed " +
-            "FROM ProposedBill p " +
-            "WHERE p.proposer.id = :figureId AND p.proposeDate BETWEEN :startDate AND :endDate " +
-            "GROUP BY YEAR(p.proposeDate), MONTH(p.proposeDate) " +
-            "ORDER BY YEAR(p.proposeDate), MONTH(p.proposeDate)")
-    List<Object[]> countBillsByMonthDetailed(@Param("figureId") Long figureId,
-                                             @Param("startDate") LocalDate startDate,
-                                             @Param("endDate") LocalDate endDate);
+//    @Query("SELECT " +
+//            "FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m') as month, " +
+//            "COUNT(p) as total, " +
+//            "SUM(CASE WHEN p.billStatus = com.example.GateStatus.domain.proposedBill.BillStatus.PASSED THEN 1 ELSE 0 END) as passed " +
+//            "FROM ProposedBill p " +
+//            "WHERE p.proposer.id = :figureId AND p.proposeDate BETWEEN :startDate AND :endDate " +
+//            "GROUP BY FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m') " +
+//            "ORDER BY FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m')")
+//    List<Object[]> countBillsByMonthDetailed(@Param("figureId") Long figureId,
+//                                             @Param("startDate") LocalDate startDate,
+//                                             @Param("endDate") LocalDate endDate);
 
 
-    @Query("SELECT p FROM ProposedBill p " +
-            "WHERE p.proposer.id = :figureId AND p.proposeDate BETWEEN :startDate AND :endDate " +
-            "AND (p.billName LIKE %:keyword1% OR p.billName LIKE %:keyword2% OR p.summary LIKE %:keyword1%)")
-    List<ProposedBill> findByCategoryKeywords(@Param("figureId") Long figureId,
-                                              @Param("keyword1") String keyword1,
-                                              @Param("keyword2") String keyword2,
-                                              @Param("startDate") LocalDate startDate,
-                                              @Param("endDate") LocalDate endDate);
+//    @Query("SELECT p FROM ProposedBill p " +
+//            "WHERE p.proposer.id = :figureId AND p.proposeDate BETWEEN :startDate AND :endDate " +
+//            "AND (p.billName LIKE %:keyword1% OR p.billName LIKE %:keyword2% OR p.summary LIKE %:keyword1%)")
+//    List<ProposedBill> findByCategoryKeywords(@Param("figureId") Long figureId,
+//                                              @Param("keyword1") String keyword1,
+//                                              @Param("keyword2") String keyword2,
+//                                              @Param("startDate") LocalDate startDate,
+//                                              @Param("endDate") LocalDate endDate);
 
 }

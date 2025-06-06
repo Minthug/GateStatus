@@ -146,4 +146,7 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
                                                     @Param("billIds") List<String> billIds,
                                                     @Param("startDate") LocalDate startDate,
                                                     @Param("endDate") LocalDate endDate);
+
+
+
 }
