@@ -41,7 +41,8 @@ public record ComparisonRequest(
 
 
     public boolean hasFigures() {
-        return hasIds() || hasNames();
+        return (figureIds != null && !figureIds.isEmpty()) ||
+                (figureNames != null && !figureNames.isEmpty());
     }
 
     /**
