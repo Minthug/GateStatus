@@ -29,6 +29,11 @@ public class ComparisonResultBuilder {
 
         List<FigureComparisonData> figureDataList = createFigureComparisonDataList(rawData, comparisonTypes);
 
+        if (figureDataList == null) {
+            log.warn("figureDataList가 null입니다. 빈 리스트로 초기화합니다.");
+            figureDataList = new ArrayList<>();
+        }
+
         Map<String, Object> summaryData = createSummaryData(rawData, figureDataList);
 
         ComparisonResult result = new ComparisonResult(
@@ -47,14 +52,22 @@ public class ComparisonResultBuilder {
 
         Map<String, Object> summary = new HashMap<>();
 
-        addBasicAnalysisInfo(summary, rawData);
+        try {
+            addBasicAnalysisInfo(summary, rawData);
+            addCategoryInfo(summary, rawData.getContext().getCategoryInfo());
 
-        addCategoryInfo(summary, rawData.getContext().getCategoryInfo());
-
-        addTopPerformersInfo(summary, figureDataList);
-
-        addOverallStatistics(summary, figureDataList);
-
+            if (figureDataList != null && !figureDataList.isEmpty()) {
+                addOverallStatistics(summary, figureDataList);
+                addTopPerformersInfo(summary, figureDataList);
+            } else {
+                log.warn("비교할 정치인 데이터가 없습니다.");
+                summary.put("message", "비교할 정치인 데이터가 없습니다.");
+                summary.put("figureCount", 0);
+            }
+        } catch (Exception e) {
+            log.error("요약 데이터 생성 중 오류: {}", e.getMessage(), e);
+            summary.put("error", "요약 데이터 생성 실패: " + e.getMessage());
+        }
         return summary;
     }
 
@@ -153,8 +166,40 @@ public class ComparisonResultBuilder {
         summary.put("partyDistribution", partyDistribution);
     }
 
-    private List<FigureComparisonData> createFigureComparisonDataList(ComparisonService.ComparisonRawData rawData, List<ComparisonType> comparisonTypes) {
-        return null;
+    /**
+     * 🔥 핵심 수정: 실제 정치인 비교 데이터 리스트 생성 구현
+     */
+    private List<FigureComparisonData> createFigureComparisonDataList(ComparisonService.ComparisonRawData rawData,
+                                                                      List<ComparisonType> comparisonTypes) {
+        List<FigureComparisonData> figureDataList = new ArrayList<>();
+
+        try {
+            if (rawData == null || rawData.getFigures() == null) {
+                log.warn("rawData 또는 figures가 null입니다.");
+                return figureDataList;
+            }
+
+            for (Figure figure : rawData.getFigures()) {
+                try {
+                    FigureComparisonData data = createSingleFigureComparisonData(figure, rawData, comparisonTypes);
+                    if (data != null) {
+                        figureDataList.add(data);
+                    }
+                } catch (Exception e) {
+                    log.error("정치인 {}의 비교 데이터 생성 실패: {}",
+                            figure != null ? figure.getName() : "Unknown", e.getMessage());
+                    // 실패해도 계속 진행 (다른 정치인들은 처리)
+                }
+            }
+
+            log.info("정치인 비교 데이터 생성 완료: 요청 {}명 중 {}명 성공",
+                    rawData.getFigures().size(), figureDataList.size());
+
+        } catch (Exception e) {
+            log.error("정치인 비교 데이터 리스트 생성 실패: {}", e.getMessage(), e);
+        }
+
+        return figureDataList;
     }
 
     /**
@@ -165,80 +210,118 @@ public class ComparisonResultBuilder {
             ComparisonService.ComparisonRawData rawData,
             List<ComparisonType> comparisonTypes) {
 
-        Long figureId = figure.getId();
-
-        List<StatementDocument> statements = rawData.getStatements().getOrDefault(figureId, Collections.emptyList());
-        List<Vote> votes = rawData.getVotes().getOrDefault(figureId, Collections.emptyList());
-        List<ProposedBill> bills = rawData.getBills().getOrDefault(figureId, Collections.emptyList());
-
-        StatementComparisonData statementData = null;
-        VoteComparisonData voteData = null;
-        BillComparisonData billData = null;
-
-        if (shouldIncludeType(comparisonTypes, ComparisonType.STATEMENT)) {
-            statementData = createStatementComparisonData(statements);
+        if (figure == null) {
+            log.warn("figure가 null 입니다");
+            return null;
         }
 
-        if (shouldIncludeType(comparisonTypes, ComparisonType.VOTE)) {
-            voteData = createVoteComparisonData(votes);
+        try {
+            Long figureId = figure.getId();
+
+            List<StatementDocument> statements = rawData.getStatements().getOrDefault(figureId, Collections.emptyList());
+            List<Vote> votes = rawData.getVotes().getOrDefault(figureId, Collections.emptyList());
+            List<ProposedBill> bills = rawData.getBills().getOrDefault(figureId, Collections.emptyList());
+
+            StatementComparisonData statementData = null;
+            VoteComparisonData voteData = null;
+            BillComparisonData billData = null;
+
+            if (shouldIncludeType(comparisonTypes, ComparisonType.STATEMENT)) {
+                statementData = createStatementComparisonData(statements);
+            }
+
+            if (shouldIncludeType(comparisonTypes, ComparisonType.VOTE)) {
+                voteData = createVoteComparisonData(votes);
+            }
+
+            if (shouldIncludeType(comparisonTypes, ComparisonType.BILL)) {
+                billData = createBillComparisonData(bills);
+            }
+
+            Map<String, Object> additionalData = createAdditionalData(
+                    figureId, statements, votes, bills, rawData.getDateRange());
+
+            return new FigureComparisonData(
+                    figure.getId(),
+                    figure.getName(),
+                    figure.getFigureParty() != null ? figure.getFigureParty().getPartyName() : "무소속",
+                    statementData,
+                    voteData,
+                    billData,
+                    additionalData
+            );
+        } catch (Exception e) {
+            log.error("정치인 {} 비교 데이터 생성 실패: {}", figure.getName(), e.getMessage());
+            return null;
         }
-
-        if (shouldIncludeType(comparisonTypes, ComparisonType.BILL)) {
-            billData = createBillComparisonData(bills);
-        }
-
-        Map<String, Object> additionalData = createAdditionalData(
-                figureId, statements, votes, bills, rawData.getDateRange());
-
-        return new FigureComparisonData(
-                figure.getId(),
-                figure.getName(),
-                figure.getFigureParty() != null ? figure.getFigureParty().getPartyName() : "무소속",
-                statementData,
-                voteData,
-                billData,
-                additionalData
-        );
-
     }
 
-    private Map<String, Object> createAdditionalData(Long figureId, List<StatementDocument> statements, List<Vote> votes, List<ProposedBill> bills, DateRange dateRange) {
+    /**
+     * 추가 데이터 생성 (활동 통계 등)
+     */
+    private Map<String, Object> createAdditionalData(Long figureId, List<StatementDocument> statements,
+                                                     List<Vote> votes, List<ProposedBill> bills, DateRange dateRange) {
         Map<String, Object> additionalData = new HashMap<>();
 
-        Set<LocalDate> allActivityDates = new HashSet<>();
+        try {
+            Set<LocalDate> allActivityDates = new HashSet<>();
 
-        statements.stream()
-                .map(StatementDocument::getStatementDate)
-                .forEach(allActivityDates::add);
+            // 각 활동 날짜 수집
+            if (statements != null) {
+                statements.stream()
+                        .map(StatementDocument::getStatementDate)
+                        .filter(Objects::nonNull)
+                        .forEach(allActivityDates::add);
+            }
 
-        votes.stream()
-                .map(Vote::getVoteDate)
-                .forEach(allActivityDates::add);
+            if (votes != null) {
+                votes.stream()
+                        .map(Vote::getVoteDate)
+                        .filter(Objects::nonNull)
+                        .forEach(allActivityDates::add);
+            }
 
-        bills.stream()
-                .map(ProposedBill::getProposeDate)
-                .forEach(allActivityDates::add);
+            if (bills != null) {
+                bills.stream()
+                        .map(ProposedBill::getProposeDate)
+                        .filter(Objects::nonNull)
+                        .forEach(allActivityDates::add);
+            }
 
-        int activeDays = allActivityDates.size();
-        additionalData.put("activeDays", activeDays);
-        
-        double activeDensity = dateRange.calculateActivityDensity(activeDays);
-        additionalData.put("activityDensity", Math.round(activeDensity * 10000) / 100.0);
+            int activeDays = allActivityDates.size();
+            additionalData.put("activeDays", activeDays);
 
-        int totalActivities = statements.size() + votes.size() + bills.size();
-        double monthlyAverage = dateRange.calculateMonthlyAverage(totalActivities);
-        additionalData.put("monthlyAverageActivity", Math.round(monthlyAverage * 100) / 100.0);
+            if (dateRange != null) {
+                double activeDensity = dateRange.calculateActivityDensity(activeDays);
+                additionalData.put("activityDensity", Math.round(activeDensity * 10000) / 100.0);
 
-        String mainActivityType = determineMainActivityType(
-                statements.size(), votes.size(), bills.size());
-        additionalData.put("mainActivityType", mainActivityType);
+                int totalActivities =
+                        (statements != null ? statements.size() : 0) +
+                                (votes != null ? votes.size() : 0) +
+                                (bills != null ? bills.size() : 0);
 
-        Map<String, Integer> activityDistribution = Map.of(
-                "statements", statements.size(),
-                "votes", votes.size(),
-                "bills", bills.size()
-        );
-        additionalData.put("activityDistribution", activityDistribution);
+                double monthlyAverage = dateRange.calculateMonthlyAverage(totalActivities);
+                additionalData.put("monthlyAverageActivity", Math.round(monthlyAverage * 100) / 100.0);
+            }
+
+            String mainActivityType = determineMainActivityType(
+                    statements != null ? statements.size() : 0,
+                    votes != null ? votes.size() : 0,
+                    bills != null ? bills.size() : 0);
+            additionalData.put("mainActivityType", mainActivityType);
+
+            Map<String, Integer> activityDistribution = Map.of(
+                    "statements", statements != null ? statements.size() : 0,
+                    "votes", votes != null ? votes.size() : 0,
+                    "bills", bills != null ? bills.size() : 0
+            );
+            additionalData.put("activityDistribution", activityDistribution);
+
+        } catch (Exception e) {
+            log.error("추가 데이터 생성 실패: {}", e.getMessage());
+            // 실패해도 빈 맵이라도 반환
+        }
+
         return additionalData;
     }
 
