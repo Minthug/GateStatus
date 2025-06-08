@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -72,21 +73,40 @@ public class ProposedBillQueueService {
     public String queueAllBillsSyncTask() {
         String jobId = UUID.randomUUID().toString();
 
-        List<Figure> figures = figureRepository.findByFigureType(FigureType.POLITICIAN);
+        try {
+            List<Figure> figures = figureRepository.findByFigureType(FigureType.POLITICIAN);
 
-        SyncJobStatus status = new SyncJobStatus(jobId);
-        jobStatusMap.put(jobId, status);
-
-        List<List<Figure>> batches = splitIntoBatches(figures, batchSize);
-
-        for (List<Figure> batch : batches) {
-            for (Figure figure : batch) {
-                queueBillsSyncTask(figure.getName(), jobId);
+            if (figures.isEmpty()) {
+                log.warn("동기화할 국회의원이 없습니다.");
+                return jobId;
             }
-        }
+
+            SyncJobStatus status = new SyncJobStatus(jobId);
+            status.setTotalTasks(figures.size());
+            jobStatusMap.put(jobId, status);
+
+            List<List<Figure>> batches = splitIntoBatches(figures, batchSize);
+
+            for (List<Figure> batch : batches) {
+                for (Figure figure : batch) {
+                    queueBillsSyncTask(figure.getName(), jobId);
+                }
+            }
 
         log.info("총 {}명의 국회의원 법안 동기화 작업을 큐에 추가했습니다. (작업 ID: {})", figures.size(), jobId);
         return jobId;
+        } catch (Exception e) {
+            log.error("전체 법안 동기화 작업 큐 추가 실패: jobId={}", jobId, e);
+
+            SyncJobStatus status = jobStatusMap.get(jobId);
+            if (status != null) {
+                status.setError(true);
+                status.setErrorMessage("작업 큐 추가 실패: " + e.getMessage());
+                status.setEndTime(LocalDateTime.now());
+            }
+
+            throw new RuntimeException("전체 동기화 작업 실패", e);
+        }
     }
 
     @RabbitListener(queues = "bill-sync-queue")
