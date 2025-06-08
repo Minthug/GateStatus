@@ -76,11 +76,6 @@ public class ProposedBillSyncService {
         return billQueueService.queueAllBillsSyncTask();
     }
 
-    public SyncJobStatus getJobStatus(String jobId) {
-        validateJobId(jobId);
-        return billQueueService.getJobStatus(jobId);
-    }
-
     @Transactional
     public ProposedBill updateFromApiData(String billId, ProposedBillApiDTO apiData) {
         validateApiData(billId, apiData);

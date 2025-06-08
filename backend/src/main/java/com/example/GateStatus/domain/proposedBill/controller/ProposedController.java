@@ -166,15 +166,15 @@ public class ProposedController {
         }
     }
 
-    @GetMapping("/sync/status/{jobId}")
-    public ResponseEntity<ApiResponse<ProposedBillQueueService.JobStatus>> getSyncStatus(@PathVariable String jobId) {
-
-        ProposedBillQueueService.JobStatus status = proposedBillService.getJobStatus(jobId);
-
-        if (status == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        return ResponseEntity.ok(ApiResponse.success("법안 동기화 작업 상태", status));
-    }
+//    @GetMapping("/sync/status/{jobId}")
+//    public ResponseEntity<ApiResponse<ProposedBillQueueService>> getSyncStatus(@PathVariable String jobId) {
+//
+//        ProposedBillQueueService.JobStatus status = proposedBillService.getJobStatus(jobId);
+//
+//        if (status == null) {
+//            return ResponseEntity.notFound().build();
+//        }
+//
+//        return ResponseEntity.ok(ApiResponse.success("법안 동기화 작업 상태", status));
+//    }
 }

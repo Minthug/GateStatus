@@ -13,15 +13,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -114,22 +117,70 @@ public class ProposedBillQueueService {
         String proposerName = task.getProposerName();
         String jobId = task.getJobId();
 
+        log.info("국회의원 {} 법안 동기화 작업 시작 (작업 ID: {})", proposerName, jobId);
+        SyncJobStatus status = jobStatusMap.get(jobId);
+
         try {
-            log.info("국회의원 {} 법안 동기화 작업 시작 (작업 ID: {})", proposerName, jobId);
             int count = proposedBillApiService.syncBillByProposer(proposerName);
 
-            if (jobId != null && jobStatusMap.containsKey(jobId)) {
-                SyncJobStatus status = jobStatusMap.get(jobId);
-                status.incrementCompleted();
+            if (status != null) {
+                status.incrementCompletedTasks();
+                status.incrementSuccessCount();
                 status.addSyncCount(count);
 
-                log.info("국회의원 {} 법안 동기화 완료: {}건 (진행률: {}%)",
-                        proposerName, count, status.getProgressPercentage());
+                if (status.isAllTasksCompleted()) {
+                    status.setCompleted(true);
+                    status.setEndTime(LocalDateTime.now());
+                    log.info("작업 ID {} 모든 동기화 완료", jobId);
+                }
             }
+                log.info("국회의원 {} 법안 동기화 완료: {}건 (진행률: {}%)",
+                        proposerName, count, status != null ? status.getProgressPercentage() : 0);
         } catch (Exception e) {
             log.error("국회의원 {} 법안 동기화 실패: {}", proposerName, e.getMessage(), e);
-            // 실패 시 재시도 로직 추가 가능
+
+            if (status != null) {
+                status.incrementSuccessCount();
+                status.incrementFailCount();
+                status.setErrorMessage("부분 실패: " + e.getMessage());
+
+                if (status.isAllTasksCompleted()) {
+                    status.setCompleted(true);
+                    status.setEndTime(LocalDateTime.now());
+
+                    if (status.getFailCount() > 0) {
+                        status.setError(true);
+                    }
+                }
+            }
         }
+    }
+
+    public SyncJobStatus getJobStatus(String jobId) {
+        validateJobId(jobId);
+        return jobStatusMap.get(jobId);
+    }
+
+    @Scheduled(fixedRate = 3600000)
+    public int cleanCompletedJob(int olderThanHours) {
+        LocalDateTime cutoff = LocalDateTime.now().minusHours(olderThanHours);
+
+        List<String> toRemove = jobStatusMap.entrySet().stream()
+                .filter(entry -> {
+                    SyncJobStatus status = entry.getValue();
+                    return status.isCompleted() &&
+                            status.getEndTime() != null &&
+                            status.getEndTime().isBefore(cutoff);
+                })
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+        toRemove.forEach(jobStatusMap::remove);
+
+        if (!toRemove.isEmpty()) {
+            log.info("완료된 작업 {} 개 정리 완료", toRemove.size());
+        }
+        return toRemove.size();
     }
 
     /**
@@ -167,6 +218,8 @@ public class ProposedBillQueueService {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class SyncTask implements Serializable {
+        private static final long serialVersionUID = 1L;
+
         private String jobId;
         private String proposerName;
     }

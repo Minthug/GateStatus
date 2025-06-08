@@ -30,7 +30,7 @@ public class BillAsyncService {
      */
     @Async
     public CompletableFuture<Integer> syncBillsByProposerAsync(String proposerName) {
-        int count = proposedBillApiService.syncBillByProposer(proposerName);
+        int count = billApiService.syncBillByProposer(proposerName);
         return CompletableFuture.completedFuture(count);
     }
 

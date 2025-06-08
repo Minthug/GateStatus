@@ -9,11 +9,12 @@ import java.time.LocalDateTime;
 public class SyncJobStatus {
     private final String jobId;
     private int totalTasks;
-    private int completedTasks;
-    private int successCount;
-    private int failCount;
-    private boolean completed;
-    private boolean error;
+    private int completedTasks = 0;
+    private int successCount = 0;
+    private int failCount = 0;
+    private int syncCount = 0;
+    private boolean completed = false;
+    private boolean error = false;
     private String errorMessage;
     private final LocalDateTime startTime = LocalDateTime.now();
     private LocalDateTime endTime;
@@ -44,4 +45,17 @@ public class SyncJobStatus {
         LocalDateTime end = endTime != null ? endTime : LocalDateTime.now();
         return Duration.between(startTime, end);
     }
+
+    public synchronized void addSyncCount(int count) {
+        this.syncCount += count;
+    }
+
+    /**
+     * 모든 작업이 완료되었는지 확인
+     * @return 완료 여부
+     */
+    public boolean isAllTasksCompleted() {
+        return completedTasks >= totalTasks;
+    }
+
 }
