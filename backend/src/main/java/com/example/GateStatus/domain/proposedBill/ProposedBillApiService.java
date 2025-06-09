@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.proposedBill;
 
+import com.example.GateStatus.domain.common.BillUtils;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
@@ -21,6 +22,9 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.example.GateStatus.domain.common.BillUtils.*;
+import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
 
 @Service
 @RequiredArgsConstructor
@@ -162,26 +166,6 @@ public class ProposedBillApiService {
         }
     }
 
-//    /**
-//     * DTO 데이터로 법안 엔티티 업데이트
-//     * @param bill
-//     * @param dto
-//     */
-//    private void updateBillFromDto(ProposedBill bill, ProposedBillApiDTO dto) {
-//        bill.update(
-//                dto.billNo(),
-//                dto.billName(),
-//                parseDate(dto.proposedDate()),
-//                dto.summary(),
-//                dto.billUrl(),
-//                parsebillStatus(dto.billStatus(), dto.processResult()),
-//                parseDate(dto.processDate()),
-//                dto.processResult(),
-//                dto.committee(),
-//                dto.coProposers()
-//        );
-//    }
-
     /**
      * 법안 상태 코드 변환
      * @param statusCode
@@ -209,26 +193,6 @@ public class ProposedBillApiService {
             }
         };
     }
-
-    /**
-     * 문자열 날짜를 LocalDate로 변환
-     * @param dateStr
-     * @return
-     */
-    private LocalDate parseDate(String dateStr) {
-        if (dateStr == null || dateStr.isEmpty()) {
-            return null;
-        }
-
-        try {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-            return LocalDate.parse(dateStr, formatter);
-        } catch (Exception e) {
-            log.warn("날짜 형식 변환 오류: {}", dateStr, e);
-            return null;
-        }
-    }
-
 
     private List<ProposedBillApiDTO> parseJsonResponse(String jsonResponse) {
         try {
@@ -370,8 +334,8 @@ public class ProposedBillApiService {
             proposer = figureRepository.findByName(proposerName).orElse(null);
         }
 
-        LocalDate proposeDate = parseDate(dto.proposedDate());
-        LocalDate processDate = parseDate(dto.processDate());
+        LocalDate proposeDate = safeParseDateWithLogging(dto.proposedDate(), "발의일");
+        LocalDate processDate = safeParseDateWithLogging(dto.processDate(), "처리일");
 
         // 법안 상태 결정
         BillStatus billStatus = determineBillStatus(dto.processResult());
@@ -391,30 +355,6 @@ public class ProposedBillApiService {
 
         // 공동발의자 업데이트
         bill.setCoProposers(dto.coProposers());
-    }
-
-
-    private BillStatus determineBillStatus(String processResult) {
-        if (processResult == null || processResult.isEmpty()) {
-            return BillStatus.PROPOSED;
-        } else if (processResult.contains("원안가결") || processResult.contains("수정가결")) {
-            return BillStatus.PASSED;
-        } else if (processResult.contains("폐기") || processResult.contains("부결")) {
-            return BillStatus.REJECTED;
-        } else if (processResult.contains("대안반영")) {
-            return BillStatus.ALTERNATIVE;
-        } else if (processResult.contains("철회")) {
-            return BillStatus.WITHDRAWN;
-        } else {
-            return BillStatus.PROCESSING;
-        }
-    }
-
-
-    // 유틸리티 메서드
-    private String getTextValue(JsonNode node, String fieldName) {
-        JsonNode field = node.get(fieldName);
-        return (field != null && !field.isNull()) ? field.asText() : "";
     }
 
     private boolean isEmpty(String str) {
