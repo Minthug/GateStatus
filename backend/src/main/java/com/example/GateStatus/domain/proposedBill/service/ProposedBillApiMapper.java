@@ -13,6 +13,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
+
 @Component
 @RequiredArgsConstructor
 public class ProposedBillApiMapper implements ApiMapper<JsonNode, List<ProposedBillApiDTO>> {
@@ -64,11 +66,5 @@ public class ProposedBillApiMapper implements ApiMapper<JsonNode, List<ProposedB
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
-    }
-
-
-    private String getTextValue(JsonNode node, String fieldName) {
-        JsonNode field = node.get(fieldName);
-        return (field != null && !field.isNull()) ? field.asText() : "";
     }
 }

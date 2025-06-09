@@ -77,4 +77,10 @@ public class JsonUtils {
     public static boolean hasField(JsonNode node, String fieldName) {
         return node.has(fieldName) && !node.get(fieldName).isNull();
     }
+
+    private boolean isEmpty(String str) {
+        return str == null || str.trim().isEmpty();
+    }
+
+
 }

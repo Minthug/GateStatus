@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -43,6 +42,9 @@ public class ProposedBillApiService {
     private String apiKey;
     @Value("${spring.openapi.assembly.proposed-bill-path}")
     private String proposedBillPath;
+
+    private static final String CURRENT_ASSEMBLY_AGE = "22";
+    private static final String API_PATH_BILLS = "nzmimeepazxkubdpn";
 
     @Transactional
     public int syncAllBills() {
@@ -74,8 +76,6 @@ public class ProposedBillApiService {
                 log.error("국회의원 {}의 발의 법안 동기화 중 오류: {}", figure.getName(), e.getMessage(), e);
             }
         }
-
-
         log.info("모든 국회의원 발의 법안 동기화 완료: 총 {}명 중 성공 {}건, 실패 {}건",
                 allFigures.size(), totalSuccess, totalFail);
         return totalSuccess;
@@ -87,6 +87,8 @@ public class ProposedBillApiService {
      */
     @Transactional
     public int syncBillByProposer(String proposerName) {
+        validateProposerName(proposerName);
+
         try {
             log.info("{}의 발의 법안 동기화 시작", proposerName);
 
@@ -99,10 +101,8 @@ public class ProposedBillApiService {
 
             log.info("동기화 대상 법안: {}건", bills.size());
 
-
             int successCount = 0;
             int failCount = 0;
-
 
             for (ProposedBillApiDTO bill : bills) {
                 try {
@@ -128,6 +128,65 @@ public class ProposedBillApiService {
         }
     }
 
+    @Transactional
+    public ProposedBill updateFromApiData(String billId, ProposedBillApiDTO apiData) {
+        validateBillId(billId);
+        validateApiData(apiData);
+
+        Optional<ProposedBill> existingBill = billRepository.findByBillId(billId);
+        ProposedBill bill;
+
+        if (existingBill.isPresent()) {
+            bill = existingBill.get();
+            updateBillFromApiData(bill, apiData);
+            log.debug("기존 법안 업데이트: {}", apiData.billName());
+        } else {
+            bill = createBillFromApiData(apiData);
+            log.debug("새 법안 생성: {}", apiData.billName());
+        }
+        return billRepository.save(bill);
+    }
+
+        private ProposedBill createBillFromApiData(ProposedBillApiDTO dto) {
+
+    }
+
+    private void updateBillFromApiData(ProposedBill bill, ProposedBillApiDTO dto) {
+        Figure proposer = findProposerByName(dto.proposer());
+
+        bill.setBillNo(dto.billNo());
+        bill.setBillName(dto.billName());
+        bill.setProposer(proposer);
+        bill.setSummary(dto.summary());
+        bill.setBillUrl(dto.linkUrl());
+        bill.setCommittee(dto.committeeName());
+        bill.setCoProposers(dto.coProposers());
+
+        BillStatus newStatus = BillUtils.determineBillStatus(dto.processResult());
+        LocalDate newProcessDate = BillUtils.safeParseDateWithLogging(dto.processDate(), "처리일");
+
+        if (bill.getBillStatus() != newStatus) {
+            log.info("법안 상태 변경: {} - {} → {}",
+                    bill.getBillName(), bill.getBillStatus(), newStatus);
+        }
+
+        bill.setBillStatus(newStatus);
+        bill.setProcessDate(newProcessDate);
+        bill.setProcessResult(dto.processResult());
+        bill.setProcessResultCode(dto.processResultCode());
+
+        LocalDate newProposeDate = BillUtils.safeParseDateWithLogging(dto.proposedDate(), "발의일");
+        if (newProposeDate != null && !newProposeDate.equals(bill.getProposeDate())) {
+            log.warn("법안 발의일 변경 감지: {} - {} → {}",
+                    bill.getBillName(), bill.getProposeDate(), newProposeDate);
+            bill.setProposeDate(newProposeDate);
+        }
+    }
+
+
+    private ProposedBill updateExistingBill(ProposedBill proposedBill, ProposedBillApiDTO apiData) {
+    }
+
     /**
      * API에서 특정 국회의원의 발의 법안 조회
      * @param proposedName
@@ -137,14 +196,12 @@ public class ProposedBillApiService {
         try {
             log.info("{}의 발의 법안 API 호출", proposedName);
 
-            String currentAge = "22";
-
             String jsonResponse = assemblyWebClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(proposedBillPath)
                             .queryParam("KEY", apiKey)
                             .queryParam("PROPOSER", proposedName)
-                            .queryParam("AGE", currentAge)
+                            .queryParam("AGE", CURRENT_ASSEMBLY_AGE)
                             .build())
                     .retrieve()
                     .bodyToMono(String.class)
@@ -197,7 +254,7 @@ public class ProposedBillApiService {
     private List<ProposedBillApiDTO> parseJsonResponse(String jsonResponse) {
         try {
             JsonNode rootNode = mapper.readTree(jsonResponse);
-            JsonNode rowsNode = rootNode.path("nzmimeepazxkubdpn")
+            JsonNode rowsNode = rootNode.path(API_PATH_BILLS).path(1)
                     .path(1)
                     .path("row");
 
@@ -212,40 +269,18 @@ public class ProposedBillApiService {
 
             for (JsonNode row : rowsNode) {
                 try {
-                    String billId = getTextValue(row, "BILL_ID");
-                    String billNo = getTextValue(row, "BILL_NO");
-                    String billName = getTextValue(row, "BILL_NAME");
-                    String proposer = getTextValue(row, "PROPOSER");
-
-                    if (isEmpty(billId) || isEmpty(billName)) {
-                        log.warn("유효하지 않은 법안 정보: ID={}, 이름={}", billId, billName);
+                    ProposedBillApiDTO dto = createBillDtoFromJsonNode(row);
+                    if (isValidBillDto(dto)) {
+                        bills.add(dto);
+                        parsedCount++;
+                    } else {
                         skipCount++;
-                        continue;
+                        log.debug("유효하지 않은 법안 정보 스킵: ID={}, 이름={}",
+                                dto.billId(), dto.billName());
                     }
-
-                    List<String> coProposers = parseCoProposers(row);
-
-                    ProposedBillApiDTO dto = new ProposedBillApiDTO(
-                            billId,
-                            billNo,
-                            billName,
-                            proposer,
-                            getTextValue(row, "PROPOSE_DT"),
-                            getTextValue(row, "SUMMARY"),
-                            getTextValue(row, "LINK_URL"),
-                            getTextValue(row, "PROC_RESULT_CD"),
-                            getTextValue(row, "PROC_DT"),
-                            getTextValue(row, "PROC_RESULT"),
-                            getTextValue(row, "COMMITTEE_NAME"),
-                            coProposers
-                    );
-
-                    bills.add(dto);
-                    parsedCount++;
-
                 } catch (Exception e) {
-                    log.warn("법안 파싱 중 오류 발생: {}", e.getMessage());
                     skipCount++;
+                    log.warn("법안 파싱 중 오류 발생: {}", e.getMessage());
                 }
             }
 
@@ -255,6 +290,23 @@ public class ProposedBillApiService {
             log.error("JSON 파싱 중 오류 발생: {}", e.getMessage());
             throw new ApiDataRetrievalException("JSON 파싱 실패 " + e.getMessage());
         }
+    }
+
+    private ProposedBillApiDTO createBillDtoFromJsonNode(JsonNode row) {
+        return new ProposedBillApiDTO(
+                getTextValue(row, "BILL_ID"),
+                getTextValue(row, "BILL_NO"),
+                getTextValue(row, "BILL_NAME"),
+                getTextValue(row, "PROPOSER"),
+                getTextValue(row, "PROPOSE_DT"),
+                getTextValue(row, "SUMMARY"),
+                getTextValue(row, "LINK_URL"),
+                getTextValue(row, "PROC_RESULT_CD"),
+                getTextValue(row, "PROC_DT"),
+                getTextValue(row, "PROC_RESULT"),
+                getTextValue(row, "COMMITTEE_NAME"),
+                parseCoProposers(row)
+        );
     }
 
     private List<String> parseCoProposers(JsonNode row) {
@@ -295,6 +347,7 @@ public class ProposedBillApiService {
             throw e;
         }
     }
+
 
     private ProposedBill createNewBill(ProposedBillApiDTO dto, String proposerName) {
         Figure proposer = null;
@@ -357,9 +410,45 @@ public class ProposedBillApiService {
         bill.setCoProposers(dto.coProposers());
     }
 
+
     private boolean isEmpty(String str) {
         return str == null || str.trim().isEmpty();
     }
 
+    // ========================================
+    // Validation Methods
+    // ========================================
 
+    private void validateProposerName(String proposerName) {
+        if (isEmpty(proposerName)) {
+            throw new IllegalArgumentException("발의자 이름은 필수입니다");
+        }
+    }
+
+    private void validateBillId(String billId) {
+        if (isEmpty(billId)) {
+            throw new IllegalArgumentException("법안 ID는 필수입니다");
+        }
+    }
+
+    private void validateApiData(ProposedBillApiDTO apiData) {
+        if (apiData == null) {
+            throw new IllegalArgumentException("API 데이터는 필수 입니다");
+        }
+    }
+
+    private Figure findProposerByName(String proposerName) {
+        if (isEmpty(proposerName)) {
+            return null;
+        }
+
+        return figureRepository.findByName(proposerName.trim()).orElse(null);
+    }
+
+    /**
+     * BillDTO 유효성 검증
+     */
+    private boolean isValidBillDto(ProposedBillApiDTO dto) {
+        return !isEmpty(dto.billId()) && !isEmpty(dto.billName());
+    }
 }
