@@ -5,6 +5,7 @@ import com.example.GateStatus.domain.proposedBill.service.ProposedBillResponse;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillService;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillSyncService;
 import com.example.GateStatus.global.config.open.ApiResponse;
+import com.google.protobuf.Api;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/v1/proposed")
@@ -109,6 +111,43 @@ public class ProposedController {
             log.error("법안 동기화 중 오류 발생: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("법안 동기화 실패: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/sync/all")
+    public ResponseEntity<ApiResponse<Integer>> syncAllBills() {
+        log.info("전체 법안 데이터 동기화 요청");
+
+        try {
+            int syncCount = billSyncService.syncAllBills();
+            return ResponseEntity.ok(ApiResponse.success("전체 법안 동기화 완료", syncCount));
+        } catch (Exception e) {
+            log.error("전체 법안 동기화 중 오류 발생: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("전체 법안 동기화 실패: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/sync/async")
+    public ResponseEntity<ApiResponse<String>> syncBillsAsync(@RequestParam(required = false) String proposerName) {
+
+        log.info("비동기 법안 동기화 요청: 대상={}",
+                proposerName != null ? proposerName : "전체");
+
+        try {
+            CompletableFuture<Integer> future;
+            if (proposerName != null && !proposerName.trim().isEmpty()) {
+                future = billSyncService.syncBillsByProposerAsync(proposerName);
+            } else {
+                future = billSyncService.syncAllBillsAsync();
+            }
+
+            return ResponseEntity.ok(ApiResponse.success(
+                    "비동기 법안 동기화 작업이 시작되었습니다.", "ASYNC_STARTED"));
+        } catch (Exception e) {
+            log.error("비동기 법안 동기화 시작 중 오류 발생: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("비동기 법안 동기화 시작 실패: " + e.getMessage()));
         }
     }
 }
