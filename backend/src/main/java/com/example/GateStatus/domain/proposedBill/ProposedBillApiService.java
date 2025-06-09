@@ -106,14 +106,9 @@ public class ProposedBillApiService {
 
             for (ProposedBillApiDTO bill : bills) {
                 try {
-                    boolean success = saveBill(bill, proposerName);
-                    if (success) {
+                    saveBill(bill, proposerName);
                         successCount++;
                         log.debug("법안 저장 성공: {}, ID={}", bill.billName(), bill.billId());
-                    } else {
-                        failCount++;
-                        log.warn("법안 저장 실패: {}", bill.billName());
-                    }
                 } catch (Exception e) {
                     failCount++;
                     log.error("법안 저장 중 오류: {} - {}", bill.billName(), e.getMessage(), e);
@@ -147,8 +142,25 @@ public class ProposedBillApiService {
         return billRepository.save(bill);
     }
 
-        private ProposedBill createBillFromApiData(ProposedBillApiDTO dto) {
+    private ProposedBill createBillFromApiData(ProposedBillApiDTO dto) {
+        Figure proposer = findProposerByName(dto.proposer());
 
+        return ProposedBill.builder()
+                .billId(dto.billId())
+                .billNo(dto.billNo())
+                .billName(dto.billName())
+                .proposer(proposer)
+                .proposeDate(BillUtils.safeParseDateWithLogging(dto.proposedDate(), "발의일"))
+                .summary(dto.summary())
+                .billUrl(dto.linkUrl())
+                .billStatus(BillUtils.determineBillStatus(dto.processResult()))
+                .processDate(BillUtils.safeParseDateWithLogging(dto.processDate(), "처리일"))
+                .processResult(dto.processResult())
+                .processResultCode(dto.processResultCode())
+                .committee(dto.committeeName())
+                .coProposers(dto.coProposers())
+                .viewCount(0)  // 새 법안은 조회수 0
+                .build();
     }
 
     private void updateBillFromApiData(ProposedBill bill, ProposedBillApiDTO dto) {
@@ -181,10 +193,6 @@ public class ProposedBillApiService {
                     bill.getBillName(), bill.getProposeDate(), newProposeDate);
             bill.setProposeDate(newProposeDate);
         }
-    }
-
-
-    private ProposedBill updateExistingBill(ProposedBill proposedBill, ProposedBillApiDTO apiData) {
     }
 
     /**
@@ -322,92 +330,28 @@ public class ProposedBillApiService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean saveBill(ProposedBillApiDTO bill, String proposerName) {
+    public void saveBill(ProposedBillApiDTO bill, String proposerName) {
         try {
 
             log.info("법안 저장 시작: {}, 발의자: {}", bill.billName(), proposerName);
 
             Optional<ProposedBill> existingBill = billRepository.findByBillId(bill.billId());
-
             ProposedBill bills;
 
             if (existingBill.isPresent()) {
                 bills = existingBill.get();
-                updateBillInfo(bills, bill, proposerName);
+                updateBillFromApiData(bills, bill);
             } else {
-                bills = createNewBill(bill, proposerName);
+                bills = createBillFromApiData(bill);
+                log.debug("새 법안 생성: {}", bill.billName());
             }
 
-            ProposedBill savedBill = billRepository.save(bills);
-            log.info("법안 저장 성공: {}, ID: {}", bill.billName(), bill.billId());
-
-            return savedBill.getId() != null;
+            billRepository.save(bills);
+            log.debug("법안 저장 완료: {}", bill.billName());
         } catch (Exception e) {
             log.error("법안 저장 중 오류: {} - {}", bill.billName(), e.getMessage(), e);
             throw e;
         }
-    }
-
-
-    private ProposedBill createNewBill(ProposedBillApiDTO dto, String proposerName) {
-        Figure proposer = null;
-        if (proposerName != null && !proposerName.isEmpty()) {
-            proposer = figureRepository.findByName(proposerName).orElse(null);
-        }
-
-        // 날짜 변환
-        LocalDate proposeDate = parseDate(dto.proposedDate());
-        LocalDate processDate = parseDate(dto.processDate());
-
-        // 법안 상태 결정
-        BillStatus billStatus = determineBillStatus(dto.processResult());
-
-        // 새 엔티티 생성 (빌더 사용)
-        return ProposedBill.builder()
-                .billId(dto.billId())
-                .billNo(dto.billNo())
-                .billName(dto.billName())
-                .proposer(proposer)
-                .proposeDate(proposeDate)
-                .summary(dto.summary())
-                .billUrl(dto.linkUrl())
-                .billStatus(billStatus)
-                .processDate(processDate)
-                .processResult(dto.processResult())
-                .processResultCode(dto.processResultCode())
-                .committee(dto.committeeName())
-                .coProposers(dto.coProposers())
-                .build();
-    }
-
-    private void updateBillInfo(ProposedBill bill, ProposedBillApiDTO dto, String proposerName) {
-        Figure proposer = null;
-
-        if (proposerName != null && !proposerName.isEmpty()) {
-            proposer = figureRepository.findByName(proposerName).orElse(null);
-        }
-
-        LocalDate proposeDate = safeParseDateWithLogging(dto.proposedDate(), "발의일");
-        LocalDate processDate = safeParseDateWithLogging(dto.processDate(), "처리일");
-
-        // 법안 상태 결정
-        BillStatus billStatus = determineBillStatus(dto.processResult());
-
-        // 엔티티 필드 업데이트 (setter 메서드 사용)
-        bill.setBillNo(dto.billNo());
-        bill.setBillName(dto.billName());
-        bill.setProposer(proposer);
-        bill.setProposeDate(proposeDate);
-        bill.setSummary(dto.summary());
-        bill.setBillUrl(dto.linkUrl());
-        bill.setBillStatus(billStatus);
-        bill.setProcessDate(processDate);
-        bill.setProcessResult(dto.processResult());
-        bill.setProcessResultCode(dto.processResultCode());
-        bill.setCommittee(dto.committeeName());
-
-        // 공동발의자 업데이트
-        bill.setCoProposers(dto.coProposers());
     }
 
 
