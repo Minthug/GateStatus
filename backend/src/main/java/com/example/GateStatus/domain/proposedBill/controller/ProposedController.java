@@ -1,6 +1,8 @@
 package com.example.GateStatus.domain.proposedBill.controller;
 
+import com.example.GateStatus.domain.common.SyncJobStatus;
 import com.example.GateStatus.domain.proposedBill.BillStatus;
+import com.example.GateStatus.domain.proposedBill.service.ProposedBillQueueService;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillResponse;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillService;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillSyncService;
@@ -30,6 +32,7 @@ public class ProposedController {
 
     private final ProposedBillService billService;
     private final ProposedBillSyncService billSyncService;
+    private final ProposedBillQueueService billQueueService;
 
     /**
      * 법안 ID로 법안 상세 정보 조회
@@ -149,5 +152,38 @@ public class ProposedController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("비동기 법안 동기화 시작 실패: " + e.getMessage()));
         }
+    }
+
+    @PostMapping("/sync/queue")
+    public ResponseEntity<ApiResponse<String>> syncBillQueue(@RequestParam(required = false) String proposerName) {
+        log.info("큐 기반 법안 동기화 요청: 대상={}", proposerName != null ? proposerName : "전체");
+
+        try {
+            String jobId;
+            if (proposerName != null && !proposerName.trim().isEmpty()) {
+                jobId = billSyncService.queueBillSyncTask(proposerName);
+            } else {
+                jobId = billSyncService.queueAllBillsSyncTask();
+            }
+            return ResponseEntity.ok(ApiResponse.success(
+                    "비동기 법안 동기화 작업이 큐에 추가되었습니다.", jobId));
+        } catch (Exception e) {
+            log.error("큐 기반 법안 동기화 요청 중 오류 발생: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("큐 기반 법안 동기화 요청 실패: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/sync/status/{jobId}")
+    public ResponseEntity<ApiResponse<SyncJobStatus>> getSyncStatus(@PathVariable String jobId) {
+        log.info("동기화 작업 상태 조회: JobId={}", jobId);
+
+        SyncJobStatus status = billQueueService.getJobStatus(jobId);
+
+        if (status == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("작업 상태 조회 성공", status));
     }
 }

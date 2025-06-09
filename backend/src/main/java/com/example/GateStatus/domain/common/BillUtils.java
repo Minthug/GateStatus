@@ -16,15 +16,56 @@ public class BillUtils {
             return null;
         }
 
-        try {
-            return LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        } catch (Exception e) {
+        String cleanDateStr = dateStr.trim();
+
+        DateTimeFormatter[] formatters = {
+                DateTimeFormatter.ofPattern("yyyy-MM-dd"),    // 2024-07-01
+                DateTimeFormatter.ofPattern("yyyyMMdd"),      // 20240701
+                DateTimeFormatter.ofPattern("yyyy.MM.dd"),    // 2024.07.01
+                DateTimeFormatter.ofPattern("yyyy/MM/dd"),    // 2024/07/01
+                DateTimeFormatter.ofPattern("yyyy년 MM월 dd일"), // 2024년 07월 01일
+                DateTimeFormatter.ofPattern("yyyy-M-d"),      // 2024-7-1 (0패딩 없음)
+                DateTimeFormatter.ofPattern("yyyy.M.d"),      // 2024.7.1
+                DateTimeFormatter.ofPattern("yyyy/M/d")       // 2024/7/1
+        };
+
+        for (DateTimeFormatter formatter : formatters) {
             try {
-                return LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyyMMdd"));
-            } catch (Exception ex) {
-                log.warn("날짜 변환 실패: {}", dateStr);
-                return null;
+                LocalDate parsedDate = LocalDate.parse(cleanDateStr, formatter);
+                log.debug("날짜 파싱 성공: {} -> {}", dateStr, parsedDate);
+                return parsedDate;
+            } catch (Exception e) {
             }
+        }
+
+        log.warn("날짜 변환 실패 - 지원하지 않는 형식: '{}'. 지원 형식: yyyy-MM-dd, yyyyMMdd, yyyy.MM.dd, yyyy/MM/dd", dateStr);
+        return null;
+    }
+
+    public static String normalizeDateString(String dateStr) {
+        if (dateStr == null) return "null";
+
+        String cleaned = dateStr.trim();
+        return String.format("원본: '%s', 정리후: '%s', 길이: '%d'", dateStr, cleaned, cleaned.length());
+    }
+    
+    public static LocalDate safeParseDateWithLogging(String dateStr, String fieldName) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            log.debug("{} 필드가 비어있음", fieldName);
+            return null;
+        }
+
+        try {
+            LocalDate result = parseDate(dateStr);
+            if (result == null) {
+                log.warn("{} 필드 날짜 파싱 실패: {}", fieldName, normalizeDateString(dateStr));
+            } else {
+                log.debug("{} 필드 날짜 파싱 성공: {} -> {}", fieldName, dateStr, result);
+            }
+            return result;
+        } catch (Exception e) {
+            log.error("{} 필드 날짜 파싱 중 예외 발생: {}, 오류: {}", fieldName, normalizeDateString(dateStr), e.getMessage());
+            return null;
         }
     }
 

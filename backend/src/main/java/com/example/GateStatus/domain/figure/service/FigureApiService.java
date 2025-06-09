@@ -1036,7 +1036,5 @@ public class FigureApiService {
     public SyncJobStatus getSyncJobStatus(String jobId) {
         return syncJobStatusMap.get(jobId);
     }
-
-
 }
 
