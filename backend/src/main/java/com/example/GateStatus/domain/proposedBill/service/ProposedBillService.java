@@ -61,12 +61,26 @@ public class ProposedBillService {
      * @param pageable
      * @return
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<ProposedBillResponse> findBillsByProposer(Long proposerId, Pageable pageable) {
         Figure proposer = getFigureByIdOrThrow(proposerId);
         Page<ProposedBill> bills = billRepository.findByProposer(proposer, pageable);
         return bills.map(ProposedBillResponse::from);
     }
+
+    @Transactional(readOnly = true)
+    public Page<ProposedBillResponse> findBillsByProposerName(String proposerName, Pageable pageable) {
+        Page<ProposedBill> bills = billRepository.findByProposerName(proposerName, pageable);
+
+        if (bills.isEmpty()) {
+            if (pageable.getPageNumber() == 0) {
+                getFigureByNameOrThrow(proposerName);
+            }
+        }
+
+        return bills.map(ProposedBillResponse::from);
+    }
+
 
     /**
      * 인기 법안 목록 조회
@@ -140,6 +154,11 @@ public class ProposedBillService {
                 .orElseThrow(() -> new EntityNotFoundException("해당 국회의원이 존재하지 않습니다 " + proposerId));
     }
 
+    private Figure getFigureByNameOrThrow(String proposerName) {
+        return figureRepository.findByName(proposerName)
+                .orElseThrow(() -> new EntityNotFoundException("해당 국회의원이 존재하지 않습니다 " + proposerName));
+    }
+
 
     private void validateLimit(int limit) {
         if (limit <= 0 || limit > 100) {
@@ -168,6 +187,12 @@ public class ProposedBillService {
         }
         if (startDate.isAfter(endDate)) {
             throw new IllegalArgumentException("시작일은 종료일보다 늦을 수 없습니다");
+        }
+    }
+
+    private void validateProposerName(String proposerName) {
+        if (proposerName == null || proposerName.trim().isEmpty()) {
+            throw new IllegalArgumentException("발의자 이름은 필수입니다");
         }
     }
 }

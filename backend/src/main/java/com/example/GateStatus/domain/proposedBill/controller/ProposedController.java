@@ -67,6 +67,21 @@ public class ProposedController {
         return ResponseEntity.ok(bills);
     }
 
+
+    // ========================================
+    // 🎯 사용자 친화적 API (새로 추가)
+    // ========================================
+
+    @GetMapping("/by-proposer-name")
+    public ResponseEntity<Page<ProposedBillResponse>> getBillsByProposerName(
+            @RequestParam @NotBlank String proposerName,
+            @PageableDefault(size = 10) Pageable pageable) {
+        log.info("발의자 이름으로 법안 목록 조회: proposerName={}", proposerName);
+        Page<ProposedBillResponse> bills = billService.findBillsByProposerName(proposerName, pageable);
+        return ResponseEntity.ok(bills);
+    }
+
+
     @GetMapping("/popular")
     public ResponseEntity<List<ProposedBillResponse>> getPopularBills(
             @RequestParam(defaultValue = "10") int limit) {

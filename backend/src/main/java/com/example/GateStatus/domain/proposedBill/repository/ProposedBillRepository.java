@@ -23,6 +23,9 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
 
     Page<ProposedBill> findByProposer(Figure proposer, Pageable pageable);
 
+    @Query("SELECT p FROM ProposedBill p JOIN p.proposer f WHERE f.name = :proposerName")
+    Page<ProposedBill> findByProposerName(@Param("proposerName") String proposerName, Pageable pageable);
+
     Page<ProposedBill> findByBillNameContaining(String keyword, Pageable pageable);
 
     List<ProposedBill> findByBillStatus(BillStatus status);
