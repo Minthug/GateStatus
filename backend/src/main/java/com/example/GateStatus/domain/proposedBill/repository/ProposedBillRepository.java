@@ -1,6 +1,5 @@
 package com.example.GateStatus.domain.proposedBill.repository;
 
-import com.example.GateStatus.domain.dashboard.dto.internal.KeywordCount;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.proposedBill.BillStatus;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;

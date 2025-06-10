@@ -1,9 +1,7 @@
 package com.example.GateStatus.domain.proposedBill.service;
 
-import com.example.GateStatus.domain.common.BillUtils;
-import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.common.SyncJobStatus;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.proposedBill.ProposedBill;
 import com.example.GateStatus.domain.proposedBill.ProposedBillApiService;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,8 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -24,8 +20,6 @@ public class ProposedBillSyncService {
     private final ProposedBillApiService billApiService;
     private final ProposedBillQueueService billQueueService;
     private final BillAsyncService billAsyncService;
-    private final ProposedBillRepository billRepository;
-    private final FigureRepository figureRepository;
 
     @Transactional
     public int syncBillsByProposer(String proposerName) {
@@ -133,5 +127,10 @@ public class ProposedBillSyncService {
         if (apiData == null) {
             throw new IllegalArgumentException("API 데이터는 필수입니다");
         }
+    }
+
+    public SyncJobStatus getJobStatus(String jobId) {
+        validateJobId(jobId);
+        return billQueueService.getJobStatus(jobId);
     }
 }

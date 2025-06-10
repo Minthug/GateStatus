@@ -17,12 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-
-import static com.example.GateStatus.domain.common.BillUtils.determineBillStatus;
-import static com.example.GateStatus.domain.common.BillUtils.parseDate;
 
 @Service
 @RequiredArgsConstructor

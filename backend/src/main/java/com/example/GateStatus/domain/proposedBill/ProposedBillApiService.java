@@ -6,7 +6,6 @@ import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillApiDTO;
-import com.example.GateStatus.domain.proposedBill.service.ProposedBillApiMapper;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +21,6 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.example.GateStatus.domain.common.BillUtils.*;
 import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
 
 @Service
@@ -31,7 +29,6 @@ import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
 public class ProposedBillApiService {
 
     private final WebClient assemblyWebClient;
-    private final ProposedBillApiMapper apiMapper;
     private final ObjectMapper mapper;
     private final ProposedBillRepository billRepository;
     private final FigureRepository figureRepository;
@@ -263,7 +260,6 @@ public class ProposedBillApiService {
         try {
             JsonNode rootNode = mapper.readTree(jsonResponse);
             JsonNode rowsNode = rootNode.path(API_PATH_BILLS).path(1)
-                    .path(1)
                     .path("row");
 
             if (!rowsNode.isArray()) {
