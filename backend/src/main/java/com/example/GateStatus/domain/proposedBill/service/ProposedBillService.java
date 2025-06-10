@@ -70,15 +70,10 @@ public class ProposedBillService {
 
     @Transactional(readOnly = true)
     public Page<ProposedBillResponse> findBillsByProposerName(String proposerName, Pageable pageable) {
-        Page<ProposedBill> bills = billRepository.findByProposerName(proposerName, pageable);
+        validateProposerName(proposerName);
+        Figure proposer = getFigureByNameOrThrow(proposerName);
 
-        if (bills.isEmpty()) {
-            if (pageable.getPageNumber() == 0) {
-                getFigureByNameOrThrow(proposerName);
-            }
-        }
-
-        return bills.map(ProposedBillResponse::from);
+        return findBillsByProposer(proposer.getId(), pageable);
     }
 
 
@@ -155,7 +150,7 @@ public class ProposedBillService {
     }
 
     private Figure getFigureByNameOrThrow(String proposerName) {
-        return figureRepository.findByName(proposerName)
+        return figureRepository.findByName(proposerName.trim())
                 .orElseThrow(() -> new EntityNotFoundException("해당 국회의원이 존재하지 않습니다 " + proposerName));
     }
 
