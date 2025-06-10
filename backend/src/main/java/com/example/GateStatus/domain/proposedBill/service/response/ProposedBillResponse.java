@@ -1,4 +1,4 @@
-package com.example.GateStatus.domain.proposedBill.service;
+package com.example.GateStatus.domain.proposedBill.service.response;
 
 import com.example.GateStatus.domain.proposedBill.BillStatus;
 import com.example.GateStatus.domain.proposedBill.ProposedBill;

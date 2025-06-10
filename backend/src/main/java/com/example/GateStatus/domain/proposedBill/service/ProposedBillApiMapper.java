@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.proposedBill.service;
 
+import com.example.GateStatus.domain.proposedBill.service.response.ProposedBillApiDTO;
 import com.example.GateStatus.global.config.exception.ApiMappingException;
 import com.example.GateStatus.global.config.open.ApiMapper;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;

@@ -2,7 +2,7 @@ package com.example.GateStatus.domain.timeline.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.proposedBill.service.ProposedBillResponse;
+import com.example.GateStatus.domain.proposedBill.service.response.ProposedBillResponse;
 import com.example.GateStatus.domain.proposedBill.service.ProposedBillService;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;

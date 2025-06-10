@@ -1,9 +1,8 @@
 package com.example.GateStatus.domain.proposedBill.service;
 
 import com.example.GateStatus.domain.common.SyncJobStatus;
-import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.proposedBill.ProposedBillApiService;
-import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
+import com.example.GateStatus.domain.proposedBill.service.response.ProposedBillApiDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

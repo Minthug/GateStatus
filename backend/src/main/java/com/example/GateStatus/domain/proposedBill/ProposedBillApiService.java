@@ -5,7 +5,7 @@ import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
-import com.example.GateStatus.domain.proposedBill.service.ProposedBillApiDTO;
+import com.example.GateStatus.domain.proposedBill.service.response.ProposedBillApiDTO;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
