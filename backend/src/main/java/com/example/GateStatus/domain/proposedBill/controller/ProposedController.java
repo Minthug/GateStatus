@@ -76,8 +76,27 @@ public class ProposedController {
     public ResponseEntity<Page<ProposedBillResponse>> getBillsByProposerName(
             @RequestParam @NotBlank String proposerName,
             @PageableDefault(size = 10) Pageable pageable) {
+
         log.info("발의자 이름으로 법안 목록 조회: proposerName={}", proposerName);
         Page<ProposedBillResponse> bills = billService.findBillsByProposerName(proposerName, pageable);
+        return ResponseEntity.ok(bills);
+    }
+
+    @GetMapping("/search-all")
+    public ResponseEntity<Page<ProposedBillResponse>> searchAllBills(
+            @RequestParam @NotBlank String query,
+            @RequestParam(defaultValue = "all") String type,
+            @PageableDefault(size = 10) Pageable pageable) {
+
+        log.info("통합 검색: query={}, type={}", query, type);
+
+        Page<ProposedBillResponse> bills = switch (type.toLowerCase()) {
+            case "proposer" -> billService.findBillsByProposerName(query, pageable);
+            case "bill" -> billService.findBillsByName(query, pageable);
+            case "keyword" -> billService.searchBills(query, pageable);
+            case "all" -> billService.searchAllFields(query, pageable);
+            default -> throw new IllegalArgumentException("유효하지 않은 검색 타입: " + type);
+        };
         return ResponseEntity.ok(bills);
     }
 

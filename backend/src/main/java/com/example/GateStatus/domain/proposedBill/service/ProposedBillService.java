@@ -76,7 +76,6 @@ public class ProposedBillService {
         return findBillsByProposer(proposer.getId(), pageable);
     }
 
-
     /**
      * 인기 법안 목록 조회
      * @param limit
@@ -106,6 +105,23 @@ public class ProposedBillService {
         return bills.map(ProposedBillResponse::from);
     }
 
+    @Transactional(readOnly = true)
+    public Page<ProposedBillResponse> findBillsByName(String billName, Pageable pageable) {
+        validateBillName(billName);
+
+        Page<ProposedBill> bills = billRepository.findByBillNameIgnoreCaseContaining(
+                billName.trim(), pageable);
+        return bills.map(ProposedBillResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProposedBillResponse> searchAllFields(String query, Pageable pageable) {
+        validateSearchQuery(query);
+
+        Page<ProposedBill> bills = billRepository.searchInAllFields(query.trim(), pageable);
+        return bills.map(ProposedBillResponse::from);
+
+    }
     /**
      * 특정 상태의 법안 목록 조회
      * @param status
@@ -136,6 +152,7 @@ public class ProposedBillService {
                 .map(ProposedBillResponse::from)
                 .collect(Collectors.toList());
     }
+
 
     // === Private Helper Methods ===
 
@@ -190,4 +207,30 @@ public class ProposedBillService {
             throw new IllegalArgumentException("발의자 이름은 필수입니다");
         }
     }
+
+    /**
+     * 법안명 유효성 검증
+     */
+    private void validateBillName(String billName) {
+        if (billName == null || billName.trim().isEmpty()) {
+            throw new IllegalArgumentException("법안명은 필수입니다");
+        }
+        if (billName.trim().length() < 2) {
+            throw new IllegalArgumentException("법안명은 2자 이상이어야 합니다");
+        }
+    }
+
+    /**
+     * 검색어 유효성 검증
+     */
+    private void validateSearchQuery(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            throw new IllegalArgumentException("검색어는 필수입니다");
+        }
+        if (query.trim().length() < 2) {
+            throw new IllegalArgumentException("검색어는 2자 이상이어야 합니다");
+        }
+    }
+
 }
+

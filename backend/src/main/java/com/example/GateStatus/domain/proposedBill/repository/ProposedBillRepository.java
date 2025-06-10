@@ -94,28 +94,25 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
                                        @Param("startDate") LocalDate startDate,
                                        @Param("endDate") LocalDate endDate);
 
+    @Query("SELECT p FROM ProposedBill p WHERE UPPER(p.billName) LIKE UPPER(CONCAT('%', :billName, '%'))")
+    Page<ProposedBill> findByBillNameIgnoreCaseContaining(@Param("billName") String billName, Pageable pageable);
 
-
-//    @Query("SELECT " +
-//            "FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m') as month, " +
-//            "COUNT(p) as total, " +
-//            "SUM(CASE WHEN p.billStatus = com.example.GateStatus.domain.proposedBill.BillStatus.PASSED THEN 1 ELSE 0 END) as passed " +
-//            "FROM ProposedBill p " +
-//            "WHERE p.proposer.id = :figureId AND p.proposeDate BETWEEN :startDate AND :endDate " +
-//            "GROUP BY FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m') " +
-//            "ORDER BY FUNCTION('DATE_FORMAT', p.proposeDate, '%Y-%m')")
-//    List<Object[]> countBillsByMonthDetailed(@Param("figureId") Long figureId,
-//                                             @Param("startDate") LocalDate startDate,
-//                                             @Param("endDate") LocalDate endDate);
-
-
-//    @Query("SELECT p FROM ProposedBill p " +
-//            "WHERE p.proposer.id = :figureId AND p.proposeDate BETWEEN :startDate AND :endDate " +
-//            "AND (p.billName LIKE %:keyword1% OR p.billName LIKE %:keyword2% OR p.summary LIKE %:keyword1%)")
-//    List<ProposedBill> findByCategoryKeywords(@Param("figureId") Long figureId,
-//                                              @Param("keyword1") String keyword1,
-//                                              @Param("keyword2") String keyword2,
-//                                              @Param("startDate") LocalDate startDate,
-//                                              @Param("endDate") LocalDate endDate);
+    @Query("""
+    SELECT DISTINCT p FROM ProposedBill p 
+    LEFT JOIN p.proposer f 
+    WHERE UPPER(p.billName) LIKE UPPER(CONCAT('%', :query, '%'))
+       OR UPPER(p.summary) LIKE UPPER(CONCAT('%', :query, '%'))
+       OR UPPER(f.name) LIKE UPPER(CONCAT('%', :query, '%'))
+       OR UPPER(p.committee) LIKE UPPER(CONCAT('%', :query, '%'))
+    ORDER BY 
+        CASE 
+            WHEN UPPER(p.billName) LIKE UPPER(CONCAT('%', :query, '%')) THEN 1
+            WHEN UPPER(f.name) LIKE UPPER(CONCAT('%', :query, '%')) THEN 2
+            WHEN UPPER(p.summary) LIKE UPPER(CONCAT('%', :query, '%')) THEN 3
+            ELSE 4
+        END,
+        p.proposeDate DESC
+    """)
+    Page<ProposedBill> searchInAllFields(@Param("query") String query, Pageable pageable);
 
 }
