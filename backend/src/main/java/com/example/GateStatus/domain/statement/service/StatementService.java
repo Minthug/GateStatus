@@ -13,6 +13,7 @@ import com.example.GateStatus.domain.statement.service.request.FactCheckRequest;
 import com.example.GateStatus.domain.statement.service.request.StatementRequest;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
+import com.example.GateStatus.domain.statement.service.response.StatementSearchCriteria;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.example.GateStatus.global.openAi.OpenAiClient;
 import jakarta.persistence.EntityNotFoundException;
@@ -150,6 +151,44 @@ public class StatementService {
     }
 
     /**
+     * 특정 출처의 발언 목록 조회
+     * @param source
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<StatementResponse> findStatementsBySource(String source) {
+        validator.validateSource(source);
+
+        List<StatementDocument> statements = statementMongoRepository.findBySource(source);
+
+        return statements.stream()
+                .map(StatementResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    // ========== 발언 검색 메서드들 ==========
+
+    /**
+     * 키워드로 발언 검색 (페이징 적용, 제목과 내용 모두 검색 )
+     */
+    @Transactional(readOnly = true)
+    public Page<StatementResponse> searchStatements(StatementSearchCriteria searchCriteria, Pageable pageable) {
+        validator.validateSearchCriteria(searchCriteria);
+
+        Page<StatementDocument> results = switch (searchCriteria.searchType()) {
+            case FULL_TEXT -> performFullTextSearch(searchCriteria.keyword(), pageable);
+            case EXACT_PHRASE -> performExactPhraseSearch(searchCriteria.exactPhrase(), pageable);
+            case MULTIPLE_KEYWORDS -> performMultipleKeywordSearch(searchCriteria.multipleKeywords(), pageable);
+            case CONTENT_ONLY -> performContentOnlySearch(searchCriteria.keyword(), pageable);
+            case RECENT -> performRecentSearch(searchCriteria.keyword(), searchCriteria.limit(), pageable);
+            default -> performFullTextSearch(searchCriteria.keyword(), pageable);
+        };
+
+        log.debug("통합 검색 완료: 검색타입={}, 총 결과={}", searchCriteria.searchType(), results.getTotalElements());
+        return results.map(StatementResponse::from);
+    }
+
+    /**
      * 발언 내용만으로 검색 (페이징 없음)
      * @param keyword
      * @return
@@ -205,37 +244,6 @@ public class StatementService {
         return results.stream()
                 .map(StatementResponse::from)
                 .collect(Collectors.toList());
-    }
-
-
-    /**
-     * 키워드로 발언 검색 (페이징 적용, 제목과 내용 모두 검색 )
-     * @param keyword
-     * @param pageable
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public Page<StatementResponse> searchStatements(String keyword, Pageable pageable) {
-        log.info("발언 검색 요청 시작: 키워드 = {}", keyword);
-
-        try {
-            Page<StatementDocument> results = statementMongoRepository.fullTextSearch(keyword, pageable);
-
-            if (results.isEmpty()) {
-                log.info("텍스트 검색 결과 없음, 정규식 검색으로 전환: {}", keyword);
-                results = statementMongoRepository.searchByRegex(keyword, pageable);
-            }
-
-            // 검색 결과 로그
-            log.info("발언 검색 완료: 키워드 = {}, 결과 수 = {}", keyword, results.getTotalElements());
-
-
-            return results.map(StatementResponse::from);
-        } catch (Exception e) {
-            log.error("발언 검색 중 오류 발생: {}", e.getMessage(), e);
-            Page<StatementDocument> fallbackResults = statementMongoRepository.searchByRegex(keyword, pageable);
-            return fallbackResults.map(StatementResponse::from);
-        }
     }
 
     /**
@@ -302,18 +310,6 @@ public class StatementService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 특정 출처의 발언 목록 조회
-     * @param source
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public List<StatementResponse> findStatementsBySource(String source) {
-        return statementMongoRepository.findBySource(source)
-                .stream()
-                .map(StatementResponse::from)
-                .collect(Collectors.toList());
-    }
 
     /**
      * 새 발언 추가
@@ -695,5 +691,69 @@ public class StatementService {
     private StatementDocument findStatementDocumentById(String id) {
         return statementMongoRepository.findById(id)
                 .orElseThrow(() -> new StatementNotFoundException(id));
+    }
+
+    /**
+     * 최근 발언에서 키워드 검색을 수행합니다.
+     */
+    private Page<StatementDocument> performRecentSearch(String keyword, int limit, Pageable pageable) {
+        List<StatementDocument> statements = statementMongoRepository.findByKeywordOrderByStatementDateDesc(
+                keyword, PageRequest.of(0, limit));
+        return new org.springframework.data.domain.PageImpl<>(statements, pageable, statements.size());
+    }
+
+    /**
+     * 발언 내용만 검색합니다
+     */
+    private Page<StatementDocument> performContentOnlySearch(String keyword, Pageable pageable) {
+        List<StatementDocument> statements = statementMongoRepository.findByContentContainingKeyword(keyword);
+        return new org.springframework.data.domain.PageImpl<>(statements, pageable, statements.size());
+    }
+
+    /**
+     * 다중 키워드 검색을 수행합니다 (AND 조건)
+     */
+    private Page<StatementDocument> performMultipleKeywordSearch(List<String> keywords, Pageable pageable) {
+        if (keywords.size() < 2) {
+            throw new IllegalArgumentException("최소 2개 이상의 키워드가 필요 합니다");
+        }
+        List<StatementDocument> results = statementMongoRepository.findByMultipleKeywords(keywords.get(0), keywords.get(1));
+
+        if (keywords.size() > 2) {
+            for (int i = 2; i < keywords.size(); i ++) {
+                final String keyword = keywords.get(i);
+                results = results.stream()
+                        .filter(statement -> statement.getContent().toLowerCase().contains(keyword.toLowerCase()))
+                        .collect(Collectors.toList());
+            }
+        }
+        return new org.springframework.data.domain.PageImpl<>(results, pageable, results.size());
+    }
+
+    /**
+     * 정확한 문구 검색을 수행합니다
+     */
+    private Page<StatementDocument> performExactPhraseSearch(String phrase, Pageable pageable) {
+        String escapedPhrase = java.util.regex.Pattern.quote(phrase);
+        List<StatementDocument> statements = statementMongoRepository.findByExactPhraseInContent(escapedPhrase);
+        return new org.springframework.data.domain.PageImpl<>(statements, pageable, statements.size());
+    }
+
+    /**
+     * 전체 텍스트 검색을 수행합니다
+     */
+    private Page<StatementDocument> performFullTextSearch(String keyword, Pageable pageable) {
+        try {
+            Page<StatementDocument> results = statementMongoRepository.fullTextSearch(keyword, pageable);
+
+            if (results.isEmpty()) {
+                log.debug("전체 텍스트 검색 결과 없음, 정규식 검색으로 전환: {}", keyword);
+                results = statementMongoRepository.searchByRegex(keyword, pageable);
+            }
+            return results;
+        } catch (Exception e) {
+            log.warn("전체 텍스트 검색 실패, 정규식 검색으로 대체: keyword={}, error={}", keyword, e.getMessage());
+            return statementMongoRepository.searchByRegex(keyword, pageable);
+        }
     }
 }

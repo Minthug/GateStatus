@@ -1,8 +1,11 @@
 package com.example.GateStatus.domain.proposedBill.service;
 
 import com.example.GateStatus.domain.statement.entity.StatementType;
+import com.example.GateStatus.domain.statement.service.response.StatementSearchCriteria;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+
+import java.time.LocalDate;
 
 @Component
 public class StatementValidator {
@@ -26,6 +29,20 @@ public class StatementValidator {
     }
 
     public void validateStatementType(StatementType type) {
+
+    }
+
+    public void validateDateRange(LocalDate startDate, LocalDate endDate) {
+
+
+    }
+
+    public void validateSource(String source) {
+
+
+    }
+
+    public void validateSearchCriteria(StatementSearchCriteria searchCriteria) {
 
     }
 }
