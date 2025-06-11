@@ -18,6 +18,7 @@ import com.example.GateStatus.global.openAi.OpenAiClient;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -104,7 +105,8 @@ public class StatementService {
      * @param limit
      * @return
      */
-    @Transactional
+    @Cacheable(value = "popularStatements", key = "#limit")
+    @Transactional(readOnly = true)
     public List<StatementResponse> findPopularStatements(int limit) {
         return statementMongoRepository.findAllByOrderByViewCountDesc(PageRequest.of(0, limit))
                 .stream()
@@ -112,6 +114,40 @@ public class StatementService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 특정 유형의 발언 목록 조회
+     * @param type
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<StatementResponse> findStatementsByType(StatementType type) {
+        validator.validateStatementType(type);
+
+        List<StatementDocument> statements = statementMongoRepository.findByType(type);
+
+        log.debug("유형별 발언 조회 완료: type={}, 개수={}", type, statements.size());
+        return statements.stream()
+                .map(StatementResponse::from)
+                .collect(Collectors.toList());
+    }
+
+
+    /**
+     * 기간별 발언 목록 조회
+     * @param startDate
+     * @param endDate
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public List<StatementResponse> findStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
+        validator.validateDateRange(startDate, endDate);
+
+        List<StatementDocument> statements = statementMongoRepository.findByPeriod(startDate, endDate);
+
+        return statements.stream()
+                .map(StatementResponse::from)
+                .collect(Collectors.toList());
+    }
 
     /**
      * 발언 내용만으로 검색 (페이징 없음)
@@ -203,19 +239,6 @@ public class StatementService {
     }
 
     /**
-     * 특정 유형의 발언 목록 조회
-     * @param type
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public List<StatementResponse> findStatementsByType(StatementType type) {
-        return statementMongoRepository.findByType(type)
-                .stream()
-                .map(StatementResponse::from)
-                .collect(Collectors.toList());
-    }
-
-    /**
      * 최근 발언 중 특정 키워드를 포함하는 발언 검색
      * @param keyword
      * @param limit
@@ -262,20 +285,6 @@ public class StatementService {
         log.info("짧은 발언 검색 완료: 최대 길이 = {}, 결과 수 = {}", maxLength, statements.size());
 
         return statements.stream()
-                .map(StatementResponse::from)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 기간별 발언 목록 조회
-     * @param startDate
-     * @param endDate
-     * @return
-     */
-    @Transactional(readOnly = true)
-    public List<StatementResponse> findStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
-        return statementMongoRepository.findByPeriod(startDate, endDate)
-                .stream()
                 .map(StatementResponse::from)
                 .collect(Collectors.toList());
     }

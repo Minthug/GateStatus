@@ -1,5 +1,6 @@
 package com.example.GateStatus.domain.proposedBill.service;
 
+import com.example.GateStatus.domain.statement.entity.StatementType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -22,5 +23,9 @@ public class StatementValidator {
     }
 
     public void validateFigureName(String figureName) {
+    }
+
+    public void validateStatementType(StatementType type) {
+
     }
 }
