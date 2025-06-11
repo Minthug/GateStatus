@@ -16,4 +16,11 @@ public class StatementValidator {
             throw new IllegalArgumentException("발언 ID는 필수 입니다");
         }
     }
+
+    public void validateFigureId(Long figureId) {
+
+    }
+
+    public void validateFigureName(String figureName) {
+    }
 }

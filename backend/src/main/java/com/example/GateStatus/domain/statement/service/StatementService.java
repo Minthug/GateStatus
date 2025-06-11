@@ -6,6 +6,7 @@ import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.proposedBill.service.StatementValidator;
 import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
+import com.example.GateStatus.domain.statement.exception.StatementNotFoundException;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
 import com.example.GateStatus.domain.statement.service.request.FactCheckRequest;
@@ -17,7 +18,6 @@ import com.example.GateStatus.global.openAi.OpenAiClient;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -55,16 +55,16 @@ public class StatementService {
      * @param id
      * @return
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public StatementResponse findStatementById(String id) {
         validator.validateStatementId(id);
 
-        StatementDocument statement = statementMongoRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("해당 발언이 존재하지 않습니다: " + id));
+        StatementDocument statement = findStatementDocumentById(id);
 
         statement.incrementViewCount();
         statementMongoRepository.save(statement);
 
+        log.debug("발언 조회 완료: ID={}, 조회수={}", id, statement.getViewCount());
         return StatementResponse.from(statement);
     }
 
@@ -74,12 +74,28 @@ public class StatementService {
      * @param pageable
      * @return
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<StatementResponse> findStatementsByFigure(Long figureId, Pageable pageable) {
-        Figure figure = figureRepository.findById(figureId)
-                .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다 " + figureId));
+        validator.validateFigureId(figureId);
+
+        figureRepository.findById(figureId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 정치인이 존재하지 않습니다: " + figureId));
 
         Page<StatementDocument> statements = statementMongoRepository.findByFigureId(figureId, pageable);
+        log.debug("정치인별 발언 조회 완료: figureId={}, 총 개수={}", figureId, statements.getTotalElements());
+        return statements.map(StatementResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<StatementResponse> findStatementsByFigureName(String figureName, Pageable pageable) {
+        validator.validateFigureName(figureName);
+
+        figureRepository.findByName(figureName)
+                .orElseThrow(() -> new EntityNotFoundException("해당 이름의 정치인이 존재하지 않습니다: " + figureName));
+
+        Page<StatementDocument> statements = statementMongoRepository.findByFigureName(figureName, pageable);
+        log.debug("정치인 이름별 발언 조회 완료: figureName={}, 총 개수={}", figureName, statements.getTotalElements());
+
         return statements.map(StatementResponse::from);
     }
 
@@ -404,50 +420,6 @@ public class StatementService {
 
         return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
     }
-
-    /**
-     * 기간별 API 데이터 동기화 메서드
-     * @param startDate
-     * @param endDate
-     * @return
-     */
-//    @Transactional
-//    public int syncStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
-//        log.info("국회방송국 API에서 기간({} ~ {}) 발언 정보 동기화 시작", startDate, endDate);
-//
-//        AssemblyApiResponse<String> apiResponse = fetchStatementsByPeriod(startDate, endDate);
-//        if (!apiResponse.isSuccess()) {
-//            throw new RuntimeException("API 호출 실패: " + apiResponse.resultMessage());
-//        }
-//
-//        List<StatementApiDTO> apiDtos = mapper.map(apiResponse);
-//        int syncCount = 0;
-//
-//        for (StatementApiDTO dto : apiDtos) {
-//            // 중복 체크 - exists 메서드 사용으로 최적화
-//            if (statementMongoRepository.existsByOriginalUrl(dto.originalUrl())) {
-//                log.debug("이미 존재하는 발언 건너뜀: {}", dto.originalUrl());
-//                continue;
-//            }
-//
-//            // 발언자 확인
-//            Figure figure = figureRepository.findByName(dto.figureName())
-//                    .orElseGet(() -> {
-//                        Figure newFigure = Figure.builder()
-//                                .name(dto.figureName())
-//                                .build();
-//                        return figureRepository.save(newFigure);
-//                    });
-//
-//            StatementDocument document = convertApiDtoToDocument(dto, figure);
-//            statementMongoRepository.save(document);
-//            syncCount++;
-//        }
-//
-//        log.info("기간({} ~ {}) 발언 정보 동기화 완료. 총 {}건 처리됨", startDate, endDate, syncCount);
-//        return syncCount;
-//    }
-
     /**
      * JPA entity -> MongoDB Document로 변환
      * @param entity
@@ -710,21 +682,9 @@ public class StatementService {
         log.info("{}개의 발언 데이터를 JPA에서 MongoDB로 마이그레이션 했습니다", documents.size());
     }
 
-    @Transactional(readOnly = true)
-    public Page<StatementResponse> findStatementsByFigureName(String figureName, Pageable pageable) {
-        log.info("정치인 이름으로 발언 목록 조회: {}", figureName);
-
-        // 1. 정치인 이름으로 Figure 엔티티 조회
-        Figure figure = figureRepository.findByName(figureName)
-                .orElseThrow(() -> new EntityNotFoundException("해당 이름의 정치인이 존재하지 않습니다: " + figureName));
-
-        Page<StatementDocument> statements = statementMongoRepository.findByFigureName(figureName, pageable);
-
-        if (statements.isEmpty()) {
-            log.warn("DB에 '{}' 발언 정보가 없습니다. API 동기화가 필요할 수 있습니다.", figureName);
-        } else {
-            log.info("'{}' 발언 정보 {}건 조회 성공", figureName, statements.getTotalElements());
-        }
-        return statements.map(StatementResponse::from);
+    // ========== Private Helper 메서드들 ==========
+    private StatementDocument findStatementDocumentById(String id) {
+        return statementMongoRepository.findById(id)
+                .orElseThrow(() -> new StatementNotFoundException(id));
     }
 }
