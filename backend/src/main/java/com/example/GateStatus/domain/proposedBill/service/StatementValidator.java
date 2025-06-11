@@ -1,11 +1,14 @@
 package com.example.GateStatus.domain.proposedBill.service;
 
+import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
+import com.example.GateStatus.domain.statement.service.request.StatementRequest;
 import com.example.GateStatus.domain.statement.service.response.StatementSearchCriteria;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Component
 public class StatementValidator {
@@ -43,6 +46,24 @@ public class StatementValidator {
     }
 
     public void validateSearchCriteria(StatementSearchCriteria searchCriteria) {
+
+    }
+
+    public void validateContentLength(Integer minLength, Integer maxLength) {
+
+
+    }
+
+    public void validateStatementRequest(StatementRequest request) {
+
+    }
+
+    public void validateFactCheckScore(Integer minScore) {
+
+    }
+
+    public void validateMigrationData(List<Statement> statements) {
+
 
     }
 }
