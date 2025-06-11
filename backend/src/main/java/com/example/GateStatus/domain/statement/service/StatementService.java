@@ -3,6 +3,7 @@ package com.example.GateStatus.domain.statement.service;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
+import com.example.GateStatus.domain.proposedBill.service.StatementValidator;
 import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
@@ -46,12 +47,8 @@ public class StatementService {
     private final WebClient.Builder webclientBuilder;
     private final OpenAiClient openAiClient;
     private final FigureApiService figureApiService;
+    private final StatementValidator validator;
 
-    @Value("${spring.openapi.assembly.url}")
-    private String baseUrl;
-
-    @Value("${spring.openapi.assembly.key}")
-    private String apikey;
 
     /**
      * 발언 ID로 발언 상세 정보 조회
@@ -60,6 +57,8 @@ public class StatementService {
      */
     @Transactional
     public StatementResponse findStatementById(String id) {
+        validator.validateStatementId(id);
+
         StatementDocument statement = statementMongoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("해당 발언이 존재하지 않습니다: " + id));
 
