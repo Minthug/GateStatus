@@ -105,13 +105,84 @@ public class StatementValidator {
         }
     }
 
-    public void validateSource(String source) {
+    /**
+     * 단일 날짜 유효성을 검증합니다
+     * @param date 검증할 날짜
+     * @param fieldName 필드명 (오류 메시지용)
+     * @throws IllegalArgumentException 날짜가 유효하지 않은 경우
+     */
+    public void validateDate(LocalDate date, String fieldName) {
+        if (date == null) {
+            throw new IllegalArgumentException(fieldName + "는 필수입니다");
+        }
 
+        if (date.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException(fieldName + "는 미래일 수 없습니다");
+        }
 
+        LocalDate minPastDate = LocalDate.of(1900, 1, 1);
+        if (date.isBefore(minPastDate)) {
+            throw new IllegalArgumentException(fieldName + "가 너무 먼 과거입니다 (1900년 이후만 허용)");
+        }
     }
 
-    public void validateSearchCriteria(StatementSearchCriteria searchCriteria) {
+    public void validateSource(String source) {
+        if (!StringUtils.hasText(source)) {
+            throw new IllegalArgumentException("출처는 필수 입니다");
+        }
 
+        source = source.trim();
+        if (source.length() > MAX_SOURCE_LENGTH) {
+            throw new IllegalArgumentException("출처는 " + MAX_SOURCE_LENGTH + "자를 초과할 수 없습니다");
+        }
+
+        validateNoMaliciousContent(source, "출처");
+    }
+
+    /**
+     * URL 유효성을 검증합니다
+     * @param url 검증할 URL
+     * @param fieldName 필드명 (오류 메시지용)
+     * @throws IllegalArgumentException URL이 유효하지 않은 경우
+     */
+    public void validateUrl(String url, String fieldName) {
+        if (!StringUtils.hasText(url)) {
+            throw new IllegalArgumentException(fieldName + "은 필수입니다");
+        }
+
+        if (!URL_PATTERN.matcher(url).matches()) {
+            throw new IllegalArgumentException("유효하지 않은 " + fieldName + " 형식입니다");
+        }
+
+        if (url.length() > 2000) {
+            throw new IllegalArgumentException(fieldName + "이 너무 깁니다 (최대 2000자)");
+        }
+    }
+
+    public void validateSearchCriteria(StatementSearchCriteria criteria) {
+        if (criteria == null) {
+            throw new IllegalArgumentException("검색 조건은 필수 입니다");
+        }
+
+        switch (criteria.searchType()) {
+            case FULL_TEXT, CONTENT_ONLY, RECENT -> validateKeyword(criteria.keyword());
+            case EXACT_PHRASE -> validateExactPhrase(criteria.exactPhrase());
+            case MULTIPLE_KEYWORDS -> validateMultipleKeywords(criteria.multipleKeywords());
+        }
+        
+        if (criteria.startDate() != null && criteria.endDate() != null) {
+            validateDateRange(criteria.startDate(), criteria.endDate());
+        }
+
+        validateLimit(criteria.limit());
+
+        if (criteria.type() != null) {
+            validateStatementType(criteria.type());
+        }
+
+        if (criteria.source() != null) {
+            validateSource(criteria.source());
+        }
     }
 
     public void validateContentLength(Integer minLength, Integer maxLength) {
@@ -143,6 +214,70 @@ public class StatementValidator {
             if (lowerContent.contains(keyword + " ") || lowerContent.contains(" " + keyword)) {
                 throw new IllegalArgumentException(fieldName + "에 허용되지 않은 SQL 키워드가 포함되어 있습니다");
             }
+        }
+    }
+
+    public void validateKeyword(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            throw new IllegalArgumentException("검색 키워드는 필수입니다");
+        }
+
+        keyword = keyword.trim();
+        if (keyword.length() > MAX_KEYWORD_LENGTH) {
+            throw new IllegalArgumentException("검색 키워드는 " + MAX_KEYWORD_LENGTH + "자를 초과할 수 없습니다");
+        }
+
+        validateNoMaliciousContent(keyword, "검색 키워드");
+    }
+
+    /**
+     * 정확한 문구 검색 유효성을 검증합니다
+     * @param phrase 검색할 문구
+     * @throws IllegalArgumentException 문구가 유효하지 않은 경우
+     */
+    public void validateExactPhrase(String phrase) {
+        if (!StringUtils.hasText(phrase)) {
+            throw new IllegalArgumentException("검색할 문구는 필수입니다");
+        }
+
+        phrase = phrase.trim();
+        if (phrase.length() < 2) {
+            throw new IllegalArgumentException("검색 문구는 최소 2자 이상이어야 합니다");
+        }
+        if (phrase.length() > MAX_KEYWORD_LENGTH) {
+            throw new IllegalArgumentException("검색 문구는 " + MAX_KEYWORD_LENGTH + "자를 초과할 수 없습니다");
+        }
+
+        validateNoMaliciousContent(phrase, "검색 문구");
+    }
+
+    /**
+     * 다중 키워드 검색 유효성을 검증합니다
+     * @param keywords 검색 키워드 목록
+     * @throws IllegalArgumentException 키워드 목록이 유효하지 않은 경우
+     */
+    public void validateMultipleKeywords(List<String> keywords) {
+        if (keywords == null || keywords.isEmpty()) {
+            throw new IllegalArgumentException("검색 키워드 목록은 필수입니다");
+        }
+
+        if (keywords.size() < 2) {
+            throw new IllegalArgumentException("다중 키워드 검색은 최소 2개 이상의 키워드가 필요합니다");
+        }
+
+        if (keywords.size() > MAX_SEARCH_KEYWORDS) {
+            throw new IllegalArgumentException("검색 키워드는 최대 " + MAX_SEARCH_KEYWORDS + "개까지 가능합니다");
+        }
+
+        // 각 키워드 개별 검증
+        for (String keyword : keywords) {
+            validateKeyword(keyword);
+        }
+
+        // 중복 키워드 검증
+        long distinctCount = keywords.stream().map(String::trim).distinct().count();
+        if (distinctCount != keywords.size()) {
+            throw new IllegalArgumentException("중복된 검색 키워드가 있습니다");
         }
     }
 }
