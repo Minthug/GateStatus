@@ -186,22 +186,124 @@ public class StatementValidator {
     }
 
     public void validateContentLength(Integer minLength, Integer maxLength) {
-
-
+        if (minLength != null && minLength < 0) {
+            throw new IllegalArgumentException("최소 길이는 0 이상이어야 합니다");
+        }
+        if (maxLength != null && maxLength < 0) {
+            throw new IllegalArgumentException("최대 길이는 0 이상이어야 합니다");
+        }
+        if (minLength != null && maxLength != null && minLength > maxLength) {
+            throw new IllegalArgumentException("최소 길이는 최대 길이보다 작거나 같아야 합니다");
+        }
+        if (maxLength != null && maxLength > MAX_CONTENT_LENGTH) {
+            throw new IllegalArgumentException("최대 길이는 " + MAX_CONTENT_LENGTH + "자를 초과할 수 없습니다");
+        }
     }
 
+    /**
+     * 발언 제목 유효성을 검증합니다
+     * @param title 발언 제목
+     * @throws IllegalArgumentException 제목이 유효하지 않은 경우
+     */
+    public void validateTitle(String title) {
+        if (!StringUtils.hasText(title)) {
+            throw new IllegalArgumentException("발언 제목은 필수입니다");
+        }
+
+        title = title.trim();
+        if (title.length() > MAX_TITLE_LENGTH) {
+            throw new IllegalArgumentException("발언 제목은 " + MAX_TITLE_LENGTH + "자를 초과할 수 없습니다");
+        }
+
+        validateNoMaliciousContent(title, "발언 제목");
+    }
+
+    /**
+     * 발언 내용 유효성을 검증합니다
+     * @param content 발언 내용
+     * @throws IllegalArgumentException 내용이 유효하지 않은 경우
+     */
+    public void validateContent(String content) {
+        if (!StringUtils.hasText(content)) {
+            throw new IllegalArgumentException("발언 내용은 필수입니다");
+        }
+
+        content = content.trim();
+        if (content.length() < MIN_CONTENT_LENGTH) {
+            throw new IllegalArgumentException("발언 내용은 최소 " + MIN_CONTENT_LENGTH + "자 이상이어야 합니다");
+        }
+        if (content.length() > MAX_CONTENT_LENGTH) {
+            throw new IllegalArgumentException("발언 내용은 " + MAX_CONTENT_LENGTH + "자를 초과할 수 없습니다");
+        }
+
+        validateNoMaliciousContent(content, "발언 내용");
+    }
+
+    // ========== 팩트체크 관련 검증 ==========
+
+    /**
+     * 팩트체크 점수 유효성을 검증합니다
+     * @param score 팩트체크 점수
+     * @throws IllegalArgumentException 점수가 유효 범위를 벗어난 경우
+     */
+    public void validateFactCheckScore(Integer score) {
+        if (score == null) {
+            throw new IllegalArgumentException("팩트체크 점수는 필수입니다");
+        }
+        if (score < MIN_FACT_CHECK_SCORE || score > MAX_FACT_CHECK_SCORE) {
+            throw new IllegalArgumentException(
+                    String.format("팩트체크 점수는 %d~%d 사이여야 합니다", MIN_FACT_CHECK_SCORE, MAX_FACT_CHECK_SCORE));
+        }
+    }
+
+    // ========== 복합 검증 메서드들 ==========
+
+    /**
+     * 발언 요청 정보 유효성을 검증합니다
+     * @param request 발언 요청 정보
+     * @throws IllegalArgumentException 필수 정보가 누락되거나 잘못된 경우
+     */
     public void validateStatementRequest(StatementRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("발언 요청 정보는 필수입니다");
+        }
 
+        // 개별 필드 검증
+        validateFigureId(request.figureId());
+        validateTitle(request.title());
+        validateContent(request.content());
+        validateDate(request.statementDate(), "발언 날짜");
+        validateSource(request.source());
+        validateUrl(request.originalUrl(), "원본 URL");
+
+        // 발언 유형 검증 (설정된 경우)
+        if (request.type() != null) {
+            validateStatementType(request.type());
+        }
+
+        // 컨텍스트 검증 (설정된 경우)
+        if (StringUtils.hasText(request.context())) {
+            validateNoMaliciousContent(request.context(), "발언 맥락");
+        }
     }
 
-    public void validateFactCheckScore(Integer minScore) {
-
+    /**
+     * 마이그레이션 데이터 유효성을 검증합니다
+     * @param statements JPA Statement 엔티티 목록
+     * @throws IllegalArgumentException 데이터가 null이거나 비어있는 경우
+     */
+    public void validateMigrationData(List<com.example.GateStatus.domain.statement.entity.Statement> statements) {
+        if (statements == null) {
+            throw new IllegalArgumentException("마이그레이션할 발언 데이터는 필수입니다");
+        }
+        if (statements.isEmpty()) {
+            throw new IllegalArgumentException("마이그레이션할 발언 데이터가 없습니다");
+        }
+        if (statements.size() > 10000) {
+            throw new IllegalArgumentException("한 번에 마이그레이션할 수 있는 데이터는 최대 10,000건입니다");
+        }
     }
 
-    public void validateMigrationData(List<Statement> statements) {
-
-
-    }
 
     private void validateNoMaliciousContent(String content, String fieldName) {
         if (MALICIOUS_PATTERN.matcher(content).find()) {
