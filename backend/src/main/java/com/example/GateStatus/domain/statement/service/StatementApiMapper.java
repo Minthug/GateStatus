@@ -308,7 +308,32 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
         return items.stream().limit(3).collect(Collectors.toList());
     }
 
-    private StatementType determineStatementType(String s) {
-        return null;
+
+    /**
+     * API의 발언 유형 코드를 애플리케이션 StatementType으로 변환
+     * @param typeCode
+     * @return
+     */
+    public StatementType determineStatementType(String typeCode) {
+        switch (typeCode) {
+            case "SPEECH":
+                return StatementType.SPEECH;
+            case "INTERVIEW":
+                return StatementType.INTERVIEW;
+            case "PRESS":
+                return StatementType.PRESS_RELEASE;
+            case "DEBATE":
+                return StatementType.DEBATE;
+            case "ASSEMBLY":
+                return StatementType.ASSEMBLY_SPEECH;
+            case "COMMITTEE":
+                return StatementType.COMMITTEE_SPEECH;
+            case "MEDIA":
+                return StatementType.MEDIA_COMMENT;
+            case "SNS":
+                return StatementType.SOCIAL_MEDIA;
+            default:
+                return StatementType.OTHER;
+        }
     }
 }

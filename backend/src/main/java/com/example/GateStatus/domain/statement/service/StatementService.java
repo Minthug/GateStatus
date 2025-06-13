@@ -2,19 +2,16 @@ package com.example.GateStatus.domain.statement.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.proposedBill.service.StatementValidator;
 import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.exception.StatementNotFoundException;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
-import com.example.GateStatus.domain.statement.service.request.FactCheckRequest;
 import com.example.GateStatus.domain.statement.service.request.StatementRequest;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import com.example.GateStatus.domain.statement.service.response.StatementSearchCriteria;
-import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.example.GateStatus.global.openAi.OpenAiClient;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -23,19 +20,14 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,9 +37,8 @@ public class StatementService {
 
     private final FigureRepository figureRepository;
     private final StatementMongoRepository statementMongoRepository;
-    private final StatementApiMapper mapper;
-    private final WebClient.Builder webclientBuilder;
     private final OpenAiClient openAiClient;
+    private final StatementApiMapper apiMapper;
     private final StatementValidator validator;
     private final StatementSyncService syncService;
 
@@ -247,35 +238,6 @@ public class StatementService {
                 .collect(Collectors.toList());
     }
 
-
-    /**
-     * API의 발언 유형 코드를 애플리케이션 StatementType으로 변환
-     * @param typeCode
-     * @return
-     */
-    public StatementType determineStatementType(String typeCode) {
-        switch (typeCode) {
-            case "SPEECH":
-                return StatementType.SPEECH;
-            case "INTERVIEW":
-                return StatementType.INTERVIEW;
-            case "PRESS":
-                return StatementType.PRESS_RELEASE;
-            case "DEBATE":
-                return StatementType.DEBATE;
-            case "ASSEMBLY":
-                return StatementType.ASSEMBLY_SPEECH;
-            case "COMMITTEE":
-                return StatementType.COMMITTEE_SPEECH;
-            case "MEDIA":
-                return StatementType.MEDIA_COMMENT;
-            case "SNS":
-                return StatementType.SOCIAL_MEDIA;
-            default:
-                return StatementType.OTHER;
-        }
-    }
-
     public StatementDocument convertApiDtoToDocument(StatementApiDTO dto, Figure figure) {
         StatementDocument.StatementDocumentBuilder builder = StatementDocument.builder()
                 .figureId(figure.getId())
@@ -286,7 +248,7 @@ public class StatementService {
                 .source(dto.source())
                 .context(dto.context())
                 .originalUrl(dto.originalUrl())
-                .type(determineStatementType(dto.typeCode()))
+                .type(apiMapper.determineStatementType(dto.typeCode()))
                 .viewCount(0)
                 .factCheckScore(null)
                 .factCheckResult(null)

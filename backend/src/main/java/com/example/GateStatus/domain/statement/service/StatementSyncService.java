@@ -108,7 +108,7 @@ public class StatementSyncService {
                 }
 
                 Figure figure = getOrCreateFigure(dto.figureName());
-                StatementDocument document = convertApiDtoToDocument(dto, figure);
+                StatementDocument document = statementService.convertApiDtoToDocument(dto, figure);
                 statementRepository.save(document);
                 syncCount++;
             }
@@ -141,7 +141,7 @@ public class StatementSyncService {
                 }
 
                 Figure figure = getOrCreateFigure(dto.figureName());
-                StatementDocument document = convertApiDtoToDocument(dto, figure);
+                StatementDocument document = statementService.convertApiDtoToDocument(dto, figure);
                 statementRepository.save(document);
                 syncCount++;
             }
@@ -304,7 +304,7 @@ public class StatementSyncService {
                     continue;
                 }
 
-                StatementDocument document = convertApiDtoToDocument(dto, figure);
+                StatementDocument document = statementService.convertApiDtoToDocument(dto, figure);
                 statementRepository.save(document);
                 syncCount++;
 
@@ -331,17 +331,6 @@ public class StatementSyncService {
         }
         return figure;
     }
-
-    /**
-     * API DTO -> MongoDB Document
-     * @param dto
-     * @param figure
-     * @return
-     */
-    private StatementDocument convertApiDtoToDocument(StatementApiDTO dto, Figure figure) {
-        return statementService.convertApiDtoToDocument(dto, figure);
-    }
-
 
     private void enrichWithAiAnalysis(StatementDocument.StatementDocumentBuilder builder, String content) {
         try {
@@ -377,28 +366,5 @@ public class StatementSyncService {
             log.warn("AI 분석 중 오류 발생: {}", e.getMessage());
             // AI 분석 실패는 전체 저장을 막지 않음
         }
-    }
-
-    /**
-     * API 유형 코드를 StatementType으로 변환합니다
-     * @param typeCode API 유형 코드
-     * @return StatementType
-     */
-    private StatementType determineStatementType(String typeCode) {
-        if (typeCode == null) {
-            return StatementType.OTHER;
-        }
-
-        return switch (typeCode) {
-            case "SPEECH" -> StatementType.SPEECH;
-            case "INTERVIEW" -> StatementType.INTERVIEW;
-            case "PRESS" -> StatementType.PRESS_RELEASE;
-            case "DEBATE" -> StatementType.DEBATE;
-            case "ASSEMBLY" -> StatementType.ASSEMBLY_SPEECH;
-            case "COMMITTEE" -> StatementType.COMMITTEE_SPEECH;
-            case "MEDIA" -> StatementType.MEDIA_COMMENT;
-            case "SNS" -> StatementType.SOCIAL_MEDIA;
-            default -> StatementType.OTHER;
-        };
     }
 }
