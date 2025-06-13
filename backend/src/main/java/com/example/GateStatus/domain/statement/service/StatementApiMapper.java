@@ -273,6 +273,138 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
 
     // ==================== NLP 분석 메서드들 ====================
 
+    public Map<String, Object> createBasicNlpData(String content) {
+        Map<String, Object> nlpData = new HashMap<>();
+
+        if (content != null && !content.isEmpty()) {
+            nlpData.put("checkableItems", extractCheckableItems(content));
+            nlpData.put("keyPhrases", extractKeyPhrases(content));
+            nlpData.put("sentiment", analyzeSentiment(content));
+            nlpData.put("wordCount", content.length());
+            nlpData.put("hasNumbers", content.matches(".*\\d+.*"));
+            nlpData.put("hasStatistics", hasStatisticalContent(content));
+            nlpData.put("complexity", calculateComplexity(content));
+        }
+        return nlpData;
+    }
+
+    private Map<String, Object> analyzeSentiment(String content) {
+        Map<String, Object> sentiment = new HashMap<>();
+
+        int positiveCount = countWords(content, new String[]{"좋은", "발전", "성공", "긍정", "찬성", "지지"});
+        int negativeCount = countWords(content, new String[]{"나쁜", "실패", "문제", "부정", "반대", "비판"});
+        int totalSentimentWords = positiveCount + negativeCount;
+
+        double score = 0.5; // 중립 기본값
+        if (totalSentimentWords > 0) {
+            score = (double) positiveCount / totalSentimentWords;
+        }
+
+        String classification;
+        if (score > 0.6) {
+            classification = "POSITIVE";
+        } else if (score < 0.4) {
+            classification = "NEGATIVE";
+        } else {
+            classification = "NEUTRAL";
+        }
+
+        sentiment.put("score", Math.round(score * 100.0) / 100.0);
+        sentiment.put("positive", positiveCount);
+        sentiment.put("negative", negativeCount);
+        sentiment.put("classification", classification);
+        sentiment.put("confidence", calculateSentimentConfidence(totalSentimentWords, content.length()));
+
+        return sentiment;
+    }
+
+    private double calculateSentimentConfidence(int sentimentWords, int totalLength) {
+        if (totalLength == 0) return 0.0;
+
+        double density = (double) sentimentWords / (totalLength / 100.0);
+        return Math.min(1.0, density / 5.0);
+    }
+
+    private List<String> extractKeyPhrases(String content) {
+        if (content == null || content.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> phrases = new ArrayList<>();
+
+        extractQuotedPhrase(content, phrases);
+
+        extractDelimitedPhrase(content, phrases);
+
+        return phrases.stream()
+                .filter(phrase -> phrase.length() > 5 && phrase.length() < 50)
+                .filter(phrase -> !phrase.matches(".*\\d{4}-\\d{2}-\\d{2}.*"))
+                .distinct()
+                .limit(10)
+                .collect(Collectors.toList());
+    }
+
+    private void extractQuotedPhrase(String content, List<String> phrases) {
+        String[] quotedParts = content.split("[\"']");
+        for (int i = 0; i < quotedParts.length; i += 2) {
+            String phrase = quotedParts[i].trim();
+            if (!phrase.isEmpty()) {
+                phrases.add(phrase);
+            }
+        }
+    }
+
+    private void extractDelimitedPhrase(String content, List<String> phrases) {
+        String[] parts = content.split("[,。.!?;]");
+        for (String part : parts) {
+            part = part.trim();
+            if (part.length() > 5  && part.length() < 50) {
+                phrases.add(part);
+            }
+        }
+    }
+
+    protected List<String> extractCheckableItems(String content) {
+        if (content == null || content.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> items = new ArrayList<>();
+        String[] sentences = content.split("[.!?。]");
+
+        for (String sentence : sentences) {
+            sentence = sentence.trim();
+            if (sentence.length() < 15 || sentence.length() > 200) continue; // 적절한 길이만
+
+            if (isCheckableSentence(sentence)) {
+                String formattedSentence = sentence + (sentence.endsWith(".") ? "" : ".");
+                items.add(formattedSentence);
+
+                if (items.size() >= 5) break; // 최대 5개
+            }
+        }
+
+        return items;
+    }
+
+    private boolean isCheckableSentence(String sentence) {
+        // 숫자나 통계가 포함된 문장
+        if (sentence.matches(".*\\d+.*")) return true;
+
+        // 특정 단위가 포함된 문장
+        if (sentence.matches(".*(퍼센트|%|억원|조원|만명|천명|개|건|년|월).*")) return true;
+
+        // 인용이나 발언이 포함된 문장
+        if (sentence.matches(".*(라고 밝혔|라고 주장|라고 말했|것으로 나타났|것으로 조사|발표했|보고했).*")) return true;
+
+        // 단정적인 표현이 포함된 문장
+        if (sentence.matches(".*(이다|였다|했다|될 것이다|할 예정이다).*")) return true;
+
+        return false;
+    }
+
+    // ==================== 유틸리티 메서드들 ====================
+
     /**
      * 원본 URL 생성
      * @param regDate
@@ -327,25 +459,6 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
         return "";
     }
 
-    private Map<String, Object> analyzeSentiment(String content) {
-        Map<String, Object> sentiment = new HashMap<>();
-
-        int positiveCount = countWords(content, new String[]{"좋은", "발전", "성공", "긍정", "찬성", "지지"});
-        int negativeCount = countWords(content, new String[]{"나쁜", "실패", "문제", "부정", "반대", "비판"});
-
-        double score = 0.5; // 중립 기본값
-
-        if (positiveCount + negativeCount > 0) {
-            score = (double) positiveCount / (positiveCount + negativeCount);
-        }
-
-        sentiment.put("score", score);
-        sentiment.put("positive", positiveCount);
-        sentiment.put("negative", negativeCount);
-
-        return sentiment;
-    }
-
     private int countWords(String text, String[] words) {
         int count = 0;
         String lowerText = text.toLowerCase();
@@ -358,40 +471,6 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
         }
 
         return count;
-    }
-
-    private List<String> extractKeyPhrases(String content) {
-        List<String> phrases = new ArrayList<>();
-
-        String[] parts = content.split("[,\"']");
-        for (String part : parts) {
-            part = part.trim();
-            if (part.length() > 5 && part.length() < 50) {
-                phrases.add(part);
-            }
-        }
-        return phrases.stream().limit(5).collect(Collectors.toList());
-    }
-
-    protected List<String> extractCheckableItems(String content) {
-        if (content == null || content.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<String> items = new ArrayList<>();
-
-        String[] sentences = content.split("\\. ");
-        for (String sentence : sentences) {
-            if (sentence.matches(".*\\d+.*") ||
-                    sentence.contains("이다") ||
-                    sentence.contains("했다") ||
-                    sentence.contains("라고 말했") ||
-                    sentence.contains("주장")) {
-                items.add(sentence.trim() + (sentence.endsWith(".") ? "" : "."));
-            }
-        }
-
-        return items.stream().limit(3).collect(Collectors.toList());
     }
 
 
