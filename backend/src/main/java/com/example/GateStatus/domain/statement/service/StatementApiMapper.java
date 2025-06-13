@@ -21,6 +21,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -405,6 +406,111 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
 
     // ==================== 유틸리티 메서드들 ====================
 
+    private boolean hasStatisticalContent(String content) {
+        return content.matches(".*(통계|조사|설문|분석|데이터|지수|비율|평균|최대|최소|증가|감소|상승|하락).*");
+    }
+
+    private int calculateComplexity(String content) {
+        if (content == null || content.isEmpty()) {
+            return 1;
+        }
+
+        int score = 1;
+
+        if (content.length() > 500) score += 2;
+        else if (content.length() > 200) score += 1;
+
+        int sentenceCount = content.split("[.!?。]").length;
+        if (sentenceCount > 10) score += 2;
+        else if (sentenceCount > 5) score += 1;
+
+        if (content.matches(".*\\d+.*")) score += 1;
+        if (hasStatisticalContent(content)) score += 1;
+
+        if (content.matches(".*(법률|조례|규정|정책|예산|법안).*")) score += 1;
+
+        return Math.min(10, score);
+    }
+
+    private int countWords(String text, String[] words) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+
+        int count = 0;
+        String lowerText = text.toLowerCase();
+
+        for (String word : words) {
+            String lowerWord = word.toLowerCase();
+            int index = 0;
+            while ((index = lowerText.indexOf(word.toLowerCase(), index)) != -1) {
+                count++;
+                index += word.length();
+            }
+        }
+
+        return count;
+    }
+
+    private String createUrlSlug(String title){
+        if (title == null || title.isEmpty()) {
+            return "untitled";
+        }
+
+        String slug = title.length() > 50 ? title.substring(0, 50) : title;
+
+        return slug.replaceAll("[^a-zA-Z0-9가-힣\\s]", "") // 특수문자 제거
+                .replaceAll("\\s+", "-") // 공백을 하이픈으로
+                .replaceAll("-{2,}", "-") // 연속 하이픈 정리
+                .replaceAll("^-|-$", ""); // 앞뒤 하이픈 제거
+    }
+
+
+    /**
+     * 날짜 문자열 파싱
+     * @param dateStr
+     * @return
+     */
+    private LocalDate parseDate(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) {
+            return LocalDate.now();
+        }
+
+        try {
+            String datePart = dateStr.split(" ")[0];
+
+            // 다양한 날짜 형식 시도
+            if (datePart.contains("-")) {
+                return LocalDate.parse(datePart);
+            } else if (datePart.length() == 8) {
+                return LocalDate.parse(datePart, DateTimeFormatter.ofPattern("yyyyMMdd"));
+            } else {
+                return LocalDate.parse(datePart, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            }
+        } catch (Exception e) {
+            log.warn("날짜 변환 실패, 현재 날짜 사용: {} -> {}", dateStr, e.getMessage());
+            return LocalDate.now();
+        }
+    }
+
+
+    /**
+     * Element에서 지정된 태의 텍스트 컨텐츠 가져오기
+     * @param element
+     * @param tagName
+     * @return
+     */
+    private String getElementTextContent(Element element, String tagName) {
+        NodeList nodeList = element.getElementsByTagName(tagName);
+        if (nodeList.getLength() > 0) {
+            String content = nodeList.item(0).getTextContent();
+            return content != null ? content.trim() : "";
+        }
+
+        return "";
+    }
+
+
     /**
      * 원본 URL 생성
      * @param regDate
@@ -427,50 +533,6 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
                 .replaceAll("-{2,}", "-");
 
         return "https://assembly.news.go.kr/news/" + dateStr + "/" + slugTitle;
-    }
-
-
-    /**
-     * 날짜 문자열 파싱
-     * @param dateStr
-     * @return
-     */
-    private LocalDate parseDate(String dateStr) {
-        try {
-            return LocalDate.parse(dateStr.split(" ")[0]);
-        } catch (Exception e) {
-            log.error("날짜 변환 실패: {}", dateStr, e);
-            return LocalDate.now();
-        }
-    }
-
-    /**
-     * Element에서 지정된 태의 텍스트 컨텐츠 가져오기
-     * @param element
-     * @param tagName
-     * @return
-     */
-    private String getElementTextContent(Element element, String tagName) {
-        NodeList nodeList = element.getElementsByTagName(tagName);
-        if (nodeList.getLength() > 0) {
-            return nodeList.item(0).getTextContent();
-        }
-
-        return "";
-    }
-
-    private int countWords(String text, String[] words) {
-        int count = 0;
-        String lowerText = text.toLowerCase();
-        for (String word : words) {
-            int index = 0;
-            while ((index = lowerText.indexOf(word.toLowerCase(), index)) != -1) {
-                count++;
-                index += word.length();
-            }
-        }
-
-        return count;
     }
 
 
