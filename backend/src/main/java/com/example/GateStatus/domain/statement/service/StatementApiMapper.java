@@ -192,6 +192,59 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
 
     // ==================== 데이터 변환 메서드들 ====================
 
+    public StatementType convertToStatementType(String typeCode) {
+        if (typeCode == null || typeCode.isEmpty()) {
+            return StatementType.OTHER;
+        }
+
+        return switch (typeCode.toUpperCase()) {
+            case "SPEECH" -> StatementType.SPEECH;
+            case "INTERVIEW" -> StatementType.INTERVIEW;
+            case "PRESS" -> StatementType.PRESS_RELEASE;
+            case "DEBATE" -> StatementType.DEBATE;
+            case "ASSEMBLY" -> StatementType.ASSEMBLY_SPEECH;
+            case "COMMITTEE" -> StatementType.COMMITTEE_SPEECH;
+            case "MEDIA" -> StatementType.MEDIA_COMMENT;
+            case "SNS" -> StatementType.SOCIAL_MEDIA;
+            default -> {
+                log.debug("알 수 없는 발언 유형 코드: {}", typeCode);
+                yield StatementType.OTHER;
+            }
+        };
+    }
+
+
+    /**
+     * StatementApiDTO를 StatementResponse로 변환
+     */
+    private StatementResponse convertToResponse(StatementApiDTO dto) {
+
+        Map<String, Object> nlpData = createBasicNlpData(dto.content());
+        List<String> checkableItems = extractCheckableItems(dto.content());
+
+        return new StatementResponse(
+                UUID.randomUUID().toString(), // 임시 ID 생성
+                null, // figureId는 나중에 설정
+                dto.figureName(),
+                dto.title(),
+                dto.content(),
+                dto.statementDate(),
+                dto.source(),
+                dto.context(),
+                dto.originalUrl(),
+                convertToStatementType(dto.typeCode()),
+                null, // factCheckScore는 나중에 설정
+                null, // factCheckResult는 나중에 설정
+                checkableItems,
+                nlpData,
+                0, // viewCount 초기값
+                LocalDateTime.now(),
+                LocalDateTime.now()
+        );
+    }
+
+    // ==================== 발언 유형 분석 메서드들 ====================
+
     /**
      * 원본 URL 생성
      * @param regDate
@@ -271,42 +324,6 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
         }
 
         return "";
-    }
-
-    /**
-     * StatementApiDTO를 StatementResponse로 변환
-     */
-    private StatementResponse convertToResponse(StatementApiDTO dto) {
-
-        StatementType statementType = determineStatementType(dto.typeCode());
-
-        Map<String, Object> nlpData = new HashMap<>();
-
-
-        // 기본적인 NLP 데이터 초기화 (필요에 따라 조정)
-        nlpData.put("checkableItems", extractCheckableItems(dto.content()));
-        nlpData.put("keyPhrases", extractKeyPhrases(dto.content()));
-        nlpData.put("sentiment", analyzeSentiment(dto.content()));
-
-        return new StatementResponse(
-                UUID.randomUUID().toString(), // 임시 ID 생성
-                null, // figureId는 나중에 설정
-                dto.figureName(),
-                dto.title(),
-                dto.content(),
-                dto.statementDate(),
-                dto.source(),
-                dto.context(),
-                dto.originalUrl(),
-                statementType,
-                null, // factCheckScore는 나중에 설정
-                null, // factCheckResult는 나중에 설정
-                extractCheckableItems(dto.content()),
-                nlpData,
-                0, // viewCount 초기값
-                LocalDateTime.now(),
-                LocalDateTime.now()
-        );
     }
 
     private Map<String, Object> analyzeSentiment(String content) {
