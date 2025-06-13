@@ -4,26 +4,27 @@ import com.example.GateStatus.domain.common.SyncJobStatus;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.figure.service.FigureApiService;
+import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.exception.StatementSyncException;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
+import com.example.GateStatus.global.openAi.OpenAiClient;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,17 +40,12 @@ public class StatementSyncService {
     private final FigureRepository figureRepository;
     private final StatementApiMapper statementApiMapper;
     private final StatementService statementService;
+    private final FigureApiService figureApiService;
+    private final StatementApiService apiService;
+    private final OpenAiClient openAiClient;
 
+    // ========== 비동기 작업 상태 관리 ==========
     private final ConcurrentMap<String, SyncJobStatus> jobStatusMap = new ConcurrentHashMap<>();
-
-    @Value("${spring.openapi.assembly.url}")
-    private String baseUrl;
-
-    @Value("${spring.openapi.assembly.key}")
-    private String apikey;
-
-    @Value("${spring.openapi.assembly.news-figure-path}")
-    private String newsFigurePath;  // 설정 파일에서 정의된 경로 주입
 
 
     /**
@@ -62,10 +58,9 @@ public class StatementSyncService {
         log.info("국회방송국 API에서 '{}' 인물 발언 정보 동기화 시작", figureName);
 
         try {
-            Figure figure = figureRepository.findByName(figureName)
-                    .orElseThrow(() -> new EntityNotFoundException("해당 인물이 존재하지 않습니다: " + figureName));
+            Figure figure = getOrCreateFigure(figureName);
 
-            AssemblyApiResponse<String> apiResponse = fetchStatementsByFigure(figureName);
+            AssemblyApiResponse<String> apiResponse = apiService.fetchStatementsByFigure(figureName);
             if (!apiResponse.isSuccess()) {
                 log.error("API 호출 실패: {}", apiResponse.resultMessage());
                 throw new RuntimeException("API 호출 실패: " + apiResponse.resultMessage());
@@ -86,52 +81,79 @@ public class StatementSyncService {
         }
     }
 
-    /**
-     * API DTO -> MongoDB Document
-     * @param dto
-     * @param figure
-     * @return
-     */
-    private StatementDocument convertApiDtoToDocument(StatementApiDTO dto, Figure figure) {
-        return statementService.convertApiDtoToDocument(dto, figure);
-    }
 
     /**
-     * API에서 특정 인물의 발언 정보 가져오기
-     * @param figureName
+     * 특정 기간 동안의 모든 발언 정보를 동기화
+     * @param startDate
+     * @param endDate
      * @return
      */
-    public AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {
-        WebClient webClient = webclientBuilder.baseUrl(baseUrl)
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
-                .build();
+    @Transactional
+    public int syncStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
+        log.info("국회방송국 API에서 기간({} ~ {}) 발언 정보 동기화 시작", startDate, endDate);
 
-        String xmlResponse = webClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path(newsFigurePath)
-                        .queryParam("apiKey", apikey)
-                        .queryParam("name", figureName)
-                        .build())
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-
-        if (xmlResponse != null) {
-            log.info("API 응답 수신 - 길이: {} 바이트", xmlResponse.length());
-            if (xmlResponse.length() > 500) {
-                log.debug("API 응답 미리보기: {}", xmlResponse.substring(0, 500));
-            } else {
-                log.debug("API 응답: {}", xmlResponse);
+        try {
+            AssemblyApiResponse<String> apiResponse = apiService.fetchStatementsByPeriod(startDate, endDate);
+            if (!apiResponse.isSuccess()) {
+                throw new RuntimeException("API 호출 실패: " + apiResponse.resultMessage());
             }
+
+            List<StatementApiDTO> apiDtos = statementApiMapper.map(apiResponse);
+            int syncCount = 0;
+
+            for (StatementApiDTO dto : apiDtos) {
+                if (statementRepository.existsByOriginalUrl(dto.originalUrl())) {
+                    log.debug("이미 존재하는 발언 건너뜀: {}", dto.originalUrl());
+                    continue;
+                }
+
+                Figure figure = getOrCreateFigure(dto.figureName());
+                StatementDocument document = convertApiDtoToDocument(dto, figure);
+                statementRepository.save(document);
+                syncCount++;
+            }
+
+            log.info("기간({} ~ {}) 발언 정보 동기화 완료. 총 {} 건 처리됨", startDate, endDate, syncCount);
+            return syncCount;
+        } catch (Exception e) {
+            log.error("기간별 발언 정보 동기화 실패: {} ~ {}, error={}", startDate, endDate, e.getMessage(), e);
+            throw new StatementSyncException("기간별 발언 정보 동기화 실패", e);
         }
-
-        String resultCode = extractResultCode(xmlResponse);
-        String resultMessage = extractResultMessage(xmlResponse);
-
-        log.info("API 응답 결과 코드: {}, 메시지: {}", resultCode, resultMessage);
-
-        return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
     }
+
+    @Async("statementSyncExecutor")
+    @Transactional
+    public CompletableFuture<Integer> syncStatementsByPeriodAsync(LocalDate startDate, LocalDate endDate) {
+        log.info("기간별 발언 정보 비동기 동기화 시작: {} ~ {}", startDate, endDate);
+
+        try {
+            AssemblyApiResponse<String> apiResponse = apiService.fetchStatementsByPeriod(startDate, endDate);
+            if (!apiResponse.isSuccess()) {
+                throw new StatementSyncException("기간별 API 호출 실패: " + apiResponse.resultMessage());
+            }
+
+            List<StatementApiDTO> apiDTOS = statementApiMapper.map(apiResponse);
+            int syncCount = 0;
+
+            for (StatementApiDTO dto : apiDTOS) {
+                if (statementRepository.existsByOriginalUrl(dto.originalUrl())) {
+                    continue;
+                }
+
+                Figure figure = getOrCreateFigure(dto.figureName());
+                StatementDocument document = convertApiDtoToDocument(dto, figure);
+                statementRepository.save(document);
+                syncCount++;
+            }
+
+            log.info("기간별 발언 정보 비동기 동기화 완료: {} ~ {}, 총 {}건", startDate, endDate, syncCount);
+            return CompletableFuture.completedFuture(syncCount);
+        } catch (Exception e) {
+            log.error("기간별 발언 정보 비동기 동기화 실패: {} ~ {}, error={}", startDate, endDate, e.getMessage(), e);
+            throw new StatementSyncException("기간별 발언 정보 동기화 실패", e);
+        }
+    }
+
 
     @Transactional
     public int syncAllStatements() {
@@ -151,8 +173,6 @@ public class StatementSyncService {
         for (Figure figure : allFigures) {
             try {
                 String name = figure.getName();
-                log.info("국회의원 {}의 발언 정보 동기화 시작", name);
-
                 int success = syncStatementsByFigure(name);
                 totalSuccess += success;
                 log.info("국회의원 {}의 발언 정보 동기화 완료: {}건", name, success);
@@ -161,7 +181,6 @@ public class StatementSyncService {
                 log.error("국회의원 {}의 발언 정보 동기화 중 오류: {}", figure.getName(), e.getMessage(), e);
             }
         }
-
         log.info("모든 국회의원 발언 정보 동기화 완료: 총 {}명 중 성공 {}건, 실패 {}건",
                 allFigures.size(), totalSuccess, totalFail);
         return totalSuccess;
@@ -275,111 +294,111 @@ public class StatementSyncService {
     }
 
 
-
-    /**
-     * 특정 기간 동안의 모든 발언 정보를 동기화
-     * @param startDate
-     * @param endDate
-     * @return
-     */
-    @Transactional
-    public int syncStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
-        log.info("국회방송국 API에서 기간({} ~ {}) 발언 정보 동기화 시작", startDate, endDate);
-
-        AssemblyApiResponse<String> apiResponse = fetchStatementsByPeriod(startDate, endDate);
-        if (!apiResponse.isSuccess()) {
-            throw new RuntimeException("API 호출 실패: " + apiResponse.resultMessage());
-        }
-
-        List<StatementApiDTO> apiDtos = statementApiMapper.map(apiResponse);
+    private int saveNewStatements(List<StatementApiDTO> apiDtos, Figure figure) {
         int syncCount = 0;
 
         for (StatementApiDTO dto : apiDtos) {
-            Optional<StatementDocument> existingStatement = statementRepository.findAll().stream()
-                    .filter(s -> s.getOriginalUrl().equals(dto.originalUrl()))
-                    .findFirst();
+            try {
+                if (statementRepository.existsByOriginalUrl(dto.originalUrl())) {
+                    log.debug("이미 존재하는 발언 건너뜀: {}", dto.originalUrl());
+                    continue;
+                }
 
-            if (existingStatement.isPresent()) {
-                log.debug("이미 존재하는 발언 건너뜀: {}", dto.originalUrl());
-                continue;
+                StatementDocument document = convertApiDtoToDocument(dto, figure);
+                statementRepository.save(document);
+                syncCount++;
+
+                log.debug("새 발언 저장 완료: title={}, url={}", dto.title(), dto.originalUrl());
+            } catch (Exception e) {
+                log.warn("발언 저장 실패: title={}, error={}", dto.title(), e.getMessage());
             }
-
-            Figure figure = figureRepository.findByName(dto.figureName())
-                    .orElseGet(() -> {
-                        Figure newFigure = Figure.builder()
-                                .name(dto.figureName())
-                                .build();
-                        return figureRepository.save(newFigure);
-                    });
-
-            StatementDocument statement = convertApiDtoToDocument(dto, figure);
-            statementRepository.save(statement);
-            syncCount++;
         }
-
-        log.info("기간({} ~ {}) 발언 정보 동기화 완료. 총 {} 건 처리됨", startDate, endDate, syncCount);
+        log.info("새 발언 저장 완료: 대상={}건, 저장={}건, 정치인={}", apiDtos.size(), syncCount, figure.getName());
         return syncCount;
     }
 
-    /**
-     * API에서 특정 기간의 발언 정보 가져오기
-     * @param startDate
-     * @param endDate
-     * @return
-     */
-    public AssemblyApiResponse<String> fetchStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
-        WebClient webClient = webclientBuilder.baseUrl(baseUrl)
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
-                .build();
+    private Figure getOrCreateFigure(String figureName) {
+        Figure figure = figureRepository.findByName(figureName).orElse(null);
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-
-        String xmlResponse = webClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/news/period")
-                        .queryParam("apiKey", apikey)
-                        .queryParam("startDate", startDate.format(formatter))
-                        .queryParam("endDate", endDate.format(formatter))
-                        .build())
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-
-        String resultCode = extractResultCode(xmlResponse);
-        String resultMessage = extractResultMessage(xmlResponse);
-
-        return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
+        if (figure == null) {
+            log.info("DB에 국회의원 정보가 없어 API에서 동기화 시도: {}", figureName);
+            try {
+                figure = figureApiService.syncFigureInfoByName(figureName);
+            } catch (Exception e) {
+                log.error("국회의원 정보 동기화 실패: {} - {}", figureName, e.getMessage());
+                throw new EntityNotFoundException("해당 인물이 존재하지 않습니다: " + figureName);
+            }
+        }
+        return figure;
     }
 
     /**
-     * XML 응답에서 결과 메시지 추출
-     * @param xmlResponse
+     * API DTO -> MongoDB Document
+     * @param dto
+     * @param figure
      * @return
      */
-    private String extractResultMessage(String xmlResponse) {
-        if (xmlResponse.contains("<MESSAGE>")) {
-            int start = xmlResponse.indexOf("<MESSAGE>") + "<MESSAGE>".length();
-            int end = xmlResponse.indexOf("</MESSAGE>");
-            if (start > 0 && end > start) {
-                return xmlResponse.substring(start, end);
+    private StatementDocument convertApiDtoToDocument(StatementApiDTO dto, Figure figure) {
+        return statementService.convertApiDtoToDocument(dto, figure);
+    }
+
+
+    private void enrichWithAiAnalysis(StatementDocument.StatementDocumentBuilder builder, String content) {
+        try {
+            // 키워드 추출
+            List<String> keywords = openAiClient.extractKeywords(content);
+            if (!keywords.isEmpty()) {
+                builder.topics(keywords);
             }
+
+            // 발언 유형 분류
+            StatementType aiDeterminedType = openAiClient.classifyStatement(content);
+            if (aiDeterminedType != StatementType.OTHER) {
+                builder.type(aiDeterminedType);
+            }
+
+            // 요약 생성 (긴 내용인 경우)
+            if (content.length() > 200) {
+                String summary = openAiClient.summarizeStatement(content);
+                if (summary != null && !summary.isEmpty()) {
+                    builder.summary(summary);
+                }
+            }
+
+            // 감성 분석
+            Map<String, Double> sentiment = openAiClient.analyzeSentiment(content);
+            if (!sentiment.isEmpty()) {
+                Map<String, Object> nlpData = new HashMap<>();
+                nlpData.put("sentiment", sentiment);
+                builder.nlpData(nlpData);
+            }
+
+        } catch (Exception e) {
+            log.warn("AI 분석 중 오류 발생: {}", e.getMessage());
+            // AI 분석 실패는 전체 저장을 막지 않음
         }
-        return "처리 중 오류가 발생했습니다";
     }
 
     /**
-     * XML 응답에서 결과 코드 추출
-     * @param xmlResponse
-     * @return
+     * API 유형 코드를 StatementType으로 변환합니다
+     * @param typeCode API 유형 코드
+     * @return StatementType
      */
-    private String extractResultCode(String xmlResponse) {
-        if (xmlResponse.contains("<CODE>")) {
-            int start = xmlResponse.indexOf("<CODE>") + "<CODE>".length();
-            int end = xmlResponse.indexOf("</CODE>");
-            if (start > 0 && end > start) {
-                return xmlResponse.substring(start, end);
-            }
+    private StatementType determineStatementType(String typeCode) {
+        if (typeCode == null) {
+            return StatementType.OTHER;
         }
-        return "99";
+
+        return switch (typeCode) {
+            case "SPEECH" -> StatementType.SPEECH;
+            case "INTERVIEW" -> StatementType.INTERVIEW;
+            case "PRESS" -> StatementType.PRESS_RELEASE;
+            case "DEBATE" -> StatementType.DEBATE;
+            case "ASSEMBLY" -> StatementType.ASSEMBLY_SPEECH;
+            case "COMMITTEE" -> StatementType.COMMITTEE_SPEECH;
+            case "MEDIA" -> StatementType.MEDIA_COMMENT;
+            case "SNS" -> StatementType.SOCIAL_MEDIA;
+            default -> StatementType.OTHER;
+        };
     }
 }

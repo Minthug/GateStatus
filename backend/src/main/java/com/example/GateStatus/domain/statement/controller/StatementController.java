@@ -218,7 +218,7 @@ public class StatementController {
         String cacheKey = "direct:statements:figure:" + figureName;
 
         List<StatementApiDTO> statements = cacheService.getOrSet(cacheKey, () -> {
-                        AssemblyApiResponse<String> apiResponse = statementService.fetchStatementsByFigure(figureName);
+                        AssemblyApiResponse<String> apiResponse = statementSyncService.fetchStatementsByFigure(figureName);
                         if (!apiResponse.isSuccess()) {
                             log.error("API 호출 실패: {}", apiResponse.resultMessage());
                             return List.of();
