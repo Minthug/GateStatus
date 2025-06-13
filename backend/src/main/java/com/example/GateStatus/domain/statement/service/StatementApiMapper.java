@@ -245,6 +245,34 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
 
     // ==================== 발언 유형 분석 메서드들 ====================
 
+    private String determineTypeCodeFromContent(String content) {
+        if (content == null || content.isEmpty()) {
+            return "OTHER";
+        }
+
+        String lowerContent = content.toLowerCase();
+
+        for (Map.Entry<String, String> entry : TYPE_KEYWORDS.entrySet()) {
+            String typeCode = entry.getKey();
+            String[] keywords = entry.getValue().split(",");
+
+            for (String keyword : keywords) {
+                if (lowerContent.contains(keyword.trim())) {
+                    log.trace("발언 유형 결정: {} (키워드: {})", typeCode, keyword);
+                    return typeCode;
+                }
+            }
+        }
+        return "OTHER";
+    }
+
+    public StatementType analyzeContentForType(String content) {
+        String typeCode = determineTypeCodeFromContent(content);
+        return convertToStatementType(typeCode);
+    }
+
+    // ==================== NLP 분석 메서드들 ====================
+
     /**
      * 원본 URL 생성
      * @param regDate
@@ -269,33 +297,6 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
         return "https://assembly.news.go.kr/news/" + dateStr + "/" + slugTitle;
     }
 
-    /**
-     * 컨텐츠 기반으로 발언 유형 추정
-     * @param content
-     * @return
-     */
-    private String determineTypeCodeFromContent(String content) {
-        String lowerContent = content.toLowerCase();
-
-        if (lowerContent.contains("인터뷰") || lowerContent.contains("대담")) {
-            return "INTERVIEW";
-        } else if (lowerContent.contains("연설") || lowerContent.contains("대회")) {
-            return "SPEECH";
-        } else if (lowerContent.contains("국회") || lowerContent.contains("본회의")) {
-            return "ASSEMBLY";
-        } else if (lowerContent.contains("위원회") || lowerContent.contains("상임위")) {
-            return "COMMITTEE";
-        } else if (lowerContent.contains("보도자료") || lowerContent.contains("발표")) {
-            return "PRESS";
-        } else if (lowerContent.contains("토론") || lowerContent.contains("논쟁")) {
-            return "DEBATE";
-        } else if (lowerContent.contains("sns") || lowerContent.contains("트위터")
-                || lowerContent.contains("페이스북") || lowerContent.contains("인스타그램")) {
-            return "SNS";
-        } else {
-            return "OTHER";
-        }
-    }
 
     /**
      * 날짜 문자열 파싱
