@@ -36,15 +36,53 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
     private final HtmlEntitiesDecoder htmlDecoder;
     private final FigureNameExtractor nameExtractor;
 
+
+    // ==================== 상수 정의 ====================
+
+    /**
+     * 감성 분석용 긍정 키워드
+     */
+    private static final String[] POSITIVE_KEYWORDS = {
+            "좋은", "발전", "성공", "긍정", "찬성", "지지", "개선", "향상", "효과적", "우수",
+            "훌륭한", "멋진", "완벽한", "최고", "만족", "기쁜", "행복", "희망적", "밝은"
+    };
+
+    /**
+     * 감성 분석용 부정 키워드
+     */
+    private static final String[] NEGATIVE_KEYWORDS = {
+            "나쁜", "실패", "문제", "부정", "반대", "비판", "악화", "심각", "위험", "부족",
+            "끔찍한", "최악", "실망", "걱정", "우려", "분노", "슬픈", "어려운", "힘든"
+    };
+
+    /**
+     * 발언 유형 판단용 키워드 맵
+     */
+    private static final Map<String, String> TYPE_KEYWORDS = Map.of(
+            "INTERVIEW", "인터뷰,대담,면담",
+            "SPEECH", "연설,강연,발표,대회,축사",
+            "ASSEMBLY", "국회,본회의,국정감사,국정질문",
+            "COMMITTEE", "위원회,상임위,특별위,소위원회",
+            "PRESS", "보도자료,기자회견,발표문,성명서",
+            "DEBATE", "토론,논쟁,토론회,세미나",
+            "SNS", "sns,트위터,페이스북,인스타그램,블로그"
+    );
+
     @Override
     public List<StatementApiDTO> map(AssemblyApiResponse<String> response) {
         if (response == null || response.data() == null) {
+            log.warn("API 응답이 null이거나 데이터가 없습니다");
             return Collections.emptyList();
         }
 
         try {
             String xmlData = response.data();
-            return parseXmlData(xmlData);
+            log.debug("XML 데이터 파싱 시작, 길이: {} bytes", xmlData.length());
+
+            List<StatementApiDTO> result = parseXmlData(xmlData);
+            log.info("XML 파싱 완료: {}개 발언 정보 추출", result.size());
+
+            return result;
         } catch (Exception e) {
             log.error("발언 정보 매핑 중 오류 발생", e);
             throw new ApiMappingException("발언 정보 매핑 중 오류 발생 ");
