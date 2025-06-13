@@ -90,6 +90,21 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
     }
 
     /**
+     * API 응답을 직접 StatementResponse로 변환 (빠른 조회용)
+     * @param response API 응답
+     * @return StatementResponse 리스트
+     */
+    public List<StatementResponse> mapToStatementResponses(AssemblyApiResponse<String> response) {
+        List<StatementApiDTO> dtos = map(response);
+
+        return dtos.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+
+    // ==================== XML 파싱 메서드들 ====================
+
+    /**
      * XML 응답을 파싱하여 StatementApiDTO 리스트로 반환
      * @param xmlData
      * @return
@@ -99,19 +114,26 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
 
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            // XXE 공격 방지를 위한 보안 설정
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
             DocumentBuilder builder = factory.newDocumentBuilder();
             Document doc = builder.parse(new InputSource(new StringReader(xmlData)));
 
             NodeList rowList = doc.getElementsByTagName("row");
+            log.debug("XML에서 {}개 row 발견", rowList.getLength());
 
             for (int i = 0; i < rowList.getLength(); i++) {
                 Element row = (Element) rowList.item(i);
                 StatementApiDTO dto = extractStatementFromRow(row);
                 if (dto != null) {
                     result.add(dto);
+                    log.trace("발언 정보 추출 성공: {}", dto.title());
                 }
             }
         } catch (Exception e) {
+            log.error("XML 파싱 실패: {}", e.getMessage());
             throw new ApiMappingException("XML 파싱 오류");
         }
         return result;
@@ -131,11 +153,14 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
             title = htmlDecoder.decodeBasic(title);
             content = htmlDecoder.decodeBasic(content);
 
+            if (isInvalidContent(title, content)) {
+                log.debug("필수 필드 누락 또는 무효한 내용으로 발언 정보 건너뜀");
+                return null;
+            }
+
             String figureName = nameExtractor.extractFromContent(content);
             String typeCode = determineTypeCodeFromContent(content);
-
             LocalDate statementDate = parseDate(regDate);
-
             String originalUrl = generateOriginalUrl(regDate, title);
 
             return new StatementApiDTO(
@@ -153,6 +178,19 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
             return null;
         }
     }
+
+    /**
+     * 내용 유효성 검증
+     * @param title 제목
+     * @param content 내용
+     * @return 무효한 내용인지 여부
+     */
+    private boolean isInvalidContent(String title, String content) {
+        return title == null || title.trim().isEmpty() || content == null || content.trim().isEmpty() ||
+                content.length() < 10;
+    }
+
+    // ==================== 데이터 변환 메서드들 ====================
 
     /**
      * 원본 URL 생성
@@ -233,14 +271,6 @@ public class StatementApiMapper implements ApiMapper<String, List<StatementApiDT
         }
 
         return "";
-    }
-
-    public List<StatementResponse> mapToStatementResponses(AssemblyApiResponse<String> response) {
-        List<StatementApiDTO> dtos = map(response);
-
-        return dtos.stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
     }
 
     /**
