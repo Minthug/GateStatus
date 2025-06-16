@@ -11,6 +11,7 @@ import com.example.GateStatus.domain.figure.service.response.FigureDTO;
 import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
 import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
 import com.example.GateStatus.domain.figure.service.response.UpdateFigureResponse;
+import com.example.GateStatus.domain.statement.service.StatementService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class FigureService {
     private final FigureApiService figureApiService;
     private final FigureCacheService figureCacheService;
     private final CacheManager cacheManager;
+    private final StatementService statementService;
 
     /**
      * 국회의원 등록 또는 조회
@@ -255,7 +257,6 @@ public class FigureService {
         return null;
     }
 
-
     /**
      * API에서 국회의원 정보 동기화
      */
@@ -267,6 +268,54 @@ public class FigureService {
 
         log.info("API에서 국회의원 정보 동기화: {}", name);
         return figureApiService.syncFigureInfoByName(name);
+    }
+
+    @Transactional
+    public Figure ensureFigureExists(String figureName, boolean forceSync, boolean syncStatements) {
+        log.info("정치인 존재 확인: {}, 강제동기화: {}", figureName, forceSync);
+
+        Figure figure = figureRepository.findByName(figureName).orElse(null);
+
+        if (figure == null || forceSync) {
+            try {
+                if (figure == null) {
+                    log.info("DB에 정치인 정보가 없어 API에서 동기화: {}", figureName);
+                    figure = figureApiService.syncFigureInfoByName(figureName);
+                } else {
+                    log.info("정치인 정보 강제 동기화: {}", figureName);
+//                    figureApiService.updateFigureInfoByName(figureName);
+                }
+                if (syncStatements) {
+                    log.info("발언 정보도 함께 동기화: {}", figureName);
+                    statementService.syncStatementsByFigure(figureName);
+                }
+            } catch (Exception e) {
+                log.error("정치인 정보 동기화 실패: {} - {}", figureName, e.getMessage());
+                if (figure == null) {
+                    throw new EntityNotFoundException("해당 정치인을 찾을 수 없습니다: " + figureName);
+                }
+            }
+        }
+        return figure;
+    }
+
+    /**
+     * 정치인 존재 확인 및 필요시 동기화 (발언 정보 포함)
+     * @param figureName 정치인 이름
+     * @param forceSync 강제 동기화 여부
+     * @return Figure 엔티티
+     */
+    public Figure ensureFigureExists(String figureName, boolean forceSync) {
+        return ensureFigureExists(figureName, forceSync, true);
+    }
+
+    /**
+     * 정치인 존재 확인 (동기화 없음)
+     * @param figureName 정치인 이름
+     * @return Figure 엔티티
+     */
+    public Figure ensureFigureExists(String figureName) {
+        return ensureFigureExists(figureName, false, false);
     }
 
 }
