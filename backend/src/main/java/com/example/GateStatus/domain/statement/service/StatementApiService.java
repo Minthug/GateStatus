@@ -1,6 +1,5 @@
 package com.example.GateStatus.domain.statement.service;
 
-import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
@@ -13,9 +12,11 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import javax.swing.plaf.nimbus.State;
+import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -37,6 +38,19 @@ public class StatementApiService {
     @Value("${spring.openapi.assembly.news-figure-path}")
     private String newsFigurePath;  // 설정 파일의 경로 주입
 
+    // ==================== 캐시 관련 상수 ====================
+
+    private static final String CACHE_PREFIX_POLITICIAN = "statements:politician:";
+    private static final String CACHE_PREFIX_KEYWORD = "statements:keyword:";
+    private static final String CACHE_PREFIX_SEARCH = "statements:search:";
+    private static final String CACHE_PREFIX_PERIOD = "statements:period:";
+
+    private static final int CACHE_SUCCESS_HOURS = 1;
+    private static final int CACHE_EMPTY_SECONDS = 30;
+    private static final int CACHE_ERROR_SECONDS = 10;
+
+    // ==================== 공개 API 메서드들 ====================
+
     /**
      * 정치인 이름으로 발언 검색
      * @param name
@@ -45,180 +59,128 @@ public class StatementApiService {
     public List<StatementResponse> getStatementsByPolitician(String name) {
         log.info("정치인 '{}' 발언 정보 API 조회 시작", name);
 
-        String cacheKey = "statements:politician:" + name;
+        String cacheKey = CACHE_PREFIX_POLITICIAN + name;
 
-        Object cached = redisTemplate.opsForValue().get(cacheKey);
-        if (cached != null) {
+        List<StatementResponse> cachedResult = getCachedStatements(cacheKey);
+        if (cachedResult != null) {
             log.debug("캐시 히트: {}", cacheKey);
-            return (List<StatementResponse>) cached;
+            return cachedResult;
         }
+
         log.debug("캐시 미스: {}", cacheKey);
 
-        AssemblyApiResponse<String> apiResponse = fetchStatementsByFigure(name);
+        try {
+            AssemblyApiResponse<String> apiResponse = fetchStatementsByFigure(name);
 
-        if (!apiResponse.isSuccess()) {
-            log.warn("API 응답 실패: {}", apiResponse.resultMessage());
-            redisTemplate.opsForValue().set(cacheKey, Collections.emptyList(), 30, TimeUnit.SECONDS);
+            if (!apiResponse.isSuccess()) {
+                log.warn("API 응답 실패: {}", apiResponse.resultMessage());
+                cacheEmptyResult(cacheKey);
+                return Collections.emptyList();
+            }
+
+            List<StatementResponse> responses = apiMapper.mapToStatementResponses(apiResponse);
+
+            cacheStatements(cacheKey, responses);
+
+            log.info("정치인 '{}' 발언 정보 조회 완료: {}건", name, responses.size());
+            return responses;
+        } catch (Exception e) {
+            log.error("정치인 '{}' 발언 조회 중 오류: {}", name, e.getMessage(), e);
+            cacheErrorResult(cacheKey);
             return Collections.emptyList();
         }
-
-        List<StatementApiDTO> apiDtos = apiMapper.map(apiResponse);
-
-        List<StatementResponse> responses = apiDtos.stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-
-        if (!responses.isEmpty()) {
-            redisTemplate.opsForValue().set(cacheKey, responses, 1, TimeUnit.HOURS);
-            log.debug("캐시 저장 성공 (JSON): {}, 만료 시간: 1시간", cacheKey);
-        } else {
-            redisTemplate.opsForValue().set(cacheKey, responses, 30, TimeUnit.SECONDS);
-            log.debug("빈 결과는 짧은 시간만 캐싱: {}", cacheKey);
-        }
-        return responses;
     }
-
-    private StatementResponse convertToResponse(StatementApiDTO dto) {
-
-        Map<String, Object> nlpData = new HashMap<>();
-        List<String> checkableItems = apiMapper.extractCheckableItems(dto.content());
-        if (!checkableItems.isEmpty()) {
-            nlpData.put("checkableItems", checkableItems);
-        }
-
-        return new StatementResponse(
-                null,
-                null,
-                dto.figureName(),
-                dto.title(),
-                dto.content(),
-                dto.statementDate(),
-                dto.source(),
-                dto.context(),
-                dto.originalUrl(),
-                apiMapper.determineStatementType(dto.typeCode()),
-                null,
-                null,
-                checkableItems,
-                nlpData,
-                0,
-                LocalDateTime.now(),
-                LocalDateTime.now());
-    }
-
-    /**
-     * API 응답을 파싱하여 발언 목록 반환
-     * @return
-     */
-//    private List<StatementApiDTO> parseResponseToStatements(AssemblyApiResponse<String> response) {
-//        if (response.data() == null) {
-//            log.warn("API 응답 데이터 없음");
-//            return Collections.emptyList();
-//        }
-//
-//        try {
-//            List<StatementApiDTO> statements = apiMapper.map(response);
-//
-//            if (statements.isEmpty()) {
-//                log.info("검색 결과가 없습니다");
-//            }
-//
-//            return statements;
-//        } catch (Exception e) {
-//            log.error("응답 파싱 중 오류: {}", e.getMessage(), e);
-//            return Collections.emptyList();
-//        }
-//    }
 
     public List<StatementResponse> getStatementsByKeyword(String keyword) {
+        log.info("키워드 '{}' 발언 검색 시작", keyword);
+
+        String cacheKey = CACHE_PREFIX_KEYWORD + keyword;
+
+        List<StatementResponse> cachedResult = getCachedStatements(cacheKey);
+        if (cachedResult != null) {
+            log.debug("캐시 히트: {}", cacheKey);
+
+            return cachedResult;
+        }
+
         try {
             AssemblyApiResponse<String> response = searchStatementsByKeyword(keyword);
             if (!response.isSuccess()) {
                 log.error("API 호출 실패: {}", response.resultMessage());
-                return List.of();
+                cachedEmptyResult(cacheKey);
+                return Collections.emptyList();
             }
 
-            return apiMapper.mapToStatementResponses(response);
+            List<StatementResponse> responses = apiMapper.mapToStatementResponses(response);
+
+            cachedStatements(cacheKey, responses);
+
+            log.info("키워드 '{}' 발언 검색 완료: {}건", keyword, responses.size());
+            return responses;
         } catch (Exception e) {
             log.error("키워드 검색 중 오류: {}", e.getMessage());
-            return List.of();
+            cachedErrorResult(cacheKey);
+            return Collections.emptyList();
         }
     }
 
+    public List<StatementResponse> searchStatements(String politician, String keyword) {
+        log.info("복합 검색 시작: 정치인='{}', 키워드='{}'", politician, keyword);
+
+        if ((politician == null || politician.trim().isEmpty()) &&
+            (keyword == null) || keyword.trim().isEmpty()) {
+            log.warn("정치인과 키워드가 모두 비어있음");
+            return Collections.emptyList();
+        }
+
+        String cacheKey = CACHE_PREFIX_SEARCH +
+                (politician != null ? politician : "") + ":" + (keyword != null ? keyword : "");
+
+        List<StatementResponse> cachedResult = getCachedStatements(cacheKey);
+        if (cachedResult != null) {
+            log.debug("캐시 히트: {}", cacheKey);
+            return cachedResult;
+        }
+
+        log.debug("캐시 미스: {}", cacheKey);
+
+        try {
+            List<StatementResponse> result = performComplexSearch(politician, keyword);
+            cachedStatements(cacheKey, result);
+            log.info("복합 검색 완료: 정치인='{}', 키워드='{}', 결과={}건",
+                    politician, keyword, result.size());
+            return result;
+        } catch (Exception e) {
+            log.error("복합 검색 중 오류: {}", e.getMessage(), e);
+            cachedErrorResult(cacheKey);
+            return Collections.emptyList();
+        }
+    }
+
+
     private AssemblyApiResponse<String> searchStatementsByKeyword(String keyword) {
-        WebClient webClient = webClientBuilder.baseUrl(baseUrl)
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
-                .build();
+        log.debug("API 호출: 키워드 발언 검색 - {}", keyword);
+
+        WebClient webClient = createWebClient();
 
         try {
             String xmlResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path("/nauvppbxargkmyovh")
+                            .path(newsFigurePath)
                             .queryParam("apiKey", apikey)
                             .queryParam("keyword", keyword)
                             .build())
                     .retrieve()
                     .bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(30))
                     .block();
 
-            String resultCode = extractResultCode(xmlResponse);
-            String resultMessage = extractResultMessage(xmlResponse);
-
-            return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
+            return new createApiResponse(xmlResponse);
         } catch (Exception e) {
             log.error("API 호출 중 오류: {}", e.getMessage(), e);
             return new AssemblyApiResponse<>("99", e.getMessage(), null);
         }
     }
-
-    public List<StatementResponse> searchStatements(String politician, String keyword) {
-
-        String cacheKey = "statements:search:" + (politician != null ? politician : "") + ":" +
-                (keyword != null ? keyword : "");
-
-        Object cached = redisTemplate.opsForValue().get(cacheKey);
-        if (cached != null) {
-            log.debug("Cache Hit: {}", cacheKey);
-            try {
-                return (List<StatementResponse>) cached;
-            } catch (ClassCastException e) {
-                log.warn("캐시 형변환 실패. 캐시 무시: {}", e.getMessage());
-            }
-        }
-
-        log.debug("Cache Miss: {}", cacheKey);
-
-        List<StatementResponse> result;
-
-        if (politician != null) {
-            List<StatementResponse> statements = getStatementsByPolitician(politician);
-
-            if (keyword != null && !keyword.isEmpty()) {
-                return statements.stream()
-                        .filter(stmt ->
-                                stmt.title().contains(keyword) && stmt.title() != null ||
-                                stmt.content().contains(keyword) && stmt.content() != null)
-                        .collect(Collectors.toList());
-            } else {
-                result = statements; // 정치인만 있는 경우
-            }
-        } else if (keyword != null && !keyword.isEmpty()) {
-            result = getStatementsByKeyword(keyword); // 키워드만 있는 경우
-        } else {
-            result = List.of();
-        }
-
-        if (!result.isEmpty()) {
-            redisTemplate.opsForValue().set(cacheKey, result, 1, TimeUnit.HOURS);
-            log.debug("캐시 저장 성공: {}, 만료 시간: 1시간", cacheKey);
-        } else {
-            redisTemplate.opsForValue().set(cacheKey, result, 30, TimeUnit.SECONDS);
-            log.debug("빈 결과는 짧은 시간만 캐싱: {}", cacheKey);
-        }
-
-        return result;
-    }
-
 
     public AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {
         WebClient webClient = webClientBuilder.baseUrl(baseUrl)
@@ -283,6 +245,13 @@ public class StatementApiService {
     }
 
     public AssemblyApiResponse<String> fetchStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
+        return null;
+    }
+
+    // ==================== 캐시 관련 메서드들 ====================
+
+    @SuppressWarnings("unchecked")
+    private List<StatementResponse> getCachedStatements(String cacheKey) {
         return null;
     }
 }
