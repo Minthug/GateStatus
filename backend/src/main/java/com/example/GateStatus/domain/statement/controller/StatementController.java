@@ -5,6 +5,7 @@ import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureService;
+import com.example.GateStatus.domain.statement.entity.Statement;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.service.*;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
@@ -246,54 +247,24 @@ public class StatementController {
         }
     }
 
-    @GetMapping("/relevant/{figureName}")
-    public ResponseEntity<?> getRelevantStatementsByFigureName(@PathVariable String figureName,
-                                                               @RequestParam(required = false, defaultValue = "false") Boolean sync,
-                                                               @PageableDefault(size = 10) Pageable pageable) {
+    @GetMapping("/by-relevant-name")
+    public ResponseEntity<Page<StatementResponse>> getRelevantStatementsByFigureName(@RequestParam String figureName,
+                                                                             @RequestParam(required = false, defaultValue = "false") Boolean sync,
+                                                                             @PageableDefault(size = 10) Pageable pageable) {
         log.info("인물 '{}' 관련성 높은 발언 조회 요청, 동기화 여부: {}", figureName, sync);
 
         try {
+            Figure figure = figureService.ensureFigureExists(figureName, sync);
 
-            // 1. 이름으로 국회의원 찾기
-            Figure figure = figureRepository.findByName(figureName)
-                    .orElse(null);
-
-            // 2. DB에 없거나 동기화 요청이 있으면 API에서 동기화
-            if (figure == null || Boolean.TRUE.equals(sync)) {
-                try {
-                    log.info("국회의원 정보 동기화 시도: {}", figureName);
-                    if (figure == null) {
-                        figure = figureApiService.syncFigureInfoByName(figureName);
-                    }
-
-                    // 발언 정보도 함께 동기화
-                    statementService.syncStatementsByFigure(figureName);
-                } catch (Exception e) {
-                    log.warn("동기화 실패: {} - {}", figureName, e.getMessage());
-                    if (figure == null) {
-                        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                                .body(ApiResponse.error("해당 국회의원을 찾을 수 없습니다: " + figureName));
-                    }
-                }
-            }
-
-            // 3. 관련성 기준으로 발언 조회
             Page<StatementResponse> statements = relevanceService.findStatementsByRelevance(figureName, pageable);
+            log.info("관련성 기준 발언 조회 완료: {}건", statements.getTotalElements());
 
-            // 4. 응답 데이터 구성
-            Map<String, Object> response = new HashMap<>();
-            response.put("figureName", figureName);
-            response.put("figureId", figure.getId());
-            response.put("totalStatements", statements.getTotalElements());
-            response.put("statements", statements.getContent());
-            response.put("totalPages", statements.getTotalPages());
-            response.put("currentPage", statements.getNumber());
-
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(statements);
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("관련 발언 조회 실패: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("발언 조회 실패: " + e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
