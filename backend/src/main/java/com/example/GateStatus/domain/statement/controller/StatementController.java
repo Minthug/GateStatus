@@ -5,10 +5,7 @@ import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.statement.entity.StatementType;
-import com.example.GateStatus.domain.statement.service.StatementApiMapper;
-import com.example.GateStatus.domain.statement.service.StatementRelevanceService;
-import com.example.GateStatus.domain.statement.service.StatementService;
-import com.example.GateStatus.domain.statement.service.StatementSyncService;
+import com.example.GateStatus.domain.statement.service.*;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import com.example.GateStatus.global.config.open.ApiResponse;
@@ -39,8 +36,8 @@ import java.util.Map;
 @Slf4j
 public class StatementController {
 
-    private final WebClient.Builder webclientBuilder;
     private final StatementService statementService;
+    private final StatementApiService apiService;
     private final StatementApiMapper apiMapper;
     private final RedisCacheService cacheService;
     private final StatementSyncService statementSyncService;
@@ -48,19 +45,12 @@ public class StatementController {
     private final FigureApiService figureApiService;
     private final StatementRelevanceService relevanceService;
 
-    @Value("${spring.openai.api.url}")
-    private String baseUrl;
-
-    @Value("${spring.openai.api.key}")
-    private String key;
-
-
     /**
      * 발언 ID로 발언 상세 정보 조회
      * @param id
      * @return
      */
-    @GetMapping("/{id}")
+    @GetMapping("/detail/{id}")
     public ResponseEntity<StatementResponse> getStatementById(@PathVariable String id) {
         log.info("발언 상세 정보 조회 요청: {}", id);
         StatementResponse statement = statementService.findStatementById(id);
@@ -73,25 +63,13 @@ public class StatementController {
      * @param pageable
      * @return
      */
-    @GetMapping("/{figureId}")
+    @GetMapping("/figure/{figureId}")
     public ResponseEntity<Page<StatementResponse>> getStatementsByFigure(@PathVariable Long figureId,
                                                                          @PageableDefault(size = 10) Pageable pageable) {
         log.info("정치인별 발언 목록 조회 요청: {}", figureId);
         Page<StatementResponse> statements = statementService.findStatementsByFigure(figureId, pageable);
         return ResponseEntity.ok(statements);
     }
-
-//    /**
-//     * 인기 발언 목록 조회
-//     * @param limit
-//     * @return
-//     */
-//    @GetMapping("/popular")
-//    public ResponseEntity<List<StatementResponse>> getPopularStatements(@RequestParam(defaultValue = "10") int limit) {
-//        log.info("인기 발언 목록 조회 요청: 상위 {}", limit);
-//        List<StatementResponse> statements = statementService.findPopularStatements(limit);
-//        return ResponseEntity.ok(statements);
-//    }
 
     /**
      * 통합 검색 엔드포인트 - 모든 필드에서 검색
@@ -244,7 +222,7 @@ public class StatementController {
         }
     }
 
-    @GetMapping("/by-name")
+    @GetMapping("/by-name/{figureName}")
     public ResponseEntity<?> getStatementsByFigureName(@RequestParam String figureName,
                                                        @RequestParam(required = false, defaultValue = "false") Boolean sync,
                                                        @PageableDefault(size = 10) Pageable pageable) {

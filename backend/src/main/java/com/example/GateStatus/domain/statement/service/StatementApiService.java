@@ -1,6 +1,5 @@
 package com.example.GateStatus.domain.statement.service;
 
-import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -12,9 +11,9 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import javax.swing.plaf.nimbus.State;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -107,13 +106,13 @@ public class StatementApiService {
             AssemblyApiResponse<String> response = searchStatementsByKeyword(keyword);
             if (!response.isSuccess()) {
                 log.error("API 호출 실패: {}", response.resultMessage());
-                cachedEmptyResult(cacheKey);
+                cacheEmptyResult(cacheKey);
                 return Collections.emptyList();
             }
 
             List<StatementResponse> responses = apiMapper.mapToStatementResponses(response);
 
-            cachedStatements(cacheKey, responses);
+            cacheStatements(cacheKey, responses);
 
             log.info("키워드 '{}' 발언 검색 완료: {}건", keyword, responses.size());
             return responses;
@@ -146,7 +145,7 @@ public class StatementApiService {
 
         try {
             List<StatementResponse> result = performComplexSearch(politician, keyword);
-            cachedStatements(cacheKey, result);
+            cacheStatements(cacheKey, result);
             log.info("복합 검색 완료: 정치인='{}', 키워드='{}', 결과={}건",
                     politician, keyword, result.size());
             return result;
@@ -154,6 +153,30 @@ public class StatementApiService {
             log.error("복합 검색 중 오류: {}", e.getMessage(), e);
             cacheErrorResult(cacheKey);
             return Collections.emptyList();
+        }
+    }
+
+    // ==================== API 호출 메서드들 ====================
+
+    public AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {
+        WebClient webClient = createWebClient();
+
+        try {
+            String xmlResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(newsFigurePath)
+                            .queryParam("apiKey", apikey)
+                            .queryParam("name", figureName)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(30))
+                    .block();
+
+            return createApiResponse(xmlResponse);
+        } catch (Exception e) {
+            log.error("정치인 발언 API 호출 실패: {} - {}", figureName, e.getMessage());
+            return new AssemblyApiResponse<>("99", "API 호출 실패: " + e.getMessage(), null);
         }
     }
 
@@ -175,36 +198,83 @@ public class StatementApiService {
                     .timeout(Duration.ofSeconds(30))
                     .block();
 
-            return new createApiResponse(xmlResponse);
+            return createApiResponse(xmlResponse);
         } catch (Exception e) {
             log.error("API 호출 중 오류: {}", e.getMessage(), e);
             return new AssemblyApiResponse<>("99", e.getMessage(), null);
         }
     }
 
-    public AssemblyApiResponse<String> fetchStatementsByFigure(String figureName) {
-        WebClient webClient = webClientBuilder.baseUrl(baseUrl)
+    public AssemblyApiResponse<String> fetchStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
+        log.debug("API 호출: 기간별 발언 조회 - {} ~ {}", startDate, endDate);
+
+        WebClient webClient = createWebClient();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+        try {
+            String xmlResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(newsFigurePath)
+                            .queryParam("apiKey", apikey)
+                            .queryParam("startDate", startDate.format(formatter))
+                            .queryParam("endDate", endDate.format(formatter))
+                            .build())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(45))
+                    .block();
+
+            return createApiResponse(xmlResponse);
+        } catch (Exception e) {
+            log.error("기간별 발언 API 호출 실패: {} ~ {} - {}", startDate, endDate, e.getMessage());
+            return new AssemblyApiResponse<>("99", "API 호출 실패: " + e.getMessage(), null);
+        }
+    }
+    // ==================== 내부 유틸리티 메서드들 ====================
+
+    private WebClient createWebClient() {
+        return webClientBuilder.baseUrl(baseUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
+                .defaultHeader(HttpHeaders.USER_AGENT, "GateStatus-API-Client/1.0")
                 .build();
+    }
 
-        String xmlResponse = webClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/nauvppbxargkmyovh")
-                        .queryParam("apiKey", apikey)
-                        .queryParam("name", figureName)
-                        .build())
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-
+    private AssemblyApiResponse<String> createApiResponse(String xmlResponse) {
         String resultCode = extractResultCode(xmlResponse);
         String resultMessage = extractResultMessage(xmlResponse);
 
+        log.debug("API 응답 파싱 완료: 코드={}, 메시지={}", resultCode, resultMessage);
         return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
     }
 
-    public AssemblyApiResponse<String> fetchStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
-        return null;
+    private List<StatementResponse> performComplexSearch(String politician, String keyword) {
+        List<StatementResponse> result;
+
+        if (politician != null && !politician.trim().isEmpty()) {
+            List<StatementResponse> statements = getStatementsByPolitician(politician);
+
+            if (keyword != null || !keyword.trim().isEmpty()) {
+                result = statements.stream()
+                        .filter(stmt -> containsKeyword(stmt, keyword))
+                        .collect(Collectors.toList());
+                log.debug("정치인 '{}' 발언 중 키워드 '{}' 필터링: {}/{}건",
+                        politician, keyword, result.size(), statements.size());
+            } else {
+                result = statements;
+            }
+        } else if (keyword != null && !keyword.trim().isEmpty()) {
+            result = getStatementsByKeyword(keyword);
+        } else {
+            result = Collections.emptyList();
+        }
+        return result;
+    }
+
+    private boolean containsKeyword(StatementResponse statement, String keyword) {
+        String lowerKeyword = keyword.toLowerCase();
+
+        return (statement.title() != null && statement.title().toLowerCase().contains(lowerKeyword)) ||
+                (statement.content() != null && statement.content().toLowerCase().contains(lowerKeyword));
     }
 
     // ==================== 캐시 관련 메서드들 ====================
@@ -284,7 +354,7 @@ public class StatementApiService {
     }
 
     private String extractResultMessage(String response) {
-        if (response == null) return "Unknown error";
+        if (response == null || response.isEmpty()) return "Unknown error";
 
         // RESULT 태그 내의 MESSAGE 값 추출
         try {
