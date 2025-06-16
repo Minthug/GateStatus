@@ -119,7 +119,7 @@ public class StatementApiService {
             return responses;
         } catch (Exception e) {
             log.error("키워드 검색 중 오류: {}", e.getMessage());
-            cachedErrorResult(cacheKey);
+            cacheErrorResult(cacheKey);
             return Collections.emptyList();
         }
     }
@@ -152,7 +152,7 @@ public class StatementApiService {
             return result;
         } catch (Exception e) {
             log.error("복합 검색 중 오류: {}", e.getMessage(), e);
-            cachedErrorResult(cacheKey);
+            cacheErrorResult(cacheKey);
             return Collections.emptyList();
         }
     }
@@ -203,6 +203,65 @@ public class StatementApiService {
         return new AssemblyApiResponse<>(resultCode, resultMessage, xmlResponse);
     }
 
+    public AssemblyApiResponse<String> fetchStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
+        return null;
+    }
+
+    // ==================== 캐시 관련 메서드들 ====================
+
+    @SuppressWarnings("unchecked")
+    private List<StatementResponse> getCachedStatements(String cacheKey) {
+        try {
+            Object cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                return (List<StatementResponse>) cached;
+            }
+        } catch (Exception e) {
+            log.warn("캐시 조회 실패, 캐시 무시: {} - {}", cacheKey, e.getMessage());
+        }
+        return null;
+    }
+
+    private void cacheStatements(String cacheKey, List<StatementResponse> statements) {
+        cacheStatements(cacheKey, statements, CACHE_SUCCESS_HOURS);
+    }
+
+    private void cacheStatements(String cacheKey, List<StatementResponse> statements, int hours) {
+        try {
+            if (!statements.isEmpty()) {
+                redisTemplate.opsForValue().set(cacheKey, statements, hours, TimeUnit.HOURS);
+                log.debug("캐시 저장 성공: {}, 만료 시간: {}시간", cacheKey, hours);
+            } else {
+                cacheEmptyResult(cacheKey);
+            }
+        } catch (Exception e) {
+            log.warn("캐시 저장 실패: {} - {}", cacheKey, e.getMessage());
+        }
+    }
+
+    private void cacheEmptyResult(String cacheKey) {
+        try {
+            redisTemplate.opsForValue().set(cacheKey, Collections.emptyList(),
+                    CACHE_EMPTY_SECONDS, TimeUnit.SECONDS);
+            log.debug("빈 결과 캐시: {}, 만료 시간: {}초", cacheKey, CACHE_EMPTY_SECONDS);
+        } catch (Exception e) {
+            log.warn("빈 결과 캐시 실패: {}", cacheKey);
+        }
+    }
+
+    private void cacheErrorResult(String cacheKey) {
+        try {
+            redisTemplate.opsForValue().set(cacheKey, Collections.emptyList(),
+                    CACHE_ERROR_SECONDS, TimeUnit.SECONDS);
+            log.debug("에러 결과 캐시: {}, 만료 시간: {}초", cacheKey, CACHE_ERROR_SECONDS);
+        } catch (Exception e) {
+            log.warn("에러 결과 캐시 실패: {}", cacheKey);
+        }
+    }
+
+    // ==================== XML 파싱 유틸리티 메서드들 ====================
+
+
     // XML 응답에서 결과 코드/메시지 추출 유틸리티 메소드
     private String extractResultCode(String response) {
         if (response == null) return "ERROR";
@@ -244,14 +303,4 @@ public class StatementApiService {
         return "Unknown message";
     }
 
-    public AssemblyApiResponse<String> fetchStatementsByPeriod(LocalDate startDate, LocalDate endDate) {
-        return null;
-    }
-
-    // ==================== 캐시 관련 메서드들 ====================
-
-    @SuppressWarnings("unchecked")
-    private List<StatementResponse> getCachedStatements(String cacheKey) {
-        return null;
-    }
 }
