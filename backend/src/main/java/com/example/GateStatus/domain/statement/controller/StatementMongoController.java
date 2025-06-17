@@ -58,13 +58,13 @@ public class StatementMongoController {
         return ResponseEntity.ok(responses);
     }
 
-    @GetMapping("/search")
-    public ResponseEntity<Page<StatementResponse>> searchStatements(@RequestParam String keyword,
-                                                                    @PageableDefault(size = 10) Pageable pageable) {
-        log.info("[MongoDB] 발언 검색 요청: 키워드 = {}", keyword);
-        Page<StatementResponse> responses = statementService.searchStatements(keyword, pageable);
-        return ResponseEntity.ok(responses);
-    }
+//    @GetMapping("/search")
+//    public ResponseEntity<Page<StatementResponse>> searchStatements(@RequestParam String keyword,
+//                                                                    @PageableDefault(size = 10) Pageable pageable) {
+//        log.info("[MongoDB] 발언 검색 요청: 키워드 = {}", keyword);
+//        Page<StatementResponse> responses = statementService.searchStatements(keyword, pageable);
+//        return ResponseEntity.ok(responses);
+//    }
 
     @GetMapping("/by-type/{type}")
     public ResponseEntity<List<StatementResponse>> getStatementsByType(@PathVariable StatementType type) {
