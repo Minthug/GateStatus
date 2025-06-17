@@ -43,6 +43,8 @@ public class StatementController {
     private final StatementRelevanceService relevanceService;
     private final FigureService figureService;
 
+    // ==================== 핵심 CRUD ====================
+
     /**
      * 발언 ID로 발언 상세 정보 조회
      * @param id
@@ -55,19 +57,7 @@ public class StatementController {
         return ResponseEntity.ok(statement);
     }
 
-    /**
-     * 특정 정치인의 발언 목록 조회
-     * @param figureId
-     * @param pageable
-     * @return
-     */
-    @GetMapping("/figure/{figureId}")
-    public ResponseEntity<Page<StatementResponse>> getStatementsByFigure(@PathVariable Long figureId,
-                                                                         @PageableDefault(size = 10) Pageable pageable) {
-        log.info("정치인별 발언 목록 조회 요청: {}", figureId);
-        Page<StatementResponse> statements = statementService.findStatementsByFigure(figureId, pageable);
-        return ResponseEntity.ok(statements);
-    }
+    // ==================== 통합 검색 (하나로 합침) ====================
 
     @GetMapping("/search")
     public ResponseEntity<Page<StatementResponse>> searchStatements(@RequestParam String keyword,
@@ -84,66 +74,45 @@ public class StatementController {
      */
     @GetMapping("/search/advanced")
     public ResponseEntity<Page<StatementResponse>> searchAdvanced(@RequestParam(defaultValue = "FULL_TEXT") SearchType searchType,
-                                                                    @RequestParam(required = false) String keyword,
-                                                                    @RequestParam(required = false) String exactPhrase,
-                                                                    @RequestParam(required = false) List<String> keywords,
-                                                                    @RequestParam(required = false) StatementType type,
-                                                                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-                                                                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-                                                                    @RequestParam(required = false) String source,
-                                                                    @RequestParam(required = false, defaultValue = "50") Integer limit,
-                                                                    @PageableDefault(size = 10) Pageable pageable) {
+                                                                  @RequestParam(required = false) String keyword,
+                                                                  @RequestParam(required = false) String exactPhrase,
+                                                                  @RequestParam(required = false) List<String> keywords,
+                                                                  @RequestParam(required = false) StatementType type,
+                                                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+                                                                  @RequestParam(required = false) String source,
+                                                                  @RequestParam(required = false, defaultValue = "50") Integer limit,
+                                                                  @PageableDefault(size = 10) Pageable pageable) {
 
-        StatementSearchCriteria criteria;
+        log.info("고급 검색: keyword={}, exactPhrase={}, type={}", keyword, exactPhrase, type);
 
-        if (exactPhrase != null) {
-            criteria = StatementSearchCriteria.exactPhrase(exactPhrase);
-        } else if (keywords != null && !keywords.isEmpty()) {
-            criteria = StatementSearchCriteria.multipleKeywords(keywords);
-        } else if (keyword != null) {
-            criteria = StatementSearchCriteria.keyword(keyword);
-        } else {
-            criteria = StatementSearchCriteria.keyword("");
-        }
-
-        // 추가 조건들 적용
-        if (type != null) criteria = criteria.withType(type);
-        if (startDate != null && endDate != null) criteria = criteria.withPeriod(startDate, endDate);
-        if (source != null) criteria = criteria.withSource(source);
-        if (limit != null) criteria = criteria.withLimit(limit);
+        StatementSearchCriteria criteria = StatementSearchCriteria.fromParams(
+                keyword, exactPhrase, keywords, type, startDate, endDate, source, limit
+        );
 
         Page<StatementResponse> statements = statementService.searchStatements(criteria, pageable);
         return ResponseEntity.ok(statements);
     }
 
+    // ==================== 정치인별 조회 (통합) ====================
 
-    /**(
-     * 기간별 발언 목록 조회
-     * @param startDate
-     * @param endDate
+
+    /**
+     * 특정 정치인의 발언 목록 조회
+     * @param figureId
+     * @param pageable
      * @return
      */
-    @GetMapping("/period")
-    public ResponseEntity<List<StatementResponse>> getStatementsByPeriod(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-                                                                         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        log.info("기간별 발언 목록 조회 요청: {} ~ {}", startDate, endDate);
-        List<StatementResponse> statements = statementService.findStatementsByPeriod(startDate, endDate);
+    @GetMapping("/figure/{figureId}")
+    public ResponseEntity<Page<StatementResponse>> getStatementsByFigure(@PathVariable Long figureId,
+                                                                         @PageableDefault(size = 10) Pageable pageable) {
+        log.info("정치인별 발언 목록 조회 요청: {}", figureId);
+        Page<StatementResponse> statements = statementService.findStatementsByFigure(figureId, pageable);
         return ResponseEntity.ok(statements);
     }
 
-    @PostMapping("/sync/figureName")
-    public ResponseEntity<ApiResponse<Integer>> syncStatementsByFigure(@RequestParam String figureName) {
-        log.info("국회의원 '{}' 발언 정보 동기화 요청", figureName);
 
-        try {
-            int count = statementService.syncStatementsByFigure(figureName);
-            return ResponseEntity.ok(ApiResponse.success(String.format("국회의원 '%s' 발언 정보 %d건 동기화 완료", figureName, count), count));
-        } catch (Exception e) {
-            log.error("발언 정보 동기화 실패: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("발언 정보 동기화 실패: " + e.getMessage()));
-        }
-    }
+
 
     @GetMapping("/by-name")
     public ResponseEntity<?> getStatementsByFigureName(@RequestParam String figureName,
@@ -187,41 +156,6 @@ public class StatementController {
         }
     }
 
-    @PostMapping("/sync/all")
-    public ResponseEntity<ApiResponse<String>> syncAllStatementsAsync() {
-        log.info("모든 국회의원 발언 정보 비동기 동기화 요청");
-
-        String jobId = statementSyncService.syncStatementsAsync();
-        return ResponseEntity.ok(ApiResponse.success("모든 국회의원 발언 정보 비동기 동기화 작업이 시작되었습니다", jobId));
-    }
-
-    @GetMapping("/sync/status/{jobId}")
-    public ResponseEntity<ApiResponse<SyncJobStatus>> getSyncStatus(@PathVariable String jobId) {
-        SyncJobStatus status = statementSyncService.getSyncJobStatus(jobId);
-
-        if (status == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        return ResponseEntity.ok(ApiResponse.success("발언 정보 동기화 작업 상태", status));
-    }
-
-    @PostMapping("/sync/period")
-    public ResponseEntity<ApiResponse<Integer>> syncStatementsByPeriod(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-                                                                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-
-        log.info("기간별 발언 정보 동기화 요청: {} ~ {}", startDate, endDate);
-
-        try {
-            int count = statementSyncService.syncStatementsByPeriod(startDate, endDate);
-            return ResponseEntity.ok(ApiResponse.success(String.format("기간(%s ~ %s) 발언 정보 %d건 동기화 완료",
-                    startDate, endDate, count), count));
-        } catch (Exception e) {
-            log.error("기간별 발언 정보 동기화 실패: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("기간별 발언 정보 동기화 실패: " + e.getMessage()));
-        }
-    }
-
     // ==================== PathVariable 적절한 사용 (고유 식별자) ====================
 
     /**
@@ -236,7 +170,7 @@ public class StatementController {
         return ResponseEntity.ok(statements);
     }
 
-    @GetMapping("/sourcce/{source}")
+    @GetMapping("/source/{source}")
     public ResponseEntity<List<StatementResponse>> getStatementsBySource(@PathVariable String source) {
         log.info("출처별 발언 목록 조회 요청: {}", source);
         List<StatementResponse> statements = statementService.findStatementsBySource(source);
@@ -245,25 +179,24 @@ public class StatementController {
 
     // ==================== API 기반 검색 (PathVariable 사용 - 명확한 식별) ====================
 
-
-    @GetMapping("/search/figure/{figureName}")
-    public ResponseEntity<List<StatementApiDTO>> getStatementsByFigure(@PathVariable String figureName) {
-        log.info("정치인 발언 직접 조회 요청: {}", figureName);
-
-        String cacheKey = "direct:statements:figure:" + figureName;
-
-        List<StatementApiDTO> statements = cacheService.getOrSet(cacheKey, () -> {
-                    AssemblyApiResponse<String> apiResponse = statementSyncService.fetchStatementsByFigure(figureName);
-                    if (!apiResponse.isSuccess()) {
-                        log.error("API 호출 실패: {}", apiResponse.resultMessage());
-                        return List.of();
-                    }
-                    return apiMapper.map(apiResponse);
-                },
-                300
-        );
-        return ResponseEntity.ok(statements);
-    }
+//    @GetMapping("/search/figure/{figureName}")
+//    public ResponseEntity<List<StatementApiDTO>> getStatementsByFigure(@PathVariable String figureName) {
+//        log.info("정치인 발언 직접 조회 요청: {}", figureName);
+//
+//        String cacheKey = "direct:statements:figure:" + figureName;
+//
+//        List<StatementApiDTO> statements = cacheService.getOrSet(cacheKey, () -> {
+//                    AssemblyApiResponse<String> apiResponse = statementSyncService.fetchStatementsByFigure(figureName);
+//                    if (!apiResponse.isSuccess()) {
+//                        log.error("API 호출 실패: {}", apiResponse.resultMessage());
+//                        return List.of();
+//                    }
+//                    return apiMapper.map(apiResponse);
+//                },
+//                300
+//        );
+//        return ResponseEntity.ok(statements);
+//    }
 
 }
 

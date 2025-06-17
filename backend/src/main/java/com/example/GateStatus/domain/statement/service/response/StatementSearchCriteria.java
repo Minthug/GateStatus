@@ -66,5 +66,44 @@ public record StatementSearchCriteria(
     public StatementSearchCriteria withLimit(int limit) {
         return new StatementSearchCriteria(keyword, multipleKeywords, exactPhrase, type, startDate, endDate, source, searchType, limit);
     }
+
+    /**
+     * ✨ 컨트롤러용 - 파라미터에서 직접 생성
+     */
+    public static StatementSearchCriteria fromParams(
+            String keyword, String exactPhrase, List<String> keywords,
+            StatementType type, LocalDate startDate, LocalDate endDate,
+            String source, Integer limit) {
+
+        // 검색 타입 자동 결정
+        SearchType searchType;
+        List<String> finalKeywords = null;
+        String finalKeyword = null;
+        String finalExactPhrase = null;
+
+        if (exactPhrase != null && !exactPhrase.isEmpty()) {
+            searchType = SearchType.EXACT_PHRASE;
+            finalExactPhrase = exactPhrase;
+        } else if (keywords != null && !keywords.isEmpty()) {
+            searchType = SearchType.MULTIPLE_KEYWORDS;
+            finalKeywords = keywords;
+        } else {
+            searchType = SearchType.FULL_TEXT;
+            finalKeyword = keyword != null ? keyword : "";
+        }
+
+        return new StatementSearchCriteria(
+                finalKeyword, finalKeywords, finalExactPhrase, type,
+                startDate, endDate, source, searchType,
+                limit != null ? limit : 50
+        );
+    }
+
+    /**
+     * ✨ 빈 조건으로 시작 (빌더 패턴 대안)
+     */
+    public static StatementSearchCriteria empty() {
+        return new StatementSearchCriteria(null, null, null, null, null, null, null, SearchType.FULL_TEXT, 50);
+    }
 }
 
