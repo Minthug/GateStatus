@@ -44,6 +44,8 @@ public class SecurityConfig {
                         .requestMatchers("/v1/statements/**").permitAll()
                         .requestMatchers("/v1/news/**").permitAll()
                         .requestMatchers("/v1/compares/**").permitAll()
+                        .requestMatchers("/v1/admin/statements/**").permitAll()
+//                        .requestMatchers("/v1/compares/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/figures/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/v1/figures/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/v1/figures/**").hasRole("ADMIN")

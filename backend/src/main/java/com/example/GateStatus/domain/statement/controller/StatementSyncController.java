@@ -16,7 +16,7 @@ import java.time.LocalDate;
 @RestController
 @RequiredArgsConstructor
 @Slf4j
-@RequestMapping("/v1/admin/statements/sync")
+@RequestMapping("/v1/admin/statements/")
 public class StatementSyncController {
 
     private final StatementSyncService syncService;
