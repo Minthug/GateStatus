@@ -12,6 +12,7 @@ import com.example.GateStatus.domain.figure.service.response.FindFigureDetailRes
 import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
 import com.example.GateStatus.domain.figure.service.response.UpdateFigureResponse;
 import com.example.GateStatus.domain.statement.service.StatementService;
+import com.example.GateStatus.domain.statement.service.StatementSyncService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +35,7 @@ public class FigureService {
     private final FigureApiService figureApiService;
     private final FigureCacheService figureCacheService;
     private final CacheManager cacheManager;
-    private final StatementService statementService;
+    private final StatementSyncService syncService;
 
     /**
      * 국회의원 등록 또는 조회
@@ -287,7 +288,7 @@ public class FigureService {
                 }
                 if (syncStatements) {
                     log.info("발언 정보도 함께 동기화: {}", figureName);
-                    statementService.syncStatementsByFigure(figureName);
+                    syncService.syncStatementsByFigure(figureName);
                 }
             } catch (Exception e) {
                 log.error("정치인 정보 동기화 실패: {} - {}", figureName, e.getMessage());

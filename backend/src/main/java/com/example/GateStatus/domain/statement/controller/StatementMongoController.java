@@ -88,12 +88,12 @@ public class StatementMongoController {
         return ResponseEntity.ok(responses);
     }
 
-    @GetMapping("/by-keyword/{keyword}")
-    public ResponseEntity<List<StatementResponse>> getStatementsByKeyword(@PathVariable String keyword) {
-        log.info("[MongoDB] 키워드 포함 발언 검색 요청: {}", keyword);
-        List<StatementResponse> responses = statementService.searchStatementContent(keyword);
-        return ResponseEntity.ok(responses);
-    }
+//    @GetMapping("/by-keyword/{keyword}")
+//    public ResponseEntity<List<StatementResponse>> getStatementsByKeyword(@PathVariable String keyword) {
+//        log.info("[MongoDB] 키워드 포함 발언 검색 요청: {}", keyword);
+//        List<StatementResponse> responses = statementService.searchStatementContent(keyword);
+//        return ResponseEntity.ok(responses);
+//    }
 
     @PostMapping
     public ResponseEntity<StatementResponse> addStatement(@Valid @RequestBody StatementRequest request) {
@@ -103,25 +103,25 @@ public class StatementMongoController {
     }
 
     // 발언 팩트체크 수동 업데이트
-    @PutMapping("/{id}/fact-check")
-    public ResponseEntity<StatementResponse> updateFactCheck(@PathVariable String id,
-                                                             @Valid @RequestBody FactCheckRequest request) {
-        log.info("[MongoDB] 발언 팩트체크 업데이트 요청: ID = {}, 점수 = {}", id, request.score());
-        StatementResponse response = statementService.updateFactCheck(id, request);
-        return ResponseEntity.ok(response);
-    }
+//    @PutMapping("/{id}/fact-check")
+//    public ResponseEntity<StatementResponse> updateFactCheck(@PathVariable String id,
+//                                                             @Valid @RequestBody FactCheckRequest request) {
+//        log.info("[MongoDB] 발언 팩트체크 업데이트 요청: ID = {}, 점수 = {}", id, request.score());
+//        StatementResponse response = statementService.updateFactCheck(id, request);
+//        return ResponseEntity.ok(response);
+//    }
 
-    @PostMapping("/{id}/auto-fact-check")
-    public ResponseEntity<ApiResponse<StatementResponse>> performAutoFactCheck(@PathVariable String id) {
-        log.info("[MongoDB] 발언 자동 팩트체크 요청: ID = {}", id);
-        try {
-            StatementResponse response = statementService.performFactCheck(id);
-            return ResponseEntity.ok(ApiResponse.success("팩트체크가 성공적으로 수행되었습니다", response));
-        } catch (Exception e) {
-            log.error("[MongoDB] 발언 자동 팩트체크 실패: {}", e.getMessage(), e);
-            return ResponseEntity.ok(ApiResponse.error("팩트체크 처리 중 오류 발생: " + e.getMessage()));
-        }
-    }
+//    @PostMapping("/{id}/auto-fact-check")
+//    public ResponseEntity<ApiResponse<StatementResponse>> performAutoFactCheck(@PathVariable String id) {
+//        log.info("[MongoDB] 발언 자동 팩트체크 요청: ID = {}", id);
+//        try {
+//            StatementResponse response = statementService.performFactCheck(id);
+//            return ResponseEntity.ok(ApiResponse.success("팩트체크가 성공적으로 수행되었습니다", response));
+//        } catch (Exception e) {
+//            log.error("[MongoDB] 발언 자동 팩트체크 실패: {}", e.getMessage(), e);
+//            return ResponseEntity.ok(ApiResponse.error("팩트체크 처리 중 오류 발생: " + e.getMessage()));
+//        }
+//    }
 
     @GetMapping("/fact-check")
     public ResponseEntity<List<StatementResponse>> getStatementsByFactCheckScore(@RequestParam(defaultValue = "70") Integer minScore) {

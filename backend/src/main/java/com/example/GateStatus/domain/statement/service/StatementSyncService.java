@@ -155,6 +155,7 @@ public class StatementSyncService {
     }
 
 
+
     @Transactional
     public int syncAllStatements() {
         log.info("모든 국회의원의 발언 정보 동기화 시작");

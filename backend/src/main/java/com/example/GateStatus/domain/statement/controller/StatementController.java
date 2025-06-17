@@ -1,17 +1,14 @@
 package com.example.GateStatus.domain.statement.controller;
 
-import com.example.GateStatus.domain.common.SyncJobStatus;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureService;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.service.*;
-import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import com.example.GateStatus.domain.statement.service.response.StatementSearchCriteria;
 import com.example.GateStatus.global.config.open.ApiResponse;
-import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.example.GateStatus.global.config.redis.RedisCacheService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;

@@ -40,7 +40,6 @@ public class StatementService {
     private final OpenAiClient openAiClient;
     private final StatementApiMapper apiMapper;
     private final StatementValidator validator;
-    private final StatementSyncService syncService;
 
     /**
      * 발언 ID로 발언 상세 정보 조회
@@ -214,13 +213,6 @@ public class StatementService {
         return StatementResponse.from(savedStatement);
     }
 
-
-    @Transactional
-    public int syncStatementsByFigure(String figureName) {
-        validator.validateFigureName(figureName);
-
-        return syncService.syncStatementsByFigure(figureName);
-    }
 
     /**
      * 팩트체크 점수가 일정 수준 이상인 발언을 조회합니다

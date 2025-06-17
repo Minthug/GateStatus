@@ -28,7 +28,7 @@ public class StatementSyncController {
         log.info("국회의원 '{}' 발언 정보 동기화 요청", figureName);
 
         try {
-            int count = statementService.syncStatementsByFigure(figureName);
+            int count = syncService.syncStatementsByFigure(figureName);
             return ResponseEntity.ok(ApiResponse.success(String.format("국회의원 '%s' 발언 정보 %d건 동기화 완료", figureName, count), count));
         } catch (Exception e) {
             log.error("발언 정보 동기화 실패: {}", e.getMessage(), e);
@@ -41,13 +41,13 @@ public class StatementSyncController {
     public ResponseEntity<ApiResponse<String>> syncAllStatementsAsync() {
         log.info("모든 국회의원 발언 정보 비동기 동기화 요청");
 
-        String jobId = statementSyncService.syncStatementsAsync();
+        String jobId = syncService.syncStatementsAsync();
         return ResponseEntity.ok(ApiResponse.success("모든 국회의원 발언 정보 비동기 동기화 작업이 시작되었습니다", jobId));
     }
 
     @GetMapping("/sync/status/{jobId}")
     public ResponseEntity<ApiResponse<SyncJobStatus>> getSyncStatus(@PathVariable String jobId) {
-        SyncJobStatus status = statementSyncService.getSyncJobStatus(jobId);
+        SyncJobStatus status = syncService.getSyncJobStatus(jobId);
 
         if (status == null) {
             return ResponseEntity.notFound().build();
@@ -63,7 +63,7 @@ public class StatementSyncController {
         log.info("기간별 발언 정보 동기화 요청: {} ~ {}", startDate, endDate);
 
         try {
-            int count = statementSyncService.syncStatementsByPeriod(startDate, endDate);
+            int count = syncService.syncStatementsByPeriod(startDate, endDate);
             return ResponseEntity.ok(ApiResponse.success(String.format("기간(%s ~ %s) 발언 정보 %d건 동기화 완료",
                     startDate, endDate, count), count));
         } catch (Exception e) {
