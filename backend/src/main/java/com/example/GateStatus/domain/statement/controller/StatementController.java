@@ -10,6 +10,7 @@ import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.service.*;
 import com.example.GateStatus.domain.statement.service.response.StatementApiDTO;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
+import com.example.GateStatus.domain.statement.service.response.StatementSearchCriteria;
 import com.example.GateStatus.global.config.open.ApiResponse;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.example.GateStatus.global.config.redis.RedisCacheService;
@@ -75,17 +76,49 @@ public class StatementController {
         return ResponseEntity.ok(statements);
     }
 
-    /**
-     * 통합 검색 엔드포인트 - 모든 필드에서 검색
-     * @param keyword
-     * @param pageable
-     * @return
-     */
     @GetMapping("/search")
     public ResponseEntity<Page<StatementResponse>> searchStatements(@RequestParam String keyword,
                                                                     @PageableDefault(size = 10) Pageable pageable) {
-        log.info("[MongoDB] 발언 통합 검색 요청: 키워드 = {}", keyword);
-        Page<StatementResponse> statements = statementService.searchStatements(keyword, pageable);
+        StatementSearchCriteria criteria = StatementSearchCriteria.keyword(keyword);
+        Page<StatementResponse> statements = statementService.searchStatements(criteria, pageable);
+
+        return ResponseEntity.ok(statements);
+    }
+
+    /**
+     * 통합 검색 엔드포인트 - 모든 필드에서 검색
+     */
+    @GetMapping("/search/advanced")
+    public ResponseEntity<Page<StatementResponse>> searchAdvanced(@RequestParam(defaultValue = "FULL_TEXT") SearchType searchType,
+                                                                    @RequestParam(required = false) String keyword,
+                                                                    @RequestParam(required = false) String exactPhrase,
+                                                                    @RequestParam(required = false) List<String> keywords,
+                                                                    @RequestParam(required = false) StatementType type,
+                                                                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                                                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+                                                                    @RequestParam(required = false) String source,
+                                                                    @RequestParam(required = false, defaultValue = "50") Integer limit,
+                                                                    @PageableDefault(size = 10) Pageable pageable) {
+
+        StatementSearchCriteria criteria;
+
+        if (exactPhrase != null) {
+            criteria = StatementSearchCriteria.exactPhrase(exactPhrase);
+        } else if (keywords != null && !keywords.isEmpty()) {
+            criteria = StatementSearchCriteria.multipleKeywords(keywords);
+        } else if (keyword != null) {
+            criteria = StatementSearchCriteria.keyword(keyword);
+        } else {
+            criteria = StatementSearchCriteria.keyword("");
+        }
+
+        // 추가 조건들 적용
+        if (type != null) criteria = criteria.withType(type);
+        if (startDate != null && endDate != null) criteria = criteria.withPeriod(startDate, endDate);
+        if (source != null) criteria = criteria.withSource(source);
+        if (limit != null) criteria = criteria.withLimit(limit);
+
+        Page<StatementResponse> statements = statementService.searchStatements(criteria, pageable);
         return ResponseEntity.ok(statements);
     }
 
