@@ -5,6 +5,7 @@ import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
 
 import java.util.List;
+import java.util.Optional;
 
 public record UpdateFigureCommand(
         String name,
@@ -50,7 +51,7 @@ public record UpdateFigureCommand(
                 request.careers(),
                 request.sites(),
                 request.activities(),
-                request.updateSource() != null ? request.updateSource() : "사용자 수정"
+                Optional.ofNullable(request.updateSource()).orElse("사용자 수정")
         );
     }
 }
