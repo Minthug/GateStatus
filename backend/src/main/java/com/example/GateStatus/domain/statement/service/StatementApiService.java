@@ -123,7 +123,7 @@ public class StatementApiService {
         }
     }
 
-    public List<StatementResponse> searchStatements(String politician, String keyword) {
+    public List<StatementResponse> searchFromApi(String politician, String keyword) {
         log.info("복합 검색 시작: 정치인='{}', 키워드='{}'", politician, keyword);
 
         if ((politician == null || politician.trim().isEmpty()) &&
