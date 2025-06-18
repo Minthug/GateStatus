@@ -11,7 +11,6 @@ import com.example.GateStatus.domain.figure.service.response.FigureDTO;
 import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
 import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
 import com.example.GateStatus.domain.figure.service.response.UpdateFigureResponse;
-import com.example.GateStatus.domain.statement.service.StatementService;
 import com.example.GateStatus.domain.statement.service.StatementSyncService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;

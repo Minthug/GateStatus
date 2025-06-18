@@ -16,19 +16,28 @@ import java.util.List;
 @NoArgsConstructor
 @Builder
 @AllArgsConstructor
+@Table(name = "figure",
+        indexes = {
+                @Index(name = "idx_figure_name", columnList = "name"),
+                @Index(name = "idx_figure_party", columnList = "figureParty"),
+                @Index(name = "idx_figure_type", columnList = "figureType"),
+                @Index(name = "idx_figure_view_count", columnList = "viewCount")
+        })
 public class Figure extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "figure_id", unique = true, nullable = false)
+    @Column(name = "figure_id", unique = true, nullable = false, length = 50)
     private String figureId;
     private String name;
     private String englishName;
     private String birth; // 출생일
     private String constituency; // 활동지
     private String profileUrl;
+    private String updateSource;
+    private Long viewCount;
 
     @Enumerated(EnumType.STRING)
     private FigureType figureType;
@@ -39,43 +48,49 @@ public class Figure extends BaseTimeEntity {
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
             name = "figure_education",
-            joinColumns = @JoinColumn(name = "figure_id")
+            joinColumns = @JoinColumn(name = "figure_id"),
+            indexes = @Index(name = "idx_figure_education_figure_id", columnList = "figure_id")
     )
     @Column(name = "education")
-    private List<String> education;
+    private List<String> education = new ArrayList<>();
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
             name = "figure_career",
-            joinColumns = @JoinColumn(name = "figure_id")
+            joinColumns = @JoinColumn(name = "figure_id"),
+            indexes = @Index(name = "idx_figure_career_figure_id", columnList = "figure_id")
     )
-    private List<Career> careers;
+    private List<Career> careers = new ArrayList<>();
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
             name = "figure_site",
-            joinColumns = @JoinColumn(name = "figure_id")
+            joinColumns = @JoinColumn(name = "figure_id"),
+            indexes = @Index(name = "idx_figure_site_figure_id", columnList = "figure_id")
     )
     @Column(name = "site")
-    private List<String> sites;
+    private List<String> sites = new ArrayList<>();
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
             name = "figure_activity",
-            joinColumns = @JoinColumn(name = "figure_id")
+            joinColumns = @JoinColumn(name = "figure_id"),
+            indexes = @Index(name = "idx_figure_activity_figure_id", columnList = "figure_id")
     )
     @Column(name = "activity")
-    private List<String> activities;
-
-    private String updateSource;
-
-    private Long viewCount;
+    private List<String> activities = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "figure_issue",
+            joinColumns = @JoinColumn(name = "figure_id"),
+            indexes = @Index(name = "idx_figure_issue_figure_id", columnList = "figure_id")
+    )
+    @Column(name = "issue_id", length = 50)
     private List<String> issueIds;
 
     @OneToMany(mappedBy = "figure", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -120,13 +135,6 @@ public class Figure extends BaseTimeEntity {
     }
 
     public void incrementViewCount() {
-        this.viewCount++;
-    }
-
-    public void clearAllCollections() {
-        if (this.education != null) this.education.clear();
-        if (this.careers != null) this.careers.clear();
-        if (this.sites != null) this.sites.clear();
-        if (this.activities != null) this.activities.clear();
+        this.viewCount = (this.viewCount == null ? 0L : this.viewCount) + 1L;
     }
 }

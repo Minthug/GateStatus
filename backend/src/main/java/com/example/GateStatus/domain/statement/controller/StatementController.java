@@ -112,13 +112,12 @@ public class StatementController {
                 keyword, exactPhrase, keywords, type, startDate, endDate, source, limit
         );
 
-        Page<StatementResponse> statements = statementService.searchStatements(criteria, pageable);
+        Page<StatementResponse> statements = statementService.searchInDatabase(criteria, pageable);
         return ResponseEntity.ok(statements);
     }
 
     // ==================== 정치인별 조회 (통합) ====================
-
-
+    
     /**
      * 특정 정치인의 발언 목록 조회
      * @param figureId

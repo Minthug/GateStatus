@@ -1,13 +1,10 @@
 package com.example.GateStatus.domain.figure.service.request;
 
 import com.example.GateStatus.domain.career.Career;
-import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
-import com.example.GateStatus.domain.figure.service.response.FigureDTO;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 public record UpdateFigureCommand(
         String name,
@@ -56,64 +53,4 @@ public record UpdateFigureCommand(
                 request.updateSource() != null ? request.updateSource() : "사용자 수정"
         );
     }
-
-    /**
-     * Figure 엔티티로부터 명령 객체 생성
-     * 기존 정보를 기반으로 수정할 때 사용
-     * @param figure 기존 국회의원 엔티티
-     * @return 엔티티 정보가 담긴 명령 객체
-     */
-    public static UpdateFigureCommand fromEntity(Figure figure) {
-        return new UpdateFigureCommand(
-                figure.getName(),
-                figure.getEnglishName(),
-                figure.getBirth(),
-                figure.getConstituency(),
-                figure.getProfileUrl(),
-                figure.getFigureType(),
-                figure.getFigureParty(),
-                figure.getEducation(),
-                figure.getCareers(),
-                figure.getSites(),
-                figure.getActivities(),
-                figure.getUpdateSource()
-        );
-    }
-
-    /**
-     * FigureDTO로부터 명령 객체 생성
-     * @param dto 국회의원 DTO
-     * @return 명령 객체
-     */
-    public static UpdateFigureCommand fromDto(FigureDTO dto) {
-        List<Career> careerList = null;
-        if (dto.getCareers() != null) {
-            careerList = dto.getCareers().stream()
-                    .map(careerDTO -> Career.builder()
-                            .title(careerDTO.getTitle())
-                            .position(careerDTO.getPosition())
-                            .organization(careerDTO.getOrganization())
-                            .period(careerDTO.getPeriod())
-                            .build())
-                    .collect(Collectors.toList());
-        } else {
-            careerList = List.of();
-        }
-
-        return new UpdateFigureCommand(
-                dto.getName(),
-                dto.getEnglishName(),
-                dto.getBirth(),
-                dto.getConstituency(),
-                dto.getProfileUrl(),
-                dto.getFigureType(),
-                dto.getFigureParty(),
-                dto.getEducation(),
-                careerList,
-                dto.getSites(),
-                dto.getActivities(),
-                "DTO로부터 변환"
-        );
-    }
-
 }

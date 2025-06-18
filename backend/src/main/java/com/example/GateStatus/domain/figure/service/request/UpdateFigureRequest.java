@@ -7,7 +7,9 @@ import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.service.response.FigureDTO;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public record UpdateFigureRequest(
@@ -34,10 +36,10 @@ public record UpdateFigureRequest(
                 figure.getProfileUrl(),
                 figure.getFigureType(),
                 figure.getFigureParty(),
-                figure.getEducation() != null ? new ArrayList<>(figure.getEducation()) : new ArrayList<>(),
-                figure.getCareers() != null ? new ArrayList<>(figure.getCareers()) : new ArrayList<>(),
-                figure.getSites() != null ? new ArrayList<>(figure.getSites()) : new ArrayList<>(),
-                figure.getActivities() != null ? new ArrayList<>(figure.getActivities()) : new ArrayList<>(),
+                safeListCopy(figure.getEducation()),
+                safeListCopy(figure.getCareers()),
+                safeListCopy(figure.getSites()),
+                safeListCopy(figure.getActivities()),
                 figure.getUpdateSource()
         );
     }
@@ -47,19 +49,16 @@ public record UpdateFigureRequest(
      * 기존 국회의원 정보를 기반으로 요청 객체를 생성할 때 사용
      */
     public static UpdateFigureRequest fromDto(FigureDTO dto) {
-        List<Career> careerList = null;
-        if (dto.getCareers() != null) {
-            careerList = dto.getCareers().stream()
-                    .map(careerDTO -> Career.builder()
-                            .title(careerDTO.getTitle())
-                            .position(careerDTO.getPosition())
-                            .organization(careerDTO.getOrganization())
-                            .period(careerDTO.getPeriod())
-                            .build())
-                    .collect(Collectors.toList());
-        } else {
-            careerList = new ArrayList<>();
-        }
+        List<Career> careerList = Optional.ofNullable(dto.getCareers())
+                .orElse(Collections.emptyList())
+                .stream()
+                .map(careerDTO -> Career.builder()
+                        .title(careerDTO.getTitle())
+                        .position(careerDTO.getPosition())
+                        .organization(careerDTO.getOrganization())
+                        .period(careerDTO.getPeriod())
+                        .build())
+                .collect(Collectors.toList());
 
         return new UpdateFigureRequest(
                 dto.getName(),
@@ -69,11 +68,15 @@ public record UpdateFigureRequest(
                 dto.getProfileUrl(),
                 dto.getFigureType(),
                 dto.getFigureParty(),
-                dto.getEducation() != null ? new ArrayList<>(dto.getEducation()) : new ArrayList<>(),
+                safeListCopy(dto.getEducation()),
                 careerList,
-                dto.getSites() != null ? new ArrayList<>(dto.getSites()) : new ArrayList<>(),
-                dto.getActivities() != null ? new ArrayList<>(dto.getActivities()) : new ArrayList<>(),
-                null // DTO에는 updateSource가 없으므로 null로 설정
+                safeListCopy(dto.getSites()),
+                safeListCopy(dto.getActivities()),
+                null // DTO에는 updateSource가 없음
         );
+    }
+
+    private static <T> List<T> safeListCopy(List<T> source) {
+        return source != null ? new ArrayList<>(source) : new ArrayList<>();
     }
 }
