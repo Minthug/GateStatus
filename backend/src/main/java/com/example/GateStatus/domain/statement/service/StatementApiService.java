@@ -126,34 +126,16 @@ public class StatementApiService {
     public List<StatementResponse> searchFromApi(String politician, String keyword) {
         log.info("복합 검색 시작: 정치인='{}', 키워드='{}'", politician, keyword);
 
-        if ((politician == null || politician.trim().isEmpty()) &&
-            (keyword == null) || keyword.trim().isEmpty()) {
-            log.warn("정치인과 키워드가 모두 비어있음");
-            return Collections.emptyList();
-        }
-
-        String cacheKey = CACHE_PREFIX_SEARCH +
-                (politician != null ? politician : "") + ":" + (keyword != null ? keyword : "");
+        String cacheKey = CACHE_PREFIX_SEARCH + (politician != null ? politician : "") + ":" + (keyword != null ? keyword : "");
 
         List<StatementResponse> cachedResult = getCachedStatements(cacheKey);
         if (cachedResult != null) {
-            log.debug("캐시 히트: {}", cacheKey);
             return cachedResult;
         }
 
-        log.debug("캐시 미스: {}", cacheKey);
-
-        try {
-            List<StatementResponse> result = performComplexSearch(politician, keyword);
-            cacheStatements(cacheKey, result);
-            log.info("복합 검색 완료: 정치인='{}', 키워드='{}', 결과={}건",
-                    politician, keyword, result.size());
-            return result;
-        } catch (Exception e) {
-            log.error("복합 검색 중 오류: {}", e.getMessage(), e);
-            cacheErrorResult(cacheKey);
-            return Collections.emptyList();
-        }
+        List<StatementResponse> result = performComplexSearch(politician, keyword);
+        cacheStatements(cacheKey, result);
+        return result;
     }
 
     // ==================== API 호출 메서드들 ====================

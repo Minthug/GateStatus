@@ -6,6 +6,7 @@ import com.example.GateStatus.domain.figure.service.FigureApiService;
 import com.example.GateStatus.domain.figure.service.FigureService;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.service.*;
+import com.example.GateStatus.domain.statement.service.response.CombinedSearchResult;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import com.example.GateStatus.domain.statement.service.response.StatementSearchCriteria;
 import com.example.GateStatus.global.config.open.ApiResponse;
@@ -21,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.swing.plaf.nimbus.State;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -39,6 +41,7 @@ public class StatementController {
     private final FigureApiService figureApiService;
     private final StatementRelevanceService relevanceService;
     private final FigureService figureService;
+    private final StatementApiService statementApiService;
 
     // ==================== 핵심 CRUD ====================
 
@@ -60,11 +63,33 @@ public class StatementController {
     public ResponseEntity<Page<StatementResponse>> searchStatements(@RequestParam String keyword,
                                                                     @PageableDefault(size = 10) Pageable pageable) {
         StatementSearchCriteria criteria = StatementSearchCriteria.keyword(keyword);
-        Page<StatementResponse> statements = statementService.searchStatements(criteria, pageable);
+        Page<StatementResponse> statements = statementService.searchInDatabase(criteria, pageable);
 
         return ResponseEntity.ok(statements);
     }
 
+    @GetMapping("/search/api")
+    public ResponseEntity<List<StatementResponse>> searchApi(@RequestParam(required = false) String politician,
+                                                             @RequestParam(required = false) String keyword) {
+        log.info("API 검색 요청: politician={}, keyword={}", politician, keyword);
+
+        List<StatementResponse> statements = statementApiService.searchFromApi(politician, keyword);
+        return ResponseEntity.ok(statements);
+    }
+
+    @GetMapping("/search/combined")
+    public ResponseEntity<CombinedSearchResult> searchCombined(@RequestParam String keyword,
+                                                               @PageableDefault(size = 10) Pageable pageable) {
+        log.info("통합 검색 요청: keyword={}", keyword);
+
+        StatementSearchCriteria criteria = StatementSearchCriteria.keyword(keyword);
+        Page<StatementResponse> dbResults = statementService.searchInDatabase(criteria, pageable);
+
+        List<StatementResponse> apiResults = statementApiService.searchFromApi(null, keyword);
+
+        CombinedSearchResult result = new CombinedSearchResult(dbResults, apiResults);
+        return ResponseEntity.ok(result);
+    }
     /**
      * 통합 검색 엔드포인트 - 모든 필드에서 검색
      * GET /v1/statements/search/advanced?keyword=경제&type=ASSEMBLY_SPEECH&startDate=2024-01-01&endDate=2024-12-31

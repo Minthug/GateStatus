@@ -161,7 +161,7 @@ public class StatementService {
      * 키워드로 발언 검색 (페이징 적용, 제목과 내용 모두 검색 )
      */
     @Transactional(readOnly = true)
-    public Page<StatementResponse> searchStatements(StatementSearchCriteria searchCriteria, Pageable pageable) {
+    public Page<StatementResponse> searchInDatabase(StatementSearchCriteria searchCriteria, Pageable pageable) {
         validator.validateSearchCriteria(searchCriteria);
 
         Page<StatementDocument> results = switch (searchCriteria.searchType()) {
