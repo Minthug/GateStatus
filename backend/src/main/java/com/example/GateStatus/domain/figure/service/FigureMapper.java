@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
 
@@ -187,22 +188,42 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
         return Optional.ofNullable(dto.education()).orElse(new ArrayList<>());
     }
 
-
     private List<Career> convertCareers(FigureInfoDTO dto) {
         List<Career> careers = new ArrayList<>();
 
-        if (dto.electedCount() != null && !dto.electedCount().isEmpty()) {
+        addAssemblyCareer(careers, dto);
+
+        addCommitteeCareer(careers, dto);
+
+        addExistingCareers(careers, dto);
+
+        return careers;
+    }
+
+    /**
+     * 국회의원 기본 경력 추가
+     * @param careers 경력 리스트
+     * @param dto FigureInfoDTO
+     */
+    private void addAssemblyCareer(List<Career> careers, FigureInfoDTO dto) {
+        if (isNotEmpty(dto.electedCount())) {
             careers.add(Career.builder()
                     .title(dto.electedCount() + "대 국회의원")
                     .position("국회의원")
                     .organization("대한민국 국회")
-                    .period(dto.electedDate() != null ? dto.electedDate() + " ~ 현재": "")
+                    .period(isNotEmpty(dto.electedDate()) ? dto.electedDate() + " ~ 현재" : "현재")
                     .build());
         }
+    }
 
-        if (dto.committeeName() != null && !dto.committeeName().isEmpty()) {
-            String position = dto.committeePosition() != null ? dto.committeePosition() : "위원";
-
+    /**
+     * 위원회 경력 추가
+     * @param careers 경력 리스트
+     * @param dto FigureInfoDTO
+     */
+    private void addCommitteeCareer(List<Career> careers, FigureInfoDTO dto) {
+        if (isNotEmpty(dto.committeeName())) {
+            String position = isNotEmpty(dto.committeePosition()) ? dto.committeePosition() : "위원";
             careers.add(Career.builder()
                     .title("국회 " + dto.committeeName())
                     .position(position)
@@ -210,37 +231,65 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
                     .period("현재")
                     .build());
         }
-
-        // 기존 경력 정보가 이미 Career 리스트라면 그대로 추가
-        if (dto.career() != null && !dto.career().isEmpty() && dto.career().get(0) instanceof Career) {
-            careers.addAll((List<Career>) dto.career());
-        }
-        return careers;
     }
 
-
+    /**
+     * 기존 경력 정보 추가
+     * @param careers 경력 리스트
+     * @param dto FigureInfoDTO
+     */
+    @SuppressWarnings("unchecked")
+    private void addExistingCareers(List<Career> careers, FigureInfoDTO dto) {
+        if (dto.career() != null && !dto.career().isEmpty()) {
+            try {
+                // 타입 안전성 검사
+                if (dto.career().get(0) instanceof Career) {
+                    careers.addAll((List<Career>) dto.career());
+                }
+            } catch (Exception e) {
+                log.warn("기존 경력 정보 추가 중 오류: {}", e.getMessage());
+            }
+        }
+    }
 
     private List<String> convertSites(FigureInfoDTO dto) {
         List<String> sites = new ArrayList<>();
 
-        if (dto.homepage() != null && !dto.homepage().trim().isEmpty()) {
-            sites.add(dto.homepage().trim());
-        }
-
-        if (dto.blog() != null && !dto.blog().trim().isEmpty()) {
-            sites.add(dto.blog().trim());
-        }
-
-        if (dto.facebook() != null && !dto.facebook().trim().isEmpty()) {
-            sites.add(dto.facebook().trim());
-        }
+        addSiteIfNotEmpty(sites, dto.homepage());
+        addSiteIfNotEmpty(sites, dto.blog());
+        addSiteIfNotEmpty(sites, dto.facebook());
 
         // 이메일 주소는 mailto: 프로토콜로 추가
-        if (dto.email() != null && !dto.email().trim().isEmpty()) {
+        if (isNotEmpty(dto.email())) {
             sites.add("mailto:" + dto.email().trim());
         }
+
         return sites;
     }
+
+    private void addSiteIfNotEmpty(List<String> sites, String url) {
+        if (isNotEmpty(url)) {
+            sites.add(url.trim());
+        }
+    }
+
+
+    private List<String> convertActivities(FigureInfoDTO dto) {
+        List<String> activities = new ArrayList<>();
+
+        if (isNotEmpty(dto.electedCount())) {
+            activities.add(dto.electedCount() + "대 국회의원");
+        }
+
+        if (isNotEmpty(dto.committeeName())) {
+            String position = isNotEmpty(dto.committeePosition()) ? dto.committeePosition() : "위원";
+            activities.add(dto.committeeName() + " " + position);
+        }
+
+        return activities;
+    }
+
+    // ========== JSON 파싱 관련 메서드 ==========
 
     private List<Career> parseCareers(JsonNode row) {
         String careerText = getTextValue(row, "MEM_TITLE");
@@ -256,37 +305,37 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
         return str == null || str.trim().isEmpty();
     }
 
+    private boolean isNotEmpty(String str) {
+        return !isEmpty(str);
+    }
 
     private List<String> parseEducation(JsonNode row) {
-        List<String> education = new ArrayList<>();
+        String singleEdu = getTextValue(row, "EDU");
+        if (isNotEmpty(singleEdu)) {
+            return Arrays.stream(singleEdu.split("\\n|\\r\\n|,|;"))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList());
+        }
 
-        addNonEmptyValue(education, getTextValue(row, "EDU1"));
-        addNonEmptyValue(education, getTextValue(row, "EDU2"));
-        addNonEmptyValue(education, getTextValue(row, "EDU3"));
+        List<String> education = new ArrayList<>();
+        addNonEmptyEducation(education, getTextValue(row, "EDU1"));
+        addNonEmptyEducation(education, getTextValue(row, "EDU2"));
+        addNonEmptyEducation(education, getTextValue(row, "EDU3"));
 
         return education;
     }
 
-    private void addNonEmptyValue(List<String> education, String edu3) {
+    private void addNonEmptyEducation(List<String> education, String eduValue) {
+        if (isNotEmpty(eduValue)) {
+            education.add(eduValue.trim());
+        }
     }
 
-    private List<String> convertActivities(FigureInfoDTO dto) {
-        List<String> activities = new ArrayList<>();
-
-        if (dto.electedCount() != null && !dto.electedCount().isEmpty()) {
-            activities.add(dto.electedCount() + "대 국회의원");
-        }
-
-        if (dto.committeeName() != null && !dto.committeeName().isEmpty()) {
-            String position = dto.committeePosition() != null ? dto.committeePosition() : "위원";
-            activities.add(dto.committeeName() + " " + position);
-        }
-
-        return activities;
-    }
+    // ========== 정당 변환 메서드 ==========
 
     private FigureParty convertToFigureParty(String partyName) {
-        if (partyName == null || partyName.isEmpty()) {
+        if (isEmpty(partyName)) {
             return FigureParty.OTHER;
         }
 
@@ -299,8 +348,10 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
             case "기본소득당" -> FigureParty.BASIC_INCOME;
             case "시대전환" -> FigureParty.TIME_TRANSITION;
             case "무소속" -> FigureParty.INDEPENDENT;
-            default -> FigureParty.OTHER;
+            default -> {
+                log.debug("알 수 없는 정당명: {}", partyName);
+                yield FigureParty.OTHER;
+            }
         };
     }
-
 }
