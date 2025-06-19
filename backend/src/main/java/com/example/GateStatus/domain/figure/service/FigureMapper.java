@@ -5,6 +5,7 @@ import com.example.GateStatus.domain.career.CareerParser;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
+import com.example.GateStatus.domain.figure.service.response.FigureDTO;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.global.config.exception.ApiMappingException;
 import com.example.GateStatus.global.config.open.ApiMapper;
@@ -15,10 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
 
@@ -115,43 +113,78 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
 
 
     public void updateFigureFromDTO(Figure figure, FigureInfoDTO dto) {
-        // 중요: figureId가 없으면 업데이트하지 않도록
+        validateAndSetFigureId(figure, dto);
+        updateBasicFields(figure, dto);
+        updateComplexFields(figure, dto);
+    }
+
+    private void validateAndSetFigureId(Figure figure, FigureInfoDTO dto) {
         if (figure.getFigureId() == null || figure.getFigureId().isEmpty()) {
             if (dto.figureId() != null && !dto.figureId().isEmpty()) {
                 figure.setFigureId(dto.figureId());
             } else {
-                // 둘 다 없으면 임시 ID 생성
-                figure.setFigureId("TEMP_" + UUID.randomUUID().toString());
+                String tempId = "TEMP_" + UUID.randomUUID().toString();
+                figure.setFigureId(tempId);
+                log.warn("FigureId가 없어 임시 ID 생성: {}", tempId);
             }
         }
+    }
 
+
+    private void updateBasicFields(Figure figure, FigureInfoDTO dto) {
         figure.setName(dto.name());
         figure.setEnglishName(dto.englishName());
         figure.setBirth(dto.birth());
         figure.setConstituency(dto.constituency());
         figure.setFigureParty(dto.partyName());
+        figure.setProfileUrl(dto.profileUrl());
         figure.setUpdateSource("국회 Open API");
+    }
 
-
+    private void updateComplexFields(Figure figure, FigureInfoDTO dto) {
         figure.update(
                 dto.name(),
                 dto.englishName(),
                 dto.birth(),
-                dto.constituency(),  // 지역구를 place로 사용
+                dto.constituency(),
                 dto.profileUrl(),
-                FigureType.POLITICIAN,  // 국회의원은 기본적으로 POLITICIAN
-                dto.partyName(),        // FigureParty 열거형
-                convertEducation(dto),  // 학력 정보 변환
-                convertCareers(dto),    // Career 객체로 변환
-                convertSites(dto),      // 사이트 URL 변환
-                convertActivities(dto), // 활동 내역 변환
-                "국회 Open API"         // 업데이트 소스
+                FigureType.POLITICIAN,
+                dto.partyName(),
+                convertEducation(dto),
+                convertCareers(dto),
+                convertSites(dto),
+                convertActivities(dto),
+                "국회 Open API"
         );
     }
 
+    // ========== DTO 변환 관련 메서드 ==========
+    public FigureDTO convertToFigureDTO(FigureInfoDTO dto) {
+        if (dto == null) {
+            log.warn("변환할 DTO가 null입니다");
+            return null;
+        }
+        return FigureDTO.builder()
+                .figureId(dto.figureId())
+                .name(dto.name())
+                .englishName(dto.englishName())
+                .birth(dto.birth())
+                .constituency(dto.constituency())
+                .profileUrl(dto.profileUrl())
+                .figureType(FigureType.POLITICIAN)
+                .figureParty(dto.partyName())
+                .education(dto.education())
+                .careers(convertCareersToDTO(dto.career()))
+                .sites(dto.getLinkUrl())
+                .activities(dto.getActivities())
+                .viewCount(0L)
+                .build();
+    }
+
+    // ========== 데이터 변환 유틸리티 메서드 ==========
 
     private List<String> convertEducation(FigureInfoDTO dto) {
-        return dto.education() != null ? dto.education() : new ArrayList<>();
+        return Optional.ofNullable(dto.education()).orElse(new ArrayList<>());
     }
 
 
