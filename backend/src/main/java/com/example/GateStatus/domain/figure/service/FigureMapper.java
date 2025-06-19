@@ -6,6 +6,7 @@ import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
+import com.example.GateStatus.global.config.exception.ApiMappingException;
 import com.example.GateStatus.global.config.open.ApiMapper;
 import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,60 +31,87 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
 
     @Override
     public List<FigureInfoDTO> map(AssemblyApiResponse<JsonNode> response) {
-        return List.of();
+        if (response == null || response.data() == null) {
+            log.warn("API 응답이 null이거나 데이터가 없습니다");
+            return Collections.emptyList();
+        }
+
+        try {
+            JsonNode dataArray = response.data();
+            return mapFromJsonNode(dataArray);
+        } catch (Exception e) {
+            log.error("API 응답 매핑 중 오류 발생: {}", e.getMessage(), e);
+            throw new ApiMappingException("국회의원 정보 매핑 중 오류 발생: " + e.getMessage());
+        }
     }
 
     public List<FigureInfoDTO> mapFromJsonNode(JsonNode dataArray) {
         if (dataArray == null || !dataArray.isArray()) {
+            log.warn("데이터 배열이 null이거나 배열 타입이 아닙니다");
             return Collections.emptyList();
         }
 
         List<FigureInfoDTO> result = new ArrayList<>();
+
         for (JsonNode row : dataArray) {
-            String figureId = getTextValue(row, "MONA_CD");
-            String name = getTextValue(row, "HG_NM");
-
-            if (isEmpty(figureId)) {
-                log.warn("유효하지 않은 figureId: {}", figureId);
-                continue;
+            try {
+                FigureInfoDTO dto = mapSingleNode(row);
+                if (dto != null) {
+                    result.add(dto);
+                }
+            } catch (Exception e) {
+                log.warn("개별 노드 매핑 실패, 건너뜀: {}", e.getMessage());
             }
-
-            if (isEmpty(name)) {
-                log.warn("유효하지 않은 name: {}", name);
-                continue;
-            }
-
-
-            // 기존 로직 그대로 유지
-            String englishName = getTextValue(row, "ENG_NM");
-            String birth = getTextValue(row, "BTH_DATE");
-            String partyNameStr = getTextValue(row, "POLY_NM");
-            String constituency = getTextValue(row, "ORIG_NM");
-            String committeeName = getTextValue(row, "CMIT_NM");
-            String committeePosition = getTextValue(row, "JOB_RES_NM");
-            String electedCount = getTextValue(row, "REELE_GBN_NM");
-            String electedDate = getTextValue(row, "UNITS");
-            String reelection = getTextValue(row, "REELE_GBN_NM");
-            String email = getTextValue(row, "E_MAIL");
-            String homepage = getTextValue(row, "HOMEPAGE");
-
-            FigureParty partyName = convertToFigureParty(partyNameStr);
-
-            List<String> education = parseEducation(row);
-            List<Career> careers = parseCareers(row);
-
-            FigureInfoDTO dto = new FigureInfoDTO(
-                    figureId, name, englishName, birth, partyName, constituency,
-                    committeeName, committeePosition, electedCount, electedDate,
-                    reelection, null,
-                    education,
-                    careers,
-                    email, homepage, null, null);
-
-            result.add(dto);
         }
+        log.info("총 {}개 노드 중 {}개 성공적으로 매핑", dataArray.size(), result.size());
         return result;
     }
+
+    private FigureInfoDTO mapSingleNode(JsonNode row) {
+        String figureId = getTextValue(row, "MONA_CD");
+        String name = getTextValue(row, "HG_NM");
+
+        if (isEmpty(figureId)) {
+            log.warn("유효하지 않은 figureId: {}", figureId);
+            return null;
+        }
+
+        if (isEmpty(name)) {
+            log.warn("유효하지 않은 name: {}", name);
+            return null;
+        }
+
+        // 기본 정보 추출
+        String englishName = getTextValue(row, "ENG_NM");
+        String birth = getTextValue(row, "BTH_DATE");
+        String partyNameStr = getTextValue(row, "POLY_NM");
+        String constituency = getTextValue(row, "ORIG_NM");
+        String committeeName = getTextValue(row, "CMIT_NM");
+        String committeePosition = getTextValue(row, "JOB_RES_NM");
+        String electedCount = getTextValue(row, "REELE_GBN_NM");
+        String electedDate = getTextValue(row, "UNITS");
+        String reelection = getTextValue(row, "REELE_GBN_NM");
+        String profileUrl = getTextValue(row, "IMAGE_URL");
+        String email = getTextValue(row, "E_MAIL");
+        String homepage = getTextValue(row, "HOMEPAGE");
+        String blog = getTextValue(row, "BLOG_URL");
+        String facebook = getTextValue(row, "FACEBOOK");
+
+        // 변환된 데이터
+        FigureParty partyName = convertToFigureParty(partyNameStr);
+        List<String> education = parseEducation(row);
+        List<Career> careers = parseCareers(row);
+
+
+        return new FigureInfoDTO(
+                figureId, name, englishName, birth, partyName, constituency,
+                committeeName, committeePosition, electedCount, electedDate,
+                reelection, profileUrl,
+                education, careers,
+                email, homepage, blog, facebook
+        );
+    }
+
 
 
     public void updateFigureFromDTO(Figure figure, FigureInfoDTO dto) {
