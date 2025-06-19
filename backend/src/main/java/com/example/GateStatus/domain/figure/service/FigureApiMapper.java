@@ -22,6 +22,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -135,13 +137,5 @@ public class FigureApiMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>>
                         .title(career.getTitle())
                         .build())
                 .collect(Collectors.toList());
-    }
-
-    /**
-     * JsonNode에서 텍스트 값 추출
-     */
-    public String getTextValue(JsonNode node, String fieldName) {
-        JsonNode field = node.get(fieldName);
-        return (field != null && !field.isNull()) ? field.asText() : "";
     }
 }

@@ -6,7 +6,10 @@ import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
+import com.example.GateStatus.global.config.open.ApiMapper;
+import com.example.GateStatus.global.config.open.AssemblyApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,11 +19,19 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class FigureMapper {
+public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
     private final CareerParser careerParser;
+    private final ObjectMapper objectMapper;
+
+    @Override
+    public List<FigureInfoDTO> map(AssemblyApiResponse<JsonNode> response) {
+        return List.of();
+    }
 
     public List<FigureInfoDTO> mapFromJsonNode(JsonNode dataArray) {
         if (dataArray == null || !dataArray.isArray()) {
@@ -231,12 +242,4 @@ public class FigureMapper {
         };
     }
 
-
-    /**
-     * JsonNode에서 텍스트 값 추출
-     */
-    public String getTextValue(JsonNode node, String fieldName) {
-        JsonNode field = node.get(fieldName);
-        return (field != null && !field.isNull()) ? field.asText() : "";
-    }
 }
