@@ -1,6 +1,7 @@
 package com.example.GateStatus.domain.figure.service;
 
 import com.example.GateStatus.domain.career.Career;
+import com.example.GateStatus.domain.career.CareerDTO;
 import com.example.GateStatus.domain.career.CareerParser;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
@@ -19,7 +20,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
+import static com.example.GateStatus.domain.common.JsonUtils.*;
 
 @Service
 @RequiredArgsConstructor
@@ -183,6 +184,22 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
     }
 
     // ========== 데이터 변환 유틸리티 메서드 ==========
+    private List<CareerDTO> convertCareersToDTO(List<Career> careers) {
+        return Optional.ofNullable(careers)
+                .orElse(Collections.emptyList())
+                .stream()
+                .map(this::convertSingleCareerToDTO)
+                .collect(Collectors.toList());
+    }
+
+    private CareerDTO convertSingleCareerToDTO(Career career) {
+        return CareerDTO.builder()
+                .title(career.getTitle())
+                .position(career.getPosition())
+                .organization(career.getOrganization())
+                .period(career.getPeriod())
+                .build();
+    }
 
     private List<String> convertEducation(FigureInfoDTO dto) {
         return Optional.ofNullable(dto.education()).orElse(new ArrayList<>());
@@ -299,14 +316,6 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
         }
 
         return careerParser.parseCareers(careerText);
-    }
-
-    private boolean isEmpty(String str) {
-        return str == null || str.trim().isEmpty();
-    }
-
-    private boolean isNotEmpty(String str) {
-        return !isEmpty(str);
     }
 
     private List<String> parseEducation(JsonNode row) {

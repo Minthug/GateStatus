@@ -19,7 +19,7 @@ public class JsonUtils {
      * @param fieldName
      * @return
      */
-    public static  String getTextValue(JsonNode node, String fieldName) {
+    public static String getTextValue(JsonNode node, String fieldName) {
         JsonNode field = node.get(fieldName);
         return (field != null && !field.isNull()) ? field.asText().trim() : "";
     }
@@ -133,9 +133,12 @@ public class JsonUtils {
         return arrayNode.get(index);
     }
 
-
-    private static boolean isEmpty(String str) {
+    public static boolean isEmpty(String str) {
         return str == null || str.trim().isEmpty();
+    }
+
+    public static boolean isNotEmpty(String str) {
+        return !isEmpty(str);
     }
 
     public static boolean isEmpty(JsonNode node) {
