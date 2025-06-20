@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.example.GateStatus.domain.common.JsonUtils.isEmpty;
@@ -60,7 +61,32 @@ public class AssemblyApiClient {
     }
 
     public List<FigureInfoDTO> fetchAllFigures() {
+        log.info("전체 국회의원 정보 API 호출 시작");
+        List<FigureInfoDTO> allFigures = new ArrayList<>();
 
+        int maxPage = 4;
+        for (int pageNo = 1; pageNo <= maxPage; pageNo++) {
+            try {
+                List<FigureInfoDTO> pageFigures = fetchFiguresPage(pageNo, 100);
+
+                if (pageFigures.isEmpty()) {
+                    log.info("페이지 {}에서 더 이상 데이터 없음", pageNo);
+                    break;
+                }
+
+                allFigures.addAll(allFigures);
+                log.info("페이지 {} 완료: {}명", pageNo, pageFigures.size());
+                if (pageFigures.size() < 100) {
+                    log.info("마지막 페이지 도달: {}", pageNo);
+                    break;
+                }
+            } catch (Exception e) {
+                log.error("페이지 {} 호출 실패: {}", pageNo, e.getMessage(), e);
+                break;
+            }
+        }
+        log.info("전체 국회의원 정보 API 호출 완료: 총 {}명", allFigures.size());
+        return allFigures;
     }
 
     public List<FigureInfoDTO> fetchFiguresByParty(String partyName) {
