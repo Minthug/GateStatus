@@ -10,23 +10,15 @@ import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -34,115 +26,29 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class FigureApiService {
 
-    private final WebClient assemblyWebClient;
-    private final ObjectMapper mapper;
+    private final AssemblyApiClient apiClient;
+    private final FigureSyncService syncService;
+    private final FigureAsyncService asyncService;
     private final FigureRepository figureRepository;
-    private final FigureMapper figureMapper;
-    private final CareerParser careerParser;
-    private final FigureCacheService figureCacheService;
-
-    @PersistenceContext
-    private final EntityManager entityManager;
-
-    private final ConcurrentMap<String, SyncJobStatus> syncJobStatusMap = new ConcurrentHashMap<>();
-
-    @Autowired
-    private PlatformTransactionManager transactionManager;
-
-    @Value("${spring.openapi.assembly.url}")
-    private String baseUrl;
-
-    @Value("${spring.openapi.assembly.key}")
-    private String apiKey;
-
-    @Value("${spring.openapi.assembly.figure-api-path}")
-    private String figureApiPath;
-
+    private final FigureCacheService cacheService;
 
     @Transactional
     public Figure syncFigureInfoByName(String figureName) {
-        FigureInfoDTO info = fetchFigureInfoFromApi(figureName);
-
-        if (info == null) {
-            throw new EntityNotFoundException("해당 이름의 정치인을 찾을 수 없습니다");
-        }
-
-        if (info.figureId() == null || info.figureId().isEmpty()) {
-            log.warn("API에서 가져온 figureId가 null입니다. 임시 ID를 생성합니다.");
-            // UUID를 사용하여 임시 ID 생성
-            String tempId = "TEMP_" + UUID.randomUUID().toString();
-
-            // 새로운 FigureInfoDTO 생성 (불변 객체일 경우)
-            info = new FigureInfoDTO(
-                    tempId,
-                    info.name(),
-                    info.englishName(),
-                    info.birth(),
-                    info.partyName(),
-                    info.constituency(),
-                    info.committeeName(),
-                    info.committeePosition(),
-                    info.electedCount(),
-                    info.electedDate(),
-                    info.reelection(),
-                    info.profileUrl(),
-                    info.education(),
-                    info.career(),
-                    info.email(),
-                    info.homepage(),
-                    info.blog(),
-                    info.facebook()
-            );
-        }
-
-        Figure figure = figureRepository.findByName(figureName)
-                .orElseGet(() -> Figure.builder()
-                        .name(figureName)
-                        .figureType(FigureType.POLITICIAN)
-                        .viewCount(0L)
-                        .build());
-
-        figureMapper.updateFigureFromDTO(figure, info);
-
-        return figureRepository.save(figure);
-    }
-
-    private FigureInfoDTO fetchFigureInfoFromApi(String figureName) {
-        log.info("국회의원 정보 API 호출 시작: {}", figureName);
+        log.info("국회의원 정보 동기화 요청: {}", figureName);
 
         try {
-            String jsonResponse = assemblyWebClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path(figureApiPath)
-                            .queryParam("KEY", apiKey)
-                            .queryParam("HG_NM", figureName)
-                            .build())
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            if (isEmpty(jsonResponse)) {
-                log.warn("API에서 빈 응답 또는 null 반환 (이름: {}) ", figureName);
-                return null;
-            }
-
-            log.debug("API 응답 수신 일부: {}", jsonResponse.substring(0, Math.min(100, jsonResponse.length())));
-
-            List<FigureInfoDTO> figures = parseJsonResponse(jsonResponse);
-            log.info("국회의원 정보 조회 결과: {} 명 ", figures.size());
-
-            return figures.isEmpty() ? null : figures.get(0);
+            Figure result = syncService.syncFigureByName(figureName);
+            log.info("국회의원 정보 동기화 성공: {}", figureName);
+            return result;
         } catch (Exception e) {
-            log.error("국회의원 정보 조회 중 오류: {} - {} ", figureName, e.getMessage(), e);
-            throw new ApiDataRetrievalException("국회의원 정보를 가져오는 중 오류 발생: " + e.getMessage());
+            log.error("국회의원 정보 동기화 실패: {} - {}", figureName, e.getMessage(), e);
+            throw e;
         }
     }
 

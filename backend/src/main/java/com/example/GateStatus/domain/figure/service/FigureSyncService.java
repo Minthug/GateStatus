@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @Service
 @Slf4j
@@ -42,6 +44,30 @@ public class FigureSyncService {
 
         log.info("국회의원 정보 동기화 완료: {}", figureName);
         return savedFigure;
+    }
+
+    public int syncAllFigures() {
+        log.info("모든 국회의원 정보 동기화 시작 ");
+
+        List<FigureInfoDTO> allFigures = apiClient.fetchAllFigures();
+        if (allFigures.isEmpty()) {
+            log.warn("동기화할 국회의원 정보가 없습니다");
+            return 0;
+        }
+
+        int successCount = 0;
+        for (FigureInfoDTO figureInfo : allFigures) {
+            try {
+                syncSingleFigure(figureInfo);
+                successCount++;
+            } catch (Exception e) {
+                log.error("국회의원 동기화 실패: {} - {}", figureInfo.name(), e.getMessage());
+            }
+        }
+
+        log.info("모든 국회의원 정보 동기화 완료: 총 {}명 중 {}명 성공",
+                allFigures.size(), successCount);
+        return successCount;
     }
 
     private Figure createNewFigure(String name) {
