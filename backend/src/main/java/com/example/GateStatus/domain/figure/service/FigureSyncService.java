@@ -19,6 +19,7 @@ public class FigureSyncService {
     private final FigureRepository figureRepository;
     private final FigureMapper mapper;
     private final FigureCacheService cacheService;
+    private final FigureMapper figureMapper;
 
     @Transactional
     public Figure syncFigureByName(String figureName) {
@@ -49,5 +50,13 @@ public class FigureSyncService {
                 .figureType(FigureType.POLITICIAN)
                 .viewCount(0L)
                 .build();
+    }
+
+    public void syncSingleFigure(FigureInfoDTO figureInfoDTO) {
+        Figure figure = figureRepository.findByFigureId(figureInfoDTO.figureId())
+                .orElseGet(() -> createNewFigure(figureInfoDTO.name()));
+
+        figureMapper.updateFigureFromDTO(figure, figureInfoDTO);
+        figureRepository.save(figure);
     }
 }

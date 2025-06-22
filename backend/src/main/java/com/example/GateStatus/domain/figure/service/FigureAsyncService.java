@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
@@ -64,7 +66,7 @@ public class FigureAsyncService {
 
             int totalSuccess = 0;
             for (List<FigureInfoDTO> batch : batches) {
-                totalSuccess += processBatch(batch, jobStatusMap);
+                totalSuccess += processBatch(batch, jobStatus);
             }
             // 작업 완료
             jobStatus.setSuccessCount(totalSuccess);
@@ -78,5 +80,38 @@ public class FigureAsyncService {
             jobStatus.setCompleted(true);
         }
 
+    }
+
+    private int processBatch(List<FigureInfoDTO> batch, SyncJobStatus jobStatus) {
+        int successCount = 0;
+
+        for (FigureInfoDTO figure : batch) {
+            try {
+                syncSingleFigureInTransaction(figure);
+                successCount++;
+                jobStatus.incrementSuccessCount();
+            } catch (Exception e) {
+                log.error("배치 처리 중 오류: {} - {}", figure.name(), e.getMessage());
+                jobStatus.incrementFailCount();
+            } finally {
+                jobStatus.incrementCompletedTasks();
+            }
+        }
+        return successCount;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void syncSingleFigureInTransaction(FigureInfoDTO figure) {
+        syncService.syncSingleFigure(figure);
+    }
+
+
+    private <T> List<List<T>> splitIntoBatches(List<T> items, int batchSize) {
+        List<List<T>> batches = new ArrayList<>();
+        for (int i = 0; i < items.size(); i += batchSize) {
+            batches.add(new ArrayList<>(
+                    items.subList(i, Math.min(i + batchSize, items.size()))));
+        }
+        return batches;
     }
 }
