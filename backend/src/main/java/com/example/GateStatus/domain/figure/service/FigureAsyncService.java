@@ -1,20 +1,13 @@
 package com.example.GateStatus.domain.figure.service;
 
-import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.common.SyncJobStatus;
-import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
-import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -29,13 +22,6 @@ import java.util.concurrent.ConcurrentMap;
 @RequiredArgsConstructor
 public class FigureAsyncService {
 
-
-    /**
-     * 해당 서비스 클래스는 아마 추후 더 큰 확장성이 필요할 때
-     * 기존 FigureApiService에 있는 Method를 대체하기 위한 비동기 처리 전용 서비스라고 생각한다
-     */
-    private final FigureApiService figureApiService;
-    private final FigureRepository figureRepository;
     private final AssemblyApiClient apiClient;
     private final FigureSyncService syncService;
 

@@ -159,17 +159,17 @@ public class FigureController {
         return ResponseEntity.ok(ApiResponse.success("국회의원 정보 비동기 동기화 작업이 시작되었습니다", jobId));
     }
 
-    @GetMapping("/sync/status/{jobId}")
-    public ResponseEntity<ApiResponse<SyncJobStatus>> getSyncStatus(@PathVariable String jobId) {
-
-        SyncJobStatus status = figureApiService.getSyncJobStatus(jobId);
-
-        if (status == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        return ResponseEntity.ok(ApiResponse.success("국회의원 정보 동기화 작업 상태", status));
-    }
+//    @GetMapping("/sync/status/{jobId}")
+//    public ResponseEntity<ApiResponse<SyncJobStatus>> getSyncStatus(@PathVariable String jobId) {
+//
+//        SyncJobStatus status = figureApiService.getSyncJobStatus(jobId);
+//
+//        if (status == null) {
+//            return ResponseEntity.notFound().build();
+//        }
+//
+//        return ResponseEntity.ok(ApiResponse.success("국회의원 정보 동기화 작업 상태", status));
+//    }
 
     @PostMapping("/sync/party")
     public ResponseEntity<SyncPartyResponse> syncFiguresByParty(@RequestParam String partyName) {

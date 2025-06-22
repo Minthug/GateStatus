@@ -5,7 +5,6 @@ import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
-import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,10 +22,8 @@ public class FigureSyncService {
 
     private final AssemblyApiClient apiClient;
     private final FigureRepository figureRepository;
-    private final FigureMapper mapper;
-    private final FigureCacheService cacheService;
     private final FigureMapper figureMapper;
-    private final EntityManager entityManager;
+    private final FigureCacheService cacheService;
 
     @Transactional
     public Figure syncFigureByName(String figureName) {
@@ -40,7 +37,7 @@ public class FigureSyncService {
         Figure figure = figureRepository.findByName(figureName)
                 .orElseGet(() -> createNewFigure(figureName));
 
-        mapper.updateFigureFromDTO(figure, info);
+        figureMapper.updateFigureFromDTO(figure, info);
         Figure savedFigure= figureRepository.save(figure);
 
         if (savedFigure.getFigureId() != null) {
@@ -110,60 +107,60 @@ public class FigureSyncService {
         figureMapper.updateFigureFromDTO(figure, figureInfoDTO);
         figureRepository.save(figure);
     }
-
-    /**
-     * 단일 국회의원 저장 메서드 (별도 트랜잭션으로 분리)
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean saveBasicFigureInfo(FigureInfoDTO figureDTO) {
-        try {
-            log.info("국회의원 저장 시작: {}", figureDTO.name());
-
-            // 1. 기존 엔티티 조회 또는 새로 생성
-            Figure figure = figureRepository.findByFigureIdWithoutCollections(figureDTO.figureId())
-                    .orElseGet(() ->
-                            Figure.builder()
-                                    .figureId(figureDTO.figureId())
-                                    .name(figureDTO.name())
-                                    .figureType(FigureType.POLITICIAN)
-                                    .viewCount(0L)
-                                    .build());
-
-            // 기본 정보만 업데이트
-            figure.setName(figureDTO.name());
-            figure.setEnglishName(figureDTO.englishName());
-            figure.setBirth(figureDTO.birth());
-            figure.setConstituency(figureDTO.constituency());
-            figure.setFigureParty(figureDTO.partyName());
-            figure.setUpdateSource("국회 Open API");
-
-            // 저장
-            Figure savedFigure = figureRepository.save(figure);
-
-            // EntityManager로 직접 조회
-            boolean exists = false;
-            try {
-                Figure found = entityManager.createQuery(
-                                "SELECT f FROM Figure f WHERE f.figureId = :id", Figure.class)
-                        .setParameter("id", figureDTO.figureId())
-                        .getSingleResult();
-                exists = (found != null);
-            } catch (Exception e) {
-                log.warn("엔티티 조회 실패: {}", e.getMessage());
-            }
-
-            if (exists) {
-                log.info("국회의원 저장 성공: {}, ID={}", figureDTO.name(), figureDTO.figureId());
-                return true;
-            } else {
-                log.warn("국회의원 저장 실패 (직접 조회 불가): {}", figureDTO.name());
-                return false;
-            }
-        } catch (Exception e) {
-            log.error("국회의원 저장 실패: {} - {}", figureDTO.name(), e.getMessage(), e);
-            throw e; // 트랜잭션 롤백을 위해 예외 다시 던지기
-        }
-    }
+//
+//    /**
+//     * 단일 국회의원 저장 메서드 (별도 트랜잭션으로 분리)
+//     */
+//    @Transactional(propagation = Propagation.REQUIRES_NEW)
+//    public boolean saveBasicFigureInfo(FigureInfoDTO figureDTO) {
+//        try {
+//            log.info("국회의원 저장 시작: {}", figureDTO.name());
+//
+//            // 1. 기존 엔티티 조회 또는 새로 생성
+//            Figure figure = figureRepository.findByFigureIdWithoutCollections(figureDTO.figureId())
+//                    .orElseGet(() ->
+//                            Figure.builder()
+//                                    .figureId(figureDTO.figureId())
+//                                    .name(figureDTO.name())
+//                                    .figureType(FigureType.POLITICIAN)
+//                                    .viewCount(0L)
+//                                    .build());
+//
+//            // 기본 정보만 업데이트
+//            figure.setName(figureDTO.name());
+//            figure.setEnglishName(figureDTO.englishName());
+//            figure.setBirth(figureDTO.birth());
+//            figure.setConstituency(figureDTO.constituency());
+//            figure.setFigureParty(figureDTO.partyName());
+//            figure.setUpdateSource("국회 Open API");
+//
+//            // 저장
+//            Figure savedFigure = figureRepository.save(figure);
+//
+//            // EntityManager로 직접 조회
+//            boolean exists = false;
+//            try {
+//                Figure found = entityManager.createQuery(
+//                                "SELECT f FROM Figure f WHERE f.figureId = :id", Figure.class)
+//                        .setParameter("id", figureDTO.figureId())
+//                        .getSingleResult();
+//                exists = (found != null);
+//            } catch (Exception e) {
+//                log.warn("엔티티 조회 실패: {}", e.getMessage());
+//            }
+//
+//            if (exists) {
+//                log.info("국회의원 저장 성공: {}, ID={}", figureDTO.name(), figureDTO.figureId());
+//                return true;
+//            } else {
+//                log.warn("국회의원 저장 실패 (직접 조회 불가): {}", figureDTO.name());
+//                return false;
+//            }
+//        } catch (Exception e) {
+//            log.error("국회의원 저장 실패: {} - {}", figureDTO.name(), e.getMessage(), e);
+//            throw e; // 트랜잭션 롤백을 위해 예외 다시 던지기
+//        }
+//    }
 
 
     /**

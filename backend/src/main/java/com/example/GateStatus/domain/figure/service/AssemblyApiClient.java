@@ -1,7 +1,5 @@
 package com.example.GateStatus.domain.figure.service;
 
-import com.example.GateStatus.domain.career.Career;
-import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -16,7 +14,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
 import static com.example.GateStatus.domain.common.JsonUtils.isEmpty;
 
 @Service
