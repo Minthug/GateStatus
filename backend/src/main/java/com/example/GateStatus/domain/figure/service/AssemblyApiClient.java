@@ -1,5 +1,7 @@
 package com.example.GateStatus.domain.figure.service;
 
+import com.example.GateStatus.domain.career.Career;
+import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -14,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static com.example.GateStatus.domain.common.JsonUtils.getTextValue;
 import static com.example.GateStatus.domain.common.JsonUtils.isEmpty;
 
 @Service
@@ -151,5 +154,45 @@ public class AssemblyApiClient {
             throw new ApiDataRetrievalException("JSON 파싱 실패: " + e.getMessage());
         }
     }
-
+//
+//    private FigureInfoDTO parseFigureFromJsonNode(JsonNode row) {
+//        String figureId = getTextValue(row, "MONA_CD");
+//        String name = getTextValue(row, "HG_NM");
+//
+//        if (isEmpty(figureId)) {
+//            log.warn("유효하지 않은 figureId: {}", figureId);
+//            return null;
+//        }
+//
+//        if (isEmpty(name)) {
+//            log.warn("유효하지 않은 name: {}", name);
+//            return null;
+//        }
+//
+//        // 기본 정보 추출
+//        String englishName = getTextValue(row, "ENG_NM");
+//        String birth = getTextValue(row, "BTH_DATE");
+//        String partyNameStr = getTextValue(row, "POLY_NM");
+//        String constituency = getTextValue(row, "ORIG_NM");
+//        String committeeName = getTextValue(row, "CMIT_NM");
+//        String committeePosition = getTextValue(row, "JOB_RES_NM");
+//        String electedCount = getTextValue(row, "REELE_GBN_NM");
+//        String electedDate = getTextValue(row, "UNITS");
+//        String reelection = getTextValue(row, "REELE_GBN_NM");
+//        String email = getTextValue(row, "E_MAIL");
+//        String homepage = getTextValue(row, "HOMEPAGE");
+//
+//        FigureParty partyName = convertToFigureParty(partyNameStr);
+//
+//        List<String> education = parseEducation(row);
+//        List<Career> careers = parseCareers(row);
+//
+//        return new FigureInfoDTO(
+//                figureId, name, englishName, birth, partyName, constituency,
+//                committeeName, committeePosition, electedCount, electedDate,
+//                reelection, null,
+//                education,
+//                careers,
+//                email, homepage, null, null);
+//    }
 }

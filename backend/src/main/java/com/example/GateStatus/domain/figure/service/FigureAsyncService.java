@@ -1,6 +1,8 @@
 package com.example.GateStatus.domain.figure.service;
 
+import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.common.SyncJobStatus;
+import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import jakarta.persistence.EntityManager;
@@ -9,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -114,4 +117,135 @@ public class FigureAsyncService {
         }
         return batches;
     }
+//
+//
+//    /**
+//     *
+//     * @param figure
+//     * @return
+//     */
+//    private boolean processOneFigure(FigureInfoDTO figure) {
+//
+//        try {
+//            Boolean result = transactionTemplate.execute(status -> {
+//                try {
+//                    // 이 블록 내에서 실행되는 모든 데이터베이스 작업은 트랜잭션 내에서 실행됩니다
+//                    boolean exists = figureRepository.existsByFigureId(figure.figureId());
+//                    Figure figureEntity;
+//
+//                    if (exists) {
+//                        figureEntity = updateFigureBasicInfoJpa(figure);
+//                    } else {
+//                        figureEntity = insertFigureBasicInfoJpa(figure);
+//                    }
+//
+//                    if (figureEntity != null) {
+//                        updateCollectionsWithJpa(figureEntity, figure);
+//                    }
+//
+//                    return true;
+//                } catch (Exception e) {
+//                    log.error("국회의원 저장 중 오류: {} - {}", figure.name(), e.getMessage(), e);
+//                    status.setRollbackOnly();
+//                    return false;
+//                }
+//            });
+//
+//            return Boolean.TRUE.equals(result);
+//        } catch (Exception e) {
+//            log.error("국회의원 트랜잭션 처리 중 예외 발생: {} - {}", figure.name(), e.getMessage(), e);
+//            return false;
+//        }
+//    }
+//
+//
+//    private void updateCollectionsWithJpa(Figure figure, FigureInfoDTO dto) {
+//        try {
+//            // 이하 기존 코드와 동일
+//            // 컬렉션 초기화
+//            if (figure.getEducation() == null) {
+//                figure.setEducation(new ArrayList<>());
+//            } else {
+//                figure.getEducation().clear();
+//            }
+//
+//            if (figure.getCareers() == null) {
+//                figure.setCareers(new ArrayList<>());
+//            } else {
+//                figure.getCareers().clear();
+//            }
+//
+//            if (figure.getSites() == null) {
+//                figure.setSites(new ArrayList<>());
+//            } else {
+//                figure.getSites().clear();
+//            }
+//
+//            if (figure.getActivities() == null) {
+//                figure.setActivities(new ArrayList<>());
+//            } else {
+//                figure.getActivities().clear();
+//            }
+//
+//            if (dto.education() != null) {
+//                for (String education : dto.education()) {
+//                    if (education != null && !education.trim().isEmpty()) {
+//                        figure.getEducation().add(education.trim());
+//                    }
+//                }
+//            }
+//
+//            if (dto.electedCount() != null && !dto.electedCount().isEmpty()) {
+//                Career assemblyCareer = Career.builder()
+//                        .title(dto.electedCount() + "대 국회의원")
+//                        .position("국회의원")
+//                        .organization("대한민국 국회")
+//                        .period(dto.electedDate() != null ? dto.electedDate() + " ~ 현재" : "현재")
+//                        .build();
+//                figure.getCareers().add(assemblyCareer);
+//            }
+//
+//            if (dto.committeeName() != null && !dto.committeeName().isEmpty()) {
+//                String position = dto.committeePosition() != null ? dto.committeePosition() : "위원";
+//                Career committeeCareer = Career.builder()
+//                        .title("국회 " + dto.committeeName())
+//                        .position(position)
+//                        .organization(dto.committeeName())
+//                        .period("현재")
+//                        .build();
+//                figure.getCareers().add(committeeCareer);
+//            }
+//
+//            if (dto.career() != null && !dto.career().isEmpty()) {
+//                figure.getCareers().addAll(dto.career());
+//            }
+//
+//            if (dto.homepage() != null && !dto.homepage().trim().isEmpty()) {
+//                figure.getSites().add(dto.homepage().trim());
+//            }
+//
+//            // Add email as mailto: link if available
+//            if (dto.email() != null && !dto.email().trim().isEmpty()) {
+//                figure.getSites().add("mailto:" + dto.email().trim());
+//            }
+//
+//            // Update activities collection
+//            // Add elected info if available
+//            if (dto.electedCount() != null && !dto.electedCount().isEmpty()) {
+//                figure.getActivities().add(dto.electedCount() + "대 국회의원");
+//            }
+//
+//            // Add committee info if available
+//            if (dto.committeeName() != null && !dto.committeeName().isEmpty()) {
+//                String position = dto.committeePosition() != null ? dto.committeePosition() : "위원";
+//                figure.getActivities().add(dto.committeeName() + " " + position);
+//            }
+//
+//            figureRepository.save(figure);
+//            log.debug("컬렉션 정보 JPA 업데이트 완료: {}", dto.name());
+//        } catch (Exception e) {
+//            log.error("컬렉션 정보 JPA 업데이트 중 오류: {} - {}", dto.name(), e.getMessage(), e);
+//            throw e;
+//        }
+//    }
 }
