@@ -3,6 +3,7 @@ package com.example.GateStatus.domain.figure.service;
 import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.career.CareerDTO;
 import com.example.GateStatus.domain.career.CareerParser;
+import com.example.GateStatus.domain.common.JsonUtils;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.example.GateStatus.domain.common.JsonUtils.*;
 
@@ -272,24 +274,22 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
     private List<String> convertSites(FigureInfoDTO dto) {
         List<String> sites = new ArrayList<>();
 
-        addSiteIfNotEmpty(sites, dto.homepage());
-        addSiteIfNotEmpty(sites, dto.blog());
-        addSiteIfNotEmpty(sites, dto.facebook());
+        // URL들을 정규화해서 추가
+        Stream.of(dto.homepage(), dto.blog(), dto.facebook())
+                .filter(JsonUtils::isNotEmpty)
+                .map(this::normalizeUrl)
+                .forEach(sites::add);
 
-        // 이메일 주소는 mailto: 프로토콜로 추가
+        // 이메일은 정규화해서 mailto: 형식으로 추가
         if (isNotEmpty(dto.email())) {
-            sites.add("mailto:" + dto.email().trim());
+            String normalizedEmail = normalizeEmail(dto.email());
+            if (isNotEmpty(normalizedEmail)) {
+                sites.add("mailto:" + normalizedEmail);
+            }
         }
 
         return sites;
     }
-
-    private void addSiteIfNotEmpty(List<String> sites, String url) {
-        if (isNotEmpty(url)) {
-            sites.add(url.trim());
-        }
-    }
-
 
     private List<String> convertActivities(FigureInfoDTO dto) {
         List<String> activities = new ArrayList<>();
@@ -319,20 +319,20 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
     }
 
     private List<String> parseEducation(JsonNode row) {
+        Set<String> educationSet = new LinkedHashSet<>();
+
         String singleEdu = getTextValue(row, "EDU");
         if (isNotEmpty(singleEdu)) {
-            return Arrays.stream(singleEdu.split("\\n|\\r\\n|,|;"))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .collect(Collectors.toList());
+            safeSplit(singleEdu, "\\n|\\r\\n|,|;").forEach(educationSet::add);
         }
 
-        List<String> education = new ArrayList<>();
-        addNonEmptyEducation(education, getTextValue(row, "EDU1"));
-        addNonEmptyEducation(education, getTextValue(row, "EDU2"));
-        addNonEmptyEducation(education, getTextValue(row, "EDU3"));
+        // 개별 교육 필드들에서 추출
+        Stream.of("EDU1", "EDU2", "EDU3")
+                .map(field -> getTextValue(row, field))
+                .filter(JsonUtils::isNotEmpty)
+                .forEach(educationSet::add);
 
-        return education;
+        return new ArrayList<>(educationSet);
     }
 
     private void addNonEmptyEducation(List<String> education, String eduValue) {
@@ -362,5 +362,96 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
                 yield FigureParty.OTHER;
             }
         };
+    }
+
+    /**
+     * 안전한 문자열 분할
+     * @param text 분할할 텍스트
+     * @param delimiter 구분자
+     * @return 분할된 문자열 리스트
+     */
+    private List<String> safeSplit(String text, String delimiter) {
+        if (JsonUtils.isEmpty(text)) {
+            return new ArrayList<>();
+        }
+
+        return Arrays.stream(text.split(delimiter))
+                .map(String::trim)
+                .filter(JsonUtils::isNotEmpty)
+                .collect(Collectors.toList());
+    }
+
+
+    /**
+     * 전화번호 형식 정규화
+     * @param phoneNumber 원본 전화번호
+     * @return 정규화된 전화번호
+     */
+    private String normalizePhoneNumber(String phoneNumber) {
+        if (isEmpty(phoneNumber)) {
+            return "";
+        }
+
+        // 숫자만 추출
+        String numbersOnly = phoneNumber.replaceAll("[^0-9]", "");
+
+        // 형식에 맞춰 변환 (예: 02-1234-5678)
+        if (numbersOnly.length() >= 10) {
+            if (numbersOnly.startsWith("02")) {
+                return numbersOnly.replaceFirst("(\\d{2})(\\d{3,4})(\\d{4})", "$1-$2-$3");
+            } else if (numbersOnly.length() == 11) {
+                return numbersOnly.replaceFirst("(\\d{3})(\\d{4})(\\d{4})", "$1-$2-$3");
+            }
+        }
+
+        return phoneNumber;
+    }
+
+    /**
+     * URL 유효성 검사 및 정규화
+     * @param url 검사할 URL
+     * @return 유효한 URL 또는 빈 문자열
+     */
+    private String normalizeUrl(String url) {
+        if (isEmpty(url)) {
+            return "";
+        }
+
+        String trimmedUrl = url.trim();
+
+        // http:// 또는 https://가 없으면 추가
+        if (!trimmedUrl.startsWith("http://") && !trimmedUrl.startsWith("https://")) {
+            trimmedUrl = "https://" + trimmedUrl;
+        }
+
+        try {
+            // URL 유효성 검사
+            new java.net.URL(trimmedUrl);
+            return trimmedUrl;
+        } catch (Exception e) {
+            log.warn("URL 형식이 올바르지 않음: {}", url);
+            return url; // 원본 반환
+        }
+    }
+
+    /**
+     * 이메일 유효성 검사
+     * @param email 검사할 이메일
+     * @return 유효한 이메일 또는 빈 문자열
+     */
+    private String normalizeEmail(String email) {
+        if (isEmpty(email)) {
+            return "";
+        }
+
+        String trimmedEmail = email.trim().toLowerCase();
+
+        // 간단한 이메일 형식 검사
+        if (trimmedEmail.matches("^[A-Za-z0-9+_.-]+@([A-Za-z0-9.-]+\\.[A-Za-z]{2,})$")) {
+            return trimmedEmail;
+        }
+
+        log.warn("이메일 형식이 올바르지 않음: {}", email);
+        return email; // 원본 반환
     }
 }
