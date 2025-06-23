@@ -3,11 +3,13 @@ package com.example.GateStatus.domain.figure.service;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +59,7 @@ public class FigureApiService {
 
     /**
      * 모든 국회의원 정보를 비동기적으로 동기화합니다
+     *
      * @return 작업 ID (상태 추적용)
      */
     public String syncAllFiguresV4() {
@@ -110,6 +113,7 @@ public class FigureApiService {
 
 
     // ========== 통계 및 모니터링 메서드들 ==========
+
     /**
      * API 호출 상태 확인
      *
@@ -133,6 +137,7 @@ public class FigureApiService {
 
     /**
      * 동기화 가능한 총 국회의원 수 조회
+     *
      * @return 총 국회의원 수
      */
     public int getTotalAvailableFiguresCount() {
@@ -158,8 +163,50 @@ public class FigureApiService {
             long dbCount = figureRepository.count();
             int apiCount = getTotalAvailableFiguresCount();
 
-            status.put("dbCount", dbCount)
+            status.put("dbCount", dbCount);
+            status.put("apiCount", apiCount);
+            status.put("syncNeeded", apiCount > dbCount);
+            status.put("syncDifference", apiCount - dbCount);
+            status.put("lastChecked", LocalDateTime.now());
+
+            log.debug("동기화 상태: DB={}명, API={}명, 차이={}명",
+                    dbCount, apiCount, (apiCount - dbCount));
+        } catch (Exception e) {
+            log.error("동기화 상태 정보 조회 실패: {}", e.getMessage(), e);
+            status.put("error", e.getMessage());
+        }
+        return status;
+    }
+
+    // ========== 캐시 관련 편의 메서드들 ==========
+
+    public void refreshFigureCache(String figureId) {
+        log.info("국회의원 캐시 갱신: figureId={}", figureId);
+
+        try {
+            Figure figure = figureRepository.findByFigureId(figureId)
+                    .orElseThrow(() -> new EntityNotFoundException("Figure not found: " + figureId));
+
+            cacheService.updateFigureCache(figure);
+            log.info("국회의원 캐시 갱신 완료: figureId={} ", figureId);
+        } catch (Exception e) {
+            log.error("국회의원 캐시 갱신 실패: figureId={}, 오류={}", figureId, e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    public void clearAllFigureCache() {
+        log.info("모든 국회의원 캐시 삭제");
+
+        try {
+            cacheService.evictFigureCache("figure:*");
+            log.info("모든 국회의원 캐시 삭제 완료");
+
+        } catch (Exception e) {
+            log.error("모든 국회의원 캐시 삭제 실패: {}", e.getMessage(), e);
+            throw e;
         }
     }
 }
+
 
