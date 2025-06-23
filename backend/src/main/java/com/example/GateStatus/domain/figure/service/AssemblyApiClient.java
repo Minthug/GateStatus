@@ -112,7 +112,7 @@ public class AssemblyApiClient {
         }
     }
 
-    private List<FigureInfoDTO> fetchFiguresPage(int pageNo, int pageSize) {
+    public List<FigureInfoDTO> fetchFiguresPage(int pageNo, int pageSize) {
         String jsonResponse = assemblyWebClient.get()
                     .uri(uriBuilder -> uriBuilder
                     .path   (figureApiPath)

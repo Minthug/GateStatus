@@ -2,10 +2,15 @@ package com.example.GateStatus.domain.figure.service;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -89,5 +94,72 @@ public class FigureApiService {
         }
     }
 
+//    @Transactional
+//    public Figure syncSingleFigure(Figure figure, FigureInfoDTO infoDTO) {
+//        log.info("단일 국회의원 정보 동기화: {}", infoDTO.name());
+//
+//        try {
+//            Figure result = syncService.syncSingleFigure(figure, infoDTO);
+//            log.info("단일 국회의원 정보 동기화 성공: {}", infoDTO.name());
+//            return result;
+//        } catch (Exception e) {
+//            log.error("단일 국회의원 정보 동기화 실패: {} - {}", infoDTO.name(), e.getMessage(), e);
+//            throw e;
+//        }
+//    }
+
+
+    // ========== 통계 및 모니터링 메서드들 ==========
+    /**
+     * API 호출 상태 확인
+     *
+     * @return API 서버 응답 가능 여부
+     */
+    public boolean checkApiHealth() {
+        log.debug("API 서버 상태 확인");
+
+        try {
+            // 간단한 API 호출로 상태 확인
+            List<FigureInfoDTO> testResult = apiClient.fetchFiguresPage(1, 1);
+            boolean isHealthy = testResult != null;
+            log.debug("API 서버 상태: {}", isHealthy ? "정상" : "비정상");
+            return isHealthy;
+        } catch (Exception e) {
+            log.warn("API 서버 상태 확인 실패: {}", e.getMessage());
+            return false;
+        }
+    }
+
+
+    /**
+     * 동기화 가능한 총 국회의원 수 조회
+     * @return 총 국회의원 수
+     */
+    public int getTotalAvailableFiguresCount() {
+        log.debug("동기화 가능한 총 국회의원 수 조회");
+
+        try {
+            List<FigureInfoDTO> allFigures = apiClient.fetchAllFigures();
+            int count = allFigures.size();
+            log.debug("동기화 가능한 총 국회의원 수: {}명", count);
+            return count;
+        } catch (Exception e) {
+            log.error("총 국회의원 수 조회 실패: {}", e.getMessage(), e);
+            return 0;
+        }
+    }
+
+    public Map<String, Object> getSyncStatus() {
+        log.debug("동기화 상태 정보 조회");
+
+        Map<String, Object> status = new HashMap<>();
+
+        try {
+            long dbCount = figureRepository.count();
+            int apiCount = getTotalAvailableFiguresCount();
+
+            status.put("dbCount", dbCount)
+        }
+    }
 }
 
