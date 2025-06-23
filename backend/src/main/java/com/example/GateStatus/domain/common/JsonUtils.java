@@ -2,6 +2,7 @@ package com.example.GateStatus.domain.common;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -20,6 +21,7 @@ public class JsonUtils {
      * @return
      */
     public static String getTextValue(JsonNode node, String fieldName) {
+        if (node == null) return "";
         JsonNode field = node.get(fieldName);
         return (field != null && !field.isNull()) ? field.asText().trim() : "";
     }
@@ -31,6 +33,7 @@ public class JsonUtils {
      * @return
      */
     public static int getIntValue(JsonNode node, String fieldName) {
+        if (node == null) return 0;
         JsonNode field = node.get(fieldName);
         if (field == null || field.isNull()) {
             return 0;
@@ -50,6 +53,7 @@ public class JsonUtils {
      * @return
      */
     public static boolean getBooleanValue(JsonNode node, String fieldName) {
+        if (node == null) return false;
         JsonNode field = node.get(fieldName);
         return field != null && !field.isNull() && field.asBoolean();
     }
@@ -61,6 +65,7 @@ public class JsonUtils {
      * @return
      */
     public static double getDoubleValue(JsonNode node, String fieldName) {
+        if (node == null) return 0.0;
         JsonNode field = node.get(fieldName);
         if (field != null || field.isNull()) {
             return 0.0;
@@ -74,6 +79,7 @@ public class JsonUtils {
     }
 
     public static long getLongValue(JsonNode node, String fieldName) {
+        if (node == null) return 0L;
         JsonNode field = node.get(fieldName);
         if (field == null || field.isNull()) {
             return 0L;
@@ -85,6 +91,8 @@ public class JsonUtils {
             return 0L;
         }
     }
+
+    // ========== 컬렉션 추출 메서드 ==========
 
     public static List<String> getStringListValue(JsonNode node, String fieldName) {
         String text = getTextValue(node, fieldName);
@@ -98,17 +106,40 @@ public class JsonUtils {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Json 필드 존재 여부 확인
-     * @param node
-     * @param fieldName
-     * @return
-     */
-    public static boolean hasField(JsonNode node, String fieldName) {
-        return node.has(fieldName) && !node.get(fieldName).isNull();
+    public static List<String> getStringListValue(JsonNode node, String fieldName, String delimiters) {
+        String text = getTextValue(node, fieldName);
+        if (isEmpty(text)) {
+            return Collections.emptyList();
+        }
+
+        return Arrays.stream(text.split(delimiters))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .distinct() // 중복 제거
+                .collect(Collectors.toList());
     }
 
+    public static List<String> getArrayAsStringList(JsonNode node, String fieldName) {
+        if (node == null) return Collections.emptyList();
 
+        JsonNode arrayNode = node.get(fieldName);
+        if (arrayNode == null || !arrayNode.isArray()) {
+            return Collections.emptyList();
+        }
+
+        List<String> result = new ArrayList<>();
+        for (JsonNode item : arrayNode) {
+            if (item != null && !item.isNull()) {
+                String value = item.asText().trim();
+                if (!value.isEmpty()) {
+                    result.add(value);
+                }
+            }
+        }
+        return result;
+    }
+
+    // ========== 고급 추출 메서드 ==========
     public static String getNestedTextValue(JsonNode node, String... paths) {
         JsonNode current = node;
         for (String path : paths) {
@@ -131,6 +162,38 @@ public class JsonUtils {
             return null;
         }
         return arrayNode.get(index);
+    }
+
+    /**
+     * 조건에 맞는 배열 요소 찾기
+     * @param arrayNode 배열 노드
+     * @param fieldName 비교할 필드명
+     * @param value 찾을 값
+     * @return 조건에 맞는 첫 번째 노드 (없으면 null)
+     */
+    public static JsonNode findArrayElement(JsonNode arrayNode, String fieldName, String value) {
+        if (arrayNode == null || !arrayNode.isArray()) {
+            return null;
+        }
+
+        for (JsonNode item : arrayNode) {
+            if (value.equals(getTextValue(item, fieldName))) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    // ========== 검증 메서드 ==========
+
+    /**
+     * Json 필드 존재 여부 확인
+     * @param node
+     * @param fieldName
+     * @return
+     */
+    public static boolean hasField(JsonNode node, String fieldName) {
+        return node.has(fieldName) && !node.get(fieldName).isNull();
     }
 
     public static boolean isEmpty(String str) {
