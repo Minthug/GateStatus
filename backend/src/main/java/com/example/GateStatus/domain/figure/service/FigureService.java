@@ -32,7 +32,7 @@ public class FigureService {
 
     private final FigureRepository figureRepository;
     private final FigureApiService figureApiService;
-    private final FigureCacheService figureCacheService;
+//    private final FigureCacheService figureCacheService;
     private final CacheManager cacheManager;
     private final StatementSyncService syncService;
 
@@ -41,55 +41,55 @@ public class FigureService {
      * @param command
      * @return
      */
-    @Transactional
-    public RegisterFigureResponse getRegisterFigure(final RegisterFigureCommand command) {
-        Figure findFigure = figureRepository.findByName(command.name())
-                .orElseGet(() -> {
-                    log.info("신규 국회의원 등록: {}", command.name());
-                    Figure figure = Figure.builder()
-                            .name(command.name())
-                            .englishName(command.englishName())
-                            .birth(command.birth())
-                            .constituency(command.constituency())
-                            .profileUrl(command.profileUrl())
-                            .figureType(command.figureType())
-                            .education(command.education())
-                            .careers(command.careers())
-                            .sites(command.sites())
-                            .activities(command.activities())
-                            .updateSource(command.updateSource())
-                            .build();
-                    Figure savedFigure = figureRepository.save(figure);
-                    if (savedFigure.getFigureId() != null) {
-                        figureCacheService.updateFigureCache(savedFigure);
-                    }
-
-                    return savedFigure;
-                });
-        return RegisterFigureResponse.from(findFigure);
-    }
+//    @Transactional
+//    public RegisterFigureResponse getRegisterFigure(final RegisterFigureCommand command) {
+//        Figure findFigure = figureRepository.findByName(command.name())
+//                .orElseGet(() -> {
+//                    log.info("신규 국회의원 등록: {}", command.name());
+//                    Figure figure = Figure.builder()
+//                            .name(command.name())
+//                            .englishName(command.englishName())
+//                            .birth(command.birth())
+//                            .constituency(command.constituency())
+//                            .profileUrl(command.profileUrl())
+//                            .figureType(command.figureType())
+//                            .education(command.education())
+//                            .careers(command.careers())
+//                            .sites(command.sites())
+//                            .activities(command.activities())
+//                            .updateSource(command.updateSource())
+//                            .build();
+//                    Figure savedFigure = figureRepository.save(figure);
+//                    if (savedFigure.getFigureId() != null) {
+//                        figureCacheService.updateFigureCache(savedFigure);
+//                    }
+//
+//                    return savedFigure;
+//                });
+//        return RegisterFigureResponse.from(findFigure);
+//    }
 
     /**
      * 국회의원 상세 정보 조회
      * @param command
      * @return
      */
-    @Transactional(readOnly = true)
-    public FindFigureDetailResponse findFigure(FindFigureCommand command) {
-        if (command.figureId() == null || command.figureId().isEmpty()) {
-            throw new IllegalArgumentException("국회의원 ID는 필수 값입니다");
-        }
-
-        log.debug("조회 시도 figureId: {}", command.figureId());
-
-        try {
-            Figure findFigure = figureCacheService.findFigureById(command.figureId());
-            return FindFigureDetailResponse.from(findFigure);
-        } catch (EntityNotFoundException e) {
-            log.warn("국회의원 정보 조회 실패: {}", command.figureId());
-            throw e;
-        }
-    }
+//    @Transactional(readOnly = true)
+//    public FindFigureDetailResponse findFigure(FindFigureCommand command) {
+//        if (command.figureId() == null || command.figureId().isEmpty()) {
+//            throw new IllegalArgumentException("국회의원 ID는 필수 값입니다");
+//        }
+//
+//        log.debug("조회 시도 figureId: {}", command.figureId());
+//
+//        try {
+//            Figure findFigure = figureCacheService.findFigureById(command.figureId());
+//            return FindFigureDetailResponse.from(findFigure);
+//        } catch (EntityNotFoundException e) {
+//            log.warn("국회의원 정보 조회 실패: {}", command.figureId());
+//            throw e;
+//        }
+//    }
 
     /**
      * 캐시 상태 확인 (모니터링 용도)
@@ -139,19 +139,19 @@ public class FigureService {
      * @param figureId
      * @return
      */
-    @Transactional(readOnly = true)
-    public FigureDTO findFigureById(String figureId) {
-        if (figureId == null || figureId.isEmpty()) {
-            throw new IllegalArgumentException("국회의원 ID는 필수 값입니다");
-        }
-
-        try {
-            return figureCacheService.findFigureDtoById(figureId);
-        } catch (EntityNotFoundException e) {
-            log.warn("국회의원 정보 조회 실패: {}", figureId);
-            throw e;
-        }
-    }
+//    @Transactional(readOnly = true)
+//    public FigureDTO findFigureById(String figureId) {
+//        if (figureId == null || figureId.isEmpty()) {
+//            throw new IllegalArgumentException("국회의원 ID는 필수 값입니다");
+//        }
+//
+//        try {
+//            return figureCacheService.findFigureDtoById(figureId);
+//        } catch (EntityNotFoundException e) {
+//            log.warn("국회의원 정보 조회 실패: {}", figureId);
+//            throw e;
+//        }
+//    }
 
     /**
      * 타입별 국회의원 목록 조회
@@ -172,62 +172,62 @@ public class FigureService {
                 .collect(Collectors.toList());
     }
 
-    @Transactional
-    public UpdateFigureResponse updateFigure(String figureId, UpdateFigureCommand command) {
-        if (figureId == null || figureId.isEmpty()) {
-            throw new IllegalArgumentException("국회의원 ID는 필수 값 입니다");
-        }
+//    @Transactional
+//    public UpdateFigureResponse updateFigure(String figureId, UpdateFigureCommand command) {
+//        if (figureId == null || figureId.isEmpty()) {
+//            throw new IllegalArgumentException("국회의원 ID는 필수 값 입니다");
+//        }
+//
+//        log.info("국회의원 정보 업데이트: {}", figureId);
+//        Figure figure = figureRepository.findByFigureId(figureId)
+//                .orElseThrow(() -> new NotFoundFigureException("국회의원을 찾을 수 없습니다" + figureId));
+//
+//        figure.update(
+//                command.name(),
+//                command.englishName(),
+//                command.birth(),
+//                command.constituency(), // place 대신 constituency 사용
+//                command.profileUrl(),
+//                command.figureType(),
+//                command.figureParty(),
+//                command.education(),
+//                command.careers(),
+//                command.sites(),
+//                command.activities(),
+//                command.updateSource()
+//        );
+//
+//        Figure updateFigure = figureRepository.save(figure);
+//
+//        figureCacheService.updateFigureCache(updateFigure);
+//        log.debug("국회의원 정보 업데이트 완료: {}", updateFigure.getName());
+//
+//        return UpdateFigureResponse.from(updateFigure);
+//    }
 
-        log.info("국회의원 정보 업데이트: {}", figureId);
-        Figure figure = figureRepository.findByFigureId(figureId)
-                .orElseThrow(() -> new NotFoundFigureException("국회의원을 찾을 수 없습니다" + figureId));
 
-        figure.update(
-                command.name(),
-                command.englishName(),
-                command.birth(),
-                command.constituency(), // place 대신 constituency 사용
-                command.profileUrl(),
-                command.figureType(),
-                command.figureParty(),
-                command.education(),
-                command.careers(),
-                command.sites(),
-                command.activities(),
-                command.updateSource()
-        );
-
-        Figure updateFigure = figureRepository.save(figure);
-
-        figureCacheService.updateFigureCache(updateFigure);
-        log.debug("국회의원 정보 업데이트 완료: {}", updateFigure.getName());
-
-        return UpdateFigureResponse.from(updateFigure);
-    }
-
-
-    @Transactional
-    public void deleteFigure(String figureId) {
-        if (figureId == null || figureId.isEmpty()) {
-            throw new IllegalArgumentException("국회의원 ID는 필수 값입니다");
-        }
-
-        log.info("국회의원 정보 삭제: {}", figureId);
-        Figure figure = figureRepository.findByFigureId(figureId)
-                .orElseThrow(() -> new EntityNotFoundException("해당 국회의원을 찾을 수 없습니다: " + figureId));
-
-        figureRepository.delete(figure);
-        figureCacheService.evictFigureCache(figureId);
-    }
-
-    @Transactional(readOnly = true)
-    public List<FindFigureDetailResponse> getPopularFigures(int limit) {
-        log.debug("인기 국회의원 조회: limit={}", limit);
-        return figureCacheService.getPopularFigures(limit)
-                .stream()
-                .map(FindFigureDetailResponse::from)
-                .collect(Collectors.toList());
-    }
+//    @Transactional
+//    public void deleteFigure(String figureId) {
+//        if (figureId == null || figureId.isEmpty()) {
+//            throw new IllegalArgumentException("국회의원 ID는 필수 값입니다");
+//        }
+//
+//        log.info("국회의원 정보 삭제: {}", figureId);
+//        Figure figure = figureRepository.findByFigureId(figureId)
+//                .orElseThrow(() -> new EntityNotFoundException("해당 국회의원을 찾을 수 없습니다: " + figureId));
+//
+//        figureRepository.delete(figure);
+//        figureCacheService.evictFigureCache(figureId);
+//    }
+//
+//    @Transactional(readOnly = true)
+//    public List<FindFigureDetailResponse> getPopularFigures(int limit) {
+//        log.debug("인기 국회의원 조회: limit={}", limit);
+//        return figureCacheService.getPopularFigures(limit)
+//                .stream()
+//                .map(FindFigureDetailResponse::from)
+//                .collect(Collectors.toList());
+//    }
 
     @Transactional(readOnly = true)
     public FigureDTO findFigureByName(String name) {
@@ -257,18 +257,6 @@ public class FigureService {
         return null;
     }
 
-    /**
-     * API에서 국회의원 정보 동기화
-     */
-    @Transactional
-    public Figure syncFromApi(String name) {
-        if (name == null || name.isEmpty()) {
-            throw new IllegalArgumentException("국회의원 이름은 필수 값입니다");
-        }
-
-        log.info("API에서 국회의원 정보 동기화: {}", name);
-        return figureApiService.syncFigureInfoByName(name);
-    }
 
     @Transactional
     public Figure ensureFigureExists(String figureName, boolean forceSync, boolean syncStatements) {
@@ -317,5 +305,4 @@ public class FigureService {
     public Figure ensureFigureExists(String figureName) {
         return ensureFigureExists(figureName, false, false);
     }
-
 }

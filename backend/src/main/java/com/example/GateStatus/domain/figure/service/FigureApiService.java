@@ -3,16 +3,12 @@ package com.example.GateStatus.domain.figure.service;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @Slf4j
@@ -23,7 +19,7 @@ public class FigureApiService {
     private final FigureSyncService syncService;
     private final FigureAsyncService asyncService;
     private final FigureRepository figureRepository;
-    private final FigureCacheService cacheService;
+//    private final FigureCacheService cacheService;
 
     @Transactional
     public Figure syncFigureInfoByName(String figureName) {
@@ -97,113 +93,46 @@ public class FigureApiService {
         }
     }
 
-//    @Transactional
-//    public Figure syncSingleFigure(Figure figure, FigureInfoDTO infoDTO) {
-//        log.info("단일 국회의원 정보 동기화: {}", infoDTO.name());
-//
-//        try {
-//            Figure result = syncService.syncSingleFigure(figure, infoDTO);
-//            log.info("단일 국회의원 정보 동기화 성공: {}", infoDTO.name());
-//            return result;
-//        } catch (Exception e) {
-//            log.error("단일 국회의원 정보 동기화 실패: {} - {}", infoDTO.name(), e.getMessage(), e);
-//            throw e;
-//        }
-//    }
-
-
-    // ========== 통계 및 모니터링 메서드들 ==========
+    // ========== 추가 편의 메서드들 ==========
 
     /**
-     * API 호출 상태 확인
+     * 특정 이름의 국회의원 정보를 API에서 조회만 (동기화 안 함)
      *
-     * @return API 서버 응답 가능 여부
+     * @param figureName 국회의원 이름
+     * @return 국회의원 정보 DTO (없으면 null)
      */
-    public boolean checkApiHealth() {
-        log.debug("API 서버 상태 확인");
+    public FigureInfoDTO fetchFigureByName(String figureName) {
+        log.info("국회의원 정보 API 조회 (동기화 안 함): {}", figureName);
 
         try {
-            // 간단한 API 호출로 상태 확인
-            List<FigureInfoDTO> testResult = apiClient.fetchFiguresPage(1, 1);
-            boolean isHealthy = testResult != null;
-            log.debug("API 서버 상태: {}", isHealthy ? "정상" : "비정상");
-            return isHealthy;
+            FigureInfoDTO figure = apiClient.fetchFigureByName(figureName);
+            if (figure != null) {
+                log.info("국회의원 정보 API 조회 성공: {}", figureName);
+            } else {
+                log.warn("국회의원 정보 API 조회 결과 없음: {}", figureName);
+            }
+            return figure;
         } catch (Exception e) {
-            log.warn("API 서버 상태 확인 실패: {}", e.getMessage());
-            return false;
-        }
-    }
-
-
-    /**
-     * 동기화 가능한 총 국회의원 수 조회
-     *
-     * @return 총 국회의원 수
-     */
-    public int getTotalAvailableFiguresCount() {
-        log.debug("동기화 가능한 총 국회의원 수 조회");
-
-        try {
-            List<FigureInfoDTO> allFigures = apiClient.fetchAllFigures();
-            int count = allFigures.size();
-            log.debug("동기화 가능한 총 국회의원 수: {}명", count);
-            return count;
-        } catch (Exception e) {
-            log.error("총 국회의원 수 조회 실패: {}", e.getMessage(), e);
-            return 0;
-        }
-    }
-
-    public Map<String, Object> getSyncStatus() {
-        log.debug("동기화 상태 정보 조회");
-
-        Map<String, Object> status = new HashMap<>();
-
-        try {
-            long dbCount = figureRepository.count();
-            int apiCount = getTotalAvailableFiguresCount();
-
-            status.put("dbCount", dbCount);
-            status.put("apiCount", apiCount);
-            status.put("syncNeeded", apiCount > dbCount);
-            status.put("syncDifference", apiCount - dbCount);
-            status.put("lastChecked", LocalDateTime.now());
-
-            log.debug("동기화 상태: DB={}명, API={}명, 차이={}명",
-                    dbCount, apiCount, (apiCount - dbCount));
-        } catch (Exception e) {
-            log.error("동기화 상태 정보 조회 실패: {}", e.getMessage(), e);
-            status.put("error", e.getMessage());
-        }
-        return status;
-    }
-
-    // ========== 캐시 관련 편의 메서드들 ==========
-
-    public void refreshFigureCache(String figureId) {
-        log.info("국회의원 캐시 갱신: figureId={}", figureId);
-
-        try {
-            Figure figure = figureRepository.findByFigureId(figureId)
-                    .orElseThrow(() -> new EntityNotFoundException("Figure not found: " + figureId));
-
-            cacheService.updateFigureCache(figure);
-            log.info("국회의원 캐시 갱신 완료: figureId={} ", figureId);
-        } catch (Exception e) {
-            log.error("국회의원 캐시 갱신 실패: figureId={}, 오류={}", figureId, e.getMessage(), e);
+            log.error("국회의원 정보 API 조회 실패: {} - {}", figureName, e.getMessage(), e);
             throw e;
         }
     }
 
-    public void clearAllFigureCache() {
-        log.info("모든 국회의원 캐시 삭제");
+    /**
+     * 특정 정당 소속 국회의원 정보를 API에서 조회만 (동기화 안 함)
+     *
+     * @param partyName 정당명
+     * @return 국회의원 정보 DTO 목록
+     */
+    public List<FigureInfoDTO> fetchFiguresByParty(String partyName) {
+        log.info("{}당 소속 국회의원 정보 API 조회 (동기화 안 함)", partyName);
 
         try {
-            cacheService.evictFigureCache("figure:*");
-            log.info("모든 국회의원 캐시 삭제 완료");
-
+            List<FigureInfoDTO> figures = apiClient.fetchFiguresByParty(partyName);
+            log.info("{}당 소속 국회의원 정보 API 조회 완료: {}명", partyName, figures.size());
+            return figures;
         } catch (Exception e) {
-            log.error("모든 국회의원 캐시 삭제 실패: {}", e.getMessage(), e);
+            log.error("{}당 소속 국회의원 정보 API 조회 실패: {} - {}", partyName, e.getMessage(), e);
             throw e;
         }
     }

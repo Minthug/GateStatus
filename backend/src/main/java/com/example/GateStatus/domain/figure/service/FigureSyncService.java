@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @RequiredArgsConstructor
 @Service
@@ -23,7 +24,7 @@ public class FigureSyncService {
     private final AssemblyApiClient apiClient;
     private final FigureRepository figureRepository;
     private final FigureMapper figureMapper;
-    private final FigureCacheService cacheService;
+//    private final FigureCacheService cacheService;
 
     @Transactional
     public Figure syncFigureByName(String figureName) {
@@ -34,18 +35,25 @@ public class FigureSyncService {
             throw new EntityNotFoundException("해당 이름의 정치인을 찾을 수 없습니다: " + figureName);
         }
 
+        // figureId 처리 (기존 로직과 동일)
+        if (info.figureId() == null || info.figureId().isEmpty()) {
+            log.warn("API에서 가져온 figureId가 null입니다. 임시 ID를 생성합니다.");
+            String tempId = "TEMP_" + UUID.randomUUID().toString();
+
+            info = new FigureInfoDTO(
+                    tempId, info.name(), info.englishName(), info.birth(),
+                    info.partyName(), info.constituency(), info.committeeName(),
+                    info.committeePosition(), info.electedCount(), info.electedDate(),
+                    info.reelection(), info.profileUrl(), info.education(),
+                    info.career(), info.email(), info.homepage(), info.blog(), info.facebook()
+            );
+        }
+
         Figure figure = figureRepository.findByName(figureName)
                 .orElseGet(() -> createNewFigure(figureName));
 
         figureMapper.updateFigureFromDTO(figure, info);
-        Figure savedFigure= figureRepository.save(figure);
-
-        if (savedFigure.getFigureId() != null) {
-            cacheService.updateFigureCache(savedFigure);
-        }
-
-        log.info("국회의원 정보 동기화 완료: {}", figureName);
-        return savedFigure;
+        return figureRepository.save(figure);
     }
 
     @Transactional
@@ -107,7 +115,6 @@ public class FigureSyncService {
         figureMapper.updateFigureFromDTO(figure, figureInfoDTO);
         figureRepository.save(figure);
     }
-//
 //    /**
 //     * 단일 국회의원 저장 메서드 (별도 트랜잭션으로 분리)
 //     */

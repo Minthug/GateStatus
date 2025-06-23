@@ -1,7 +1,6 @@
 package com.example.GateStatus.domain.figure.service;
 
 import com.example.GateStatus.domain.common.SyncJobStatus;
-import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -103,8 +102,7 @@ public class FigureAsyncService {
         }
         return batches;
     }
-//
-//
+
 //    /**
 //     *
 //     * @param figure

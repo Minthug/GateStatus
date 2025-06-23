@@ -75,7 +75,7 @@ public class AssemblyApiClient {
                     break;
                 }
 
-                allFigures.addAll(allFigures);
+                allFigures.addAll(pageFigures);
                 log.info("페이지 {} 완료: {}명", pageNo, pageFigures.size());
                 if (pageFigures.size() < 100) {
                     log.info("마지막 페이지 도달: {}", pageNo);
@@ -103,32 +103,28 @@ public class AssemblyApiClient {
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
-            List<FigureInfoDTO> figures = parseApiResponse(jsonResponse);
-            log.info("{}당 소속 국회의원 정보 API 호출 완료: {}명", partyName, figures.size());
-            return figures;
+            return parseApiResponse(jsonResponse);
         } catch (Exception e) {
             log.error("정당별 API 호출 실패: {} - {}", partyName, e.getMessage(), e);
             throw new ApiDataRetrievalException("정당별 API 호출 실패: " + e.getMessage());
         }
     }
 
-    public List<FigureInfoDTO> fetchFiguresPage(int pageNo, int pageSize) {
+    private List<FigureInfoDTO> fetchFiguresPage(int pageNo, int pageSize) {
         String jsonResponse = assemblyWebClient.get()
                     .uri(uriBuilder -> uriBuilder
-                    .path   (figureApiPath)
-                    .queryParam("KEY", apiKey)
-                    .queryParam("Type", "json")
-                    .queryParam("pIndex", pageNo)
-                    .queryParam("pSize", pageSize)
-                    .build())
+                            .path(figureApiPath)
+                            .queryParam("KEY", apiKey)
+                            .queryParam("Type", "json")
+                            .queryParam("pIndex", pageNo)
+                            .queryParam("pSize", pageSize)
+                            .build())
                 .retrieve()
                 .bodyToMono(String.class)
                 .block();
 
         return parseApiResponse(jsonResponse);
-
     }
-
 
     private List<FigureInfoDTO> parseApiResponse(String jsonResponse) {
         if (isEmpty(jsonResponse)) {
@@ -142,16 +138,14 @@ public class AssemblyApiClient {
                     .path("row");
 
             if (!rowsNode.isArray()) {
-                log.warn("API 응답에서 row 배열을 찾을 수 없음");
                 return Collections.emptyList();
             }
             return figureMapper.mapFromJsonNode(rowsNode);
         } catch (Exception e) {
-            log.error("JSON 파싱 실패: {}", e.getMessage(), e);
             throw new ApiDataRetrievalException("JSON 파싱 실패: " + e.getMessage());
         }
     }
-//
+
 //    private FigureInfoDTO parseFigureFromJsonNode(JsonNode row) {
 //        String figureId = getTextValue(row, "MONA_CD");
 //        String name = getTextValue(row, "HG_NM");
