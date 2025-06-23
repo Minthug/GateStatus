@@ -1,16 +1,16 @@
 package com.example.GateStatus.domain.statement.controller;
 
 import com.example.GateStatus.domain.figure.Figure;
-import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.figure.service.FigureApiService;
-import com.example.GateStatus.domain.figure.service.FigureService;
+import com.example.GateStatus.domain.figure.service.core.FigureService;
 import com.example.GateStatus.domain.statement.entity.StatementType;
-import com.example.GateStatus.domain.statement.service.*;
+import com.example.GateStatus.domain.statement.service.SearchType;
+import com.example.GateStatus.domain.statement.service.StatementApiService;
+import com.example.GateStatus.domain.statement.service.StatementRelevanceService;
+import com.example.GateStatus.domain.statement.service.StatementService;
 import com.example.GateStatus.domain.statement.service.response.CombinedSearchResult;
 import com.example.GateStatus.domain.statement.service.response.StatementResponse;
 import com.example.GateStatus.domain.statement.service.response.StatementSearchCriteria;
 import com.example.GateStatus.global.config.open.ApiResponse;
-import com.example.GateStatus.global.config.redis.RedisCacheService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.swing.plaf.nimbus.State;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -33,12 +32,6 @@ import java.util.List;
 public class StatementController {
 
     private final StatementService statementService;
-    private final StatementApiService apiService;
-    private final StatementApiMapper apiMapper;
-    private final RedisCacheService cacheService;
-    private final StatementSyncService statementSyncService;
-    private final FigureRepository figureRepository;
-    private final FigureApiService figureApiService;
     private final StatementRelevanceService relevanceService;
     private final FigureService figureService;
     private final StatementApiService statementApiService;

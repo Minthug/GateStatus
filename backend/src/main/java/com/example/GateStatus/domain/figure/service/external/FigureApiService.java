@@ -1,4 +1,4 @@
-package com.example.GateStatus.domain.figure.service;
+package com.example.GateStatus.domain.figure.service.external;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;

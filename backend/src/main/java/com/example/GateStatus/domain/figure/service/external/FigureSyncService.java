@@ -1,15 +1,15 @@
-package com.example.GateStatus.domain.figure.service;
+package com.example.GateStatus.domain.figure.service.external;
 
 import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
+import com.example.GateStatus.domain.figure.service.FigureMapper;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;

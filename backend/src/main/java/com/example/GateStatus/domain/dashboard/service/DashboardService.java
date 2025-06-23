@@ -3,7 +3,7 @@ package com.example.GateStatus.domain.dashboard.service;
 import com.example.GateStatus.domain.dashboard.dto.response.*;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.figure.service.FigureApiService;
+import com.example.GateStatus.domain.figure.service.external.FigureApiService;
 import com.example.GateStatus.domain.figure.service.response.FigureDTO;
 import com.example.GateStatus.domain.proposedBill.repository.ProposedBillRepository;
 import com.example.GateStatus.domain.statement.repository.StatementMongoRepository;

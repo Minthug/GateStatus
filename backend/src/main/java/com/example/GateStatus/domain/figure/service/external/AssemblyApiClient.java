@@ -1,5 +1,6 @@
-package com.example.GateStatus.domain.figure.service;
+package com.example.GateStatus.domain.figure.service.external;
 
+import com.example.GateStatus.domain.figure.service.FigureMapper;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;
 import com.example.GateStatus.global.config.exception.ApiDataRetrievalException;
 import com.fasterxml.jackson.databind.JsonNode;

@@ -4,7 +4,7 @@ import com.example.GateStatus.domain.common.SyncJobStatus;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.figure.service.FigureApiService;
+import com.example.GateStatus.domain.figure.service.external.FigureApiService;
 import com.example.GateStatus.domain.statement.entity.StatementType;
 import com.example.GateStatus.domain.statement.exception.StatementSyncException;
 import com.example.GateStatus.domain.statement.mongo.StatementDocument;

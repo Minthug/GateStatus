@@ -1,4 +1,4 @@
-package com.example.GateStatus.domain.figure.service;
+package com.example.GateStatus.domain.figure.service.external;
 
 import com.example.GateStatus.domain.common.SyncJobStatus;
 import com.example.GateStatus.domain.figure.service.response.FigureInfoDTO;

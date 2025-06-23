@@ -1,16 +1,11 @@
-package com.example.GateStatus.domain.figure.service;
+package com.example.GateStatus.domain.figure.service.core;
 
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureType;
-import com.example.GateStatus.domain.figure.exception.NotFoundFigureException;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
-import com.example.GateStatus.domain.figure.service.request.FindFigureCommand;
-import com.example.GateStatus.domain.figure.service.request.RegisterFigureCommand;
-import com.example.GateStatus.domain.figure.service.request.UpdateFigureCommand;
+import com.example.GateStatus.domain.figure.service.external.FigureApiService;
 import com.example.GateStatus.domain.figure.service.response.FigureDTO;
 import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
-import com.example.GateStatus.domain.figure.service.response.RegisterFigureResponse;
-import com.example.GateStatus.domain.figure.service.response.UpdateFigureResponse;
 import com.example.GateStatus.domain.statement.service.StatementSyncService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +27,7 @@ public class FigureService {
 
     private final FigureRepository figureRepository;
     private final FigureApiService figureApiService;
-//    private final FigureCacheService figureCacheService;
+    private final FigureCacheService figureCacheService;
     private final CacheManager cacheManager;
     private final StatementSyncService syncService;
 
