@@ -1,12 +1,17 @@
 package com.example.GateStatus.domain.figure.service.core;
 
 import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.figure.FigureParty;
+import com.example.GateStatus.domain.figure.service.request.FigureSearchRequest;
 import com.example.GateStatus.domain.figure.service.response.FigureDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -42,7 +47,43 @@ public class FigureService {
     }
 
     @Transactional(readOnly = true)
-    public Page<FigureDTO> getFigures() {
+    public Page<FigureDTO> getFigures(FigureSearchRequest request) {
+        log.debug("국회의원 목록 조회: {}", request);
 
+        Page<Figure> figures = queryService.findAllWithCriteria(request);
+        return figures.map(FigureDTO::from);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FigureDTO> getPopularFigures(int limit) {
+        log.debug("인기 국회의원 조회: {}명", limit);
+
+        String cacheKey = "popular_figures_" + limit;
+
+        return cacheService.getOrCompute(cacheKey, 1800, () -> {
+            List<Figure> figures = queryService.findPopularFigures(limit);
+            return figures.stream()
+                    .map(FigureDTO::from)
+                    .collect(Collectors.toList());
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public List<FigureDTO> getFiguresByParty(FigureParty party) {
+        log.debug("정당별 국회의원 조회: {}", party);
+
+        String cacheKey = "party_figures_" + party.name();
+
+        return cacheService.getOrCompute(cacheKey, 3600, () -> {
+            List<Figure> figures = queryService.findByParty(party);
+            return figures.stream()
+                    .map(FigureDTO::from)
+                    .collect(Collectors.toList());
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public boolean existsFigure(String figureId) {
+        return queryService.existsByFigureId(figureId);
     }
 }

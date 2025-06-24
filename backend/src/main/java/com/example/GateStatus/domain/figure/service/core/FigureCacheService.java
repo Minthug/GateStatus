@@ -61,7 +61,7 @@ public class FigureCacheService {
      * @param figureId
      * @return
      */
-    public FigureDTO getCachedFigure(String figureId) {
+    public FigureDTO getCachedDTO(String figureId) {
         if (JsonUtils.isEmpty(figureId)) {
             return null;
         }
@@ -84,7 +84,107 @@ public class FigureCacheService {
         }
     }
 
+    /**
+     * ID로 Figure 정보 조회 - 캐싱 적용
+     * @param figureId 국회의원 ID
+     * @return 캐시된 Figure (없으면 null)
+     */
+    public Figure findFigureById(String figureId) {
+        if (JsonUtils.isEmpty(figureId)) {
+            return null;
+        }
+
+        String cacheKey = CACHE_KEY_PREFIX + figureId;
+        try {
+            Figure cachedFigure = (Figure) redisTemplate.opsForValue().get(cacheKey);
+
+            if (cachedFigure != null) {
+                log.debug("Cache hit for figure ID: {}", figureId);
+                return cachedFigure;
+            } else {
+                log.debug("Cache miss for figure ID: {}", figureId);
+                return null;
+            }
+        } catch (Exception e) {
+            log.warn("Figure 캐시 조회 실패: {} - {}", figureId, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * ID로 FigureDTO 조회 (V2 추가)
+     * @param figureId 국회의원 ID
+     * @return 캐시된 FigureDTO (없으면 null)
+     */
+    public FigureDTO getCachedFigure(String figureId) {
+        if (JsonUtils.isEmpty(figureId)) {
+            return null;
+        }
+
+        String cacheKey = CACHE_KEY_PREFIX + "dto:" + figureId;
+        try {
+            Object cached = redisTemplate.opsForValue().get(cacheKey);
+
+            if (cached instanceof String) {
+                return objectMapper.readValue((String) cached, FigureDTO.class);
+            }
+
+            log.debug("FigureDTO 캐시 미스: {}", figureId);
+            return null;
+        } catch (Exception e) {
+            log.warn("FigureDTO 캐시 조회 실패: {} - {}", figureId, e.getMessage());
+            return null;
+        }
+    }
+
+
     // ========== getOrCompute 패턴 ==========
+    @SuppressWarnings("unchecked")
+    public <T> T getOrCompute(String key, long ttl, Supplier<T> supplier) {
+        try {
+            // 1. 캐시에서 조회
+            Object cached = redisTemplate.opsForValue().get(key);
+
+            if (cached != null) {
+                log.debug("캐시 히트: {}", key);
+
+                // JSON 문자열인 경우 역직렬화 시도
+                if (cached instanceof String && ((String) cached).startsWith("{")) {
+                    try {
+                        return (T) cached; // JSON 문자열 그대로 반환하거나 필요시 역직렬화
+                    } catch (Exception e) {
+                        log.warn("캐시 역직렬화 실패: {} - {}", key, e.getMessage());
+                    }
+                }
+
+                return (T) cached;
+            }
+
+            // 2. 캐시 미스 - 새로 계산
+            log.debug("캐시 미스 - 새로 계산: {}", key);
+            T result = supplier.get();
+
+            if (result != null) {
+                // 3. 결과 캐싱
+                if (result instanceof String || result instanceof Number || result instanceof Boolean) {
+                    redisTemplate.opsForValue().set(key, result, ttl, TimeUnit.SECONDS);
+                } else {
+                    // 복잡한 객체는 JSON으로 직렬화
+                    String jsonValue = objectMapper.writeValueAsString(result);
+                    redisTemplate.opsForValue().set(key, jsonValue, ttl, TimeUnit.SECONDS);
+                }
+                log.debug("새 값 캐싱 완료: {}", key);
+            }
+
+            return result;
+
+        } catch (Exception e) {
+            log.error("getOrCompute 실패: {} - {}", key, e.getMessage());
+            // 캐시 실패 시 직접 계산
+            return supplier.get();
+        }
+    }
+
     /**
      * FigureDTO 전용 getOrCompute
      * @param figureId 국회의원 ID
@@ -93,7 +193,7 @@ public class FigureCacheService {
      */
     public FigureDTO getOrComputeFigure(String figureId, Supplier<FigureDTO> supplier) {
         // 1. 캐시에서 먼저 조회
-        FigureDTO cached = getCachedFigure(figureId);
+        FigureDTO cached = getCachedDTO(figureId);
         if (cached != null) {
             return cached;
         }
