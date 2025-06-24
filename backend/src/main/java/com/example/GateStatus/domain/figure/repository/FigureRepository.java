@@ -36,12 +36,13 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     List<Figure> findByFigureType(FigureType figureType);
 
+    Page<Figure> findByFigureParty(FigureParty figureParty, Pageable pageable);
     List<Figure> findByFigureParty(FigureParty figureParty);
 
     List<Figure> findByNameContainingAndFigureParty(String name, FigureParty figureParty);
 
     @Query("SELECT f FROM Figure f ORDER BY f.viewCount DESC ")
-    List<Figure> findTopByOrderByViewCountDesc(PageRequest pageRequest);
+    List<Figure> findTopByOrderByViewCountDesc(Pageable pageable);
 
     @Modifying
     @Transactional
@@ -51,7 +52,7 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
     @Query("SELECT f FROM Figure f JOIN f.figureTag ft JOIN ft.tag t WHERE t.tagName = :tagName")
     List<Figure> findByTagName(@Param("tagName") String tagName);
 
-    List<Figure> findTop10ByOrderByModifiedDateDesc();
+    List<Figure> findTop10ByOrderByModifiedDateDesc(Pageable pageable);
 
     // 기본 정보만 로딩 (컬렉션 없이)
     @Query("SELECT f FROM Figure f WHERE f.figureId = :figureId")
@@ -77,4 +78,8 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
 
 
     List<Figure> findByNameIn(List<String> cleanNames);
+
+    void incrementViewCount(String figureId);
+
+    Page<Figure> findByNameContainingOrConstituencyContaining(String keyword, String keyword1, Pageable pageable);
 }

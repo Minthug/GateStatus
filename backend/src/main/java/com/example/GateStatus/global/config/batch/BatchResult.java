@@ -7,4 +7,12 @@ public record BatchResult(
         int errorCount,
         List<String> errorIds
 ) {
+    public double getSuccessRate() {
+        int total = successCount + errorCount;
+        return total > 0 ? (double) successCount / total * 100 : 0;
+    }
+
+    public boolean hasErrors() {
+        return errorCount > 0;
+    }
 }
