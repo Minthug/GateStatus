@@ -12,6 +12,8 @@ import com.example.GateStatus.domain.figure.service.request.FigureSearchRequest;
 import com.example.GateStatus.domain.figure.service.response.FigureDTO;
 import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
 import com.example.GateStatus.domain.vote.service.VoteService;
+import com.example.GateStatus.global.config.open.ApiResponse;
+import com.google.protobuf.Api;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
@@ -142,6 +144,35 @@ public class FigureController {
         } catch (Exception e) {
             log.error("이름 검색 중 오류: {}", name, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // ========== 기존 동기화 API (URL 패턴 그대로 유지) ==========
+    @PostMapping("/sync/all")
+    public ResponseEntity<ApiResponse<Integer>> syncAllFigures() {
+        log.info("모든 국회의원 정보 동기화 요청 (V3)");
+
+        try {
+            int count = apiService.syncAllFiguresV3();
+            return ResponseEntity.ok(ApiResponse.success("국회의원 정보 동기화 완료", count));
+        } catch (Exception e) {
+            log.error("동기화 실패", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("국회의원 정보 동기화 실패: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/sync/allV2")
+    public ResponseEntity<ApiResponse<String>> syncFiguresAsync() {
+        log.info("국회의원 정보 비동기 동기화 요청 (V4)");
+
+        try {
+            String jobId = apiService.syncAllFiguresV4();
+            return ResponseEntity.ok(ApiResponse.success("국회의원 정보 비동기 동기화 작업이 시작되었습니다", jobId));
+        } catch (Exception e) {
+            log.error("비동기 동기화 실패", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("비동기 동기화 실패: " + e.getMessage()));
         }
     }
 
