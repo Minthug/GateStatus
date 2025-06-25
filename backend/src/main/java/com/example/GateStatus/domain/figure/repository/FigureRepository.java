@@ -81,5 +81,6 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     void incrementViewCount(String figureId);
 
-    Page<Figure> findByNameContainingOrConstituencyContaining(String keyword, String keyword1, Pageable pageable);
+    Page<Figure> findByNameContainingOrConstituencyContaining(String keyword, String keyword2, Pageable pageable);
+    List<Figure> findByNameContainingOrConstituencyContaining(String keyword, String keyword2);
 }

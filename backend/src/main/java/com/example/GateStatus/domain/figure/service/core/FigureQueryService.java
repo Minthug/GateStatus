@@ -3,6 +3,7 @@ package com.example.GateStatus.domain.figure.service.core;
 import com.example.GateStatus.domain.common.JsonUtils;
 import com.example.GateStatus.domain.figure.Figure;
 import com.example.GateStatus.domain.figure.FigureParty;
+import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.exception.NotFoundFigureException;
 import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.request.FigureSearchRequest;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -107,6 +109,20 @@ public class FigureQueryService {
         return party != null ?
                 figureRepository.findByFigureParty(party, pageable) :
                 Page.empty(pageable);
+    }
+
+    public List<Figure> findByType(FigureType figureType) {
+        if (figureType == null) {
+            return Collections.emptyList();
+        }
+
+        try {
+            List<Figure> figures = figureRepository.findByFigureType(figureType);
+
+            return figures;
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
     }
 }
 

@@ -2,6 +2,7 @@ package com.example.GateStatus.domain.figure.controller;
 
 import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.exception.NotFoundFigureException;
 import com.example.GateStatus.domain.figure.service.core.FigureCacheService;
 import com.example.GateStatus.domain.figure.service.core.FigureService;
@@ -19,7 +20,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import retrofit2.http.Path;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
@@ -92,6 +96,53 @@ public class FigureController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
 
+    }
+
+    @GetMapping("/type/{figureType}")
+    public ResponseEntity<List<FindFigureDetailResponse>> findFiguresByType(@PathVariable FigureType figureType) {
+        log.info("타입별 국회의원 조회: {}", figureType);
+
+        try {
+            List<FigureDTO> figureDTOs = figureService.getFiguresByType(figureType);
+
+            if (figureDTOs.isEmpty()) {
+                log.info("타입별 조회 결과 없음: {}", figureType.getDisplayName());
+                return ResponseEntity.ok(Collections.emptyList());
+            }
+
+            List<FindFigureDetailResponse> responses = figureDTOs.stream()
+                    .map(dto -> {
+                        Figure figure = convertDtoToEntity(dto);
+                        return FindFigureDetailResponse.from(figure);
+                    })
+                    .collect(Collectors.toList());
+            log.info("타입별 조회 성공: {} - {}명", figureType.getDisplayName(), responses.size());
+            return ResponseEntity.ok(responses);
+        } catch (IllegalArgumentException e) {
+            log.warn("잘못된 국회의원 타입: {}", figureType, e);
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("타입별 국회의원 조회 중 오류: {}", figureType, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/search/name")
+    public ResponseEntity<?> searchFigureByName(@RequestParam String name) {
+        log.info("이름으로 국회의원 검색 요청: {}", name);
+
+        try {
+            List<FigureDTO> searchResult = figureService.searchFigures(name);
+
+            if (!searchResult.isEmpty()) {
+                return ResponseEntity.ok(searchResult.get(0));
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            log.error("이름 검색 중 오류: {}", name, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     private Figure convertDtoToEntity(FigureDTO dto) {
