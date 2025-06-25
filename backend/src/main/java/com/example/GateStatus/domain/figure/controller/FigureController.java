@@ -11,6 +11,7 @@ import com.example.GateStatus.domain.figure.service.external.FigureSyncService;
 import com.example.GateStatus.domain.figure.service.request.FigureSearchRequest;
 import com.example.GateStatus.domain.figure.service.response.FigureDTO;
 import com.example.GateStatus.domain.figure.service.response.FindFigureDetailResponse;
+import com.example.GateStatus.domain.figure.service.response.SyncPartyResponse;
 import com.example.GateStatus.domain.vote.service.VoteService;
 import com.example.GateStatus.global.config.open.ApiResponse;
 import com.google.protobuf.Api;
@@ -175,6 +176,20 @@ public class FigureController {
                     .body(ApiResponse.error("비동기 동기화 실패: " + e.getMessage()));
         }
     }
+
+    @PostMapping("/sync/party")
+    public ResponseEntity<SyncPartyResponse> syncFiguresByParty(@RequestParam String partyName) {
+        log.info("정당별 국회의원 동기화 요청: {}", partyName);
+
+        try {
+            int syncCount = apiService.syncFigureByParty(partyName);
+            return ResponseEntity.ok(new SyncPartyResponse(partyName, syncCount));
+        } catch (Exception e) {
+            log.error("정당별 동기화 실패: {}", partyName, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
 
     private Figure convertDtoToEntity(FigureDTO dto) {
         return Figure.builder()
