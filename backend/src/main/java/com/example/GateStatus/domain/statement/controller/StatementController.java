@@ -125,9 +125,6 @@ public class StatementController {
         return ResponseEntity.ok(statements);
     }
 
-
-
-
     @GetMapping("/by-name")
     public ResponseEntity<?> getStatementsByFigureName(@RequestParam String figureName,
                                                        @RequestParam(required = false, defaultValue = "false") Boolean sync,

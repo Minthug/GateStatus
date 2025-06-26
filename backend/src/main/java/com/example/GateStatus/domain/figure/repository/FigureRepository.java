@@ -79,6 +79,9 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     List<Figure> findByNameIn(List<String> cleanNames);
 
+    @Modifying
+    @Transactional
+    @Query("UPDATE Figure f SET f.viewCount = f.viewCount + 1 WHERE f.figureId = :figureId")
     void incrementViewCount(String figureId);
 
     Page<Figure> findByNameContainingOrConstituencyContaining(String keyword, String keyword2, Pageable pageable);
