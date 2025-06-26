@@ -2,6 +2,7 @@ package com.example.GateStatus.domain.figure.controller;
 
 import com.example.GateStatus.domain.career.Career;
 import com.example.GateStatus.domain.figure.Figure;
+import com.example.GateStatus.domain.figure.FigureParty;
 import com.example.GateStatus.domain.figure.FigureType;
 import com.example.GateStatus.domain.figure.exception.NotFoundFigureException;
 import com.example.GateStatus.domain.figure.service.core.FigureCacheService;
@@ -14,7 +15,6 @@ import com.example.GateStatus.domain.figure.service.response.FindFigureDetailRes
 import com.example.GateStatus.domain.figure.service.response.SyncPartyResponse;
 import com.example.GateStatus.domain.vote.service.VoteService;
 import com.example.GateStatus.global.config.open.ApiResponse;
-import com.google.protobuf.Api;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
@@ -23,7 +23,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import retrofit2.http.Path;
 
 import java.util.Collections;
 import java.util.List;
@@ -190,6 +189,33 @@ public class FigureController {
         }
     }
 
+    @GetMapping("/popular")
+    public ResponseEntity<ApiResponse<List<FigureDTO>>> getPopularFigures(@RequestParam(defaultValue = "10") int limit) {
+        log.info("인기 국회의원 조회: {}명", limit);
+
+        try {
+            List<FigureDTO> popularFigures = figureService.getPopularFigures(limit);
+            return ResponseEntity.ok(ApiResponse.success("인기 국회의원 조회 성공", popularFigures));
+        } catch (Exception e) {
+            log.error("인기 국회의원 조회 실패", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("인기 국회의원 조회 실패" + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/party/{party}")
+    public ResponseEntity<ApiResponse<List<FigureDTO>>> getFiguresByParty(@PathVariable FigureParty party) {
+        log.info("정당별 국회의원 조회: {}", party.getPartyName());
+
+        try {
+            List<FigureDTO> partyFigures = figureService.getFiguresByParty(party);
+            return ResponseEntity.ok(ApiResponse.success("정당별 조회 성공", partyFigures));
+        } catch (Exception e) {
+            log.error("정당별 조회 실패: {}", party, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("정당별 조회 실패 " + e.getMessage()));
+        }
+    }
 
     private Figure convertDtoToEntity(FigureDTO dto) {
         return Figure.builder()
