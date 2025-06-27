@@ -104,7 +104,6 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
         List<String> education = parseEducation(row);
         List<Career> careers = parseCareers(row);
 
-
         return new FigureInfoDTO(
                 figureId, name, englishName, birth, partyName, constituency,
                 committeeName, committeePosition, electedCount, electedDate,
@@ -114,12 +113,24 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
         );
     }
 
-
-
+    // ========== Entity 업데이트 관련 메서드 ==========
     public void updateFigureFromDTO(Figure figure, FigureInfoDTO dto) {
         validateAndSetFigureId(figure, dto);
-        updateBasicFields(figure, dto);
-        updateComplexFields(figure, dto);
+
+        figure.update(
+                dto.name(),
+                dto.englishName(),
+                dto.birth(),
+                dto.constituency(),
+                dto.profileUrl(),
+                FigureType.POLITICIAN,
+                dto.partyName(),
+                convertEducation(dto),
+                convertCareers(dto),
+                convertSites(dto),
+                convertActivities(dto),
+                "국회 Open API"
+        );
     }
 
     private void validateAndSetFigureId(Figure figure, FigureInfoDTO dto) {
@@ -335,11 +346,11 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
         return new ArrayList<>(educationSet);
     }
 
-    private void addNonEmptyEducation(List<String> education, String eduValue) {
-        if (isNotEmpty(eduValue)) {
-            education.add(eduValue.trim());
-        }
-    }
+//    private void addNonEmptyEducation(List<String> education, String eduValue) {
+//        if (isNotEmpty(eduValue)) {
+//            education.add(eduValue.trim());
+//        }
+//    }
 
     // ========== 정당 변환 메서드 ==========
 

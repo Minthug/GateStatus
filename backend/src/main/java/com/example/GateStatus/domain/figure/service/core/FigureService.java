@@ -7,7 +7,6 @@ import com.example.GateStatus.domain.figure.repository.FigureRepository;
 import com.example.GateStatus.domain.figure.service.external.FigureApiService;
 import com.example.GateStatus.domain.figure.service.request.FigureSearchRequest;
 import com.example.GateStatus.domain.figure.service.response.FigureDTO;
-import com.example.GateStatus.domain.statement.service.StatementApiService;
 import com.example.GateStatus.domain.statement.service.StatementSyncService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
