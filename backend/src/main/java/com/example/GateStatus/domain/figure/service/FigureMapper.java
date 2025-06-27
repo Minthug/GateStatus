@@ -145,35 +145,32 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
         }
     }
 
+    // ========== DTO ↔ Entity 변환 관련 메서드 ==========
+    public Figure convertDtoToResponseEntity(FigureDTO dto) {
+        if (dto == null) {
+            log.warn("변환할 FigureDTO가 null입니다");
+            return null;
+        }
 
-    private void updateBasicFields(Figure figure, FigureInfoDTO dto) {
-        figure.setName(dto.name());
-        figure.setEnglishName(dto.englishName());
-        figure.setBirth(dto.birth());
-        figure.setConstituency(dto.constituency());
-        figure.setFigureParty(dto.partyName());
-        figure.setProfileUrl(dto.profileUrl());
-        figure.setUpdateSource("국회 Open API");
+        return Figure.builder()
+                .id(null)
+                .figureId(dto.getFigureId())
+                .name(dto.getName())
+                .englishName(dto.getEnglishName())
+                .birth(dto.getBirth())
+                .constituency(dto.getConstituency())
+                .profileUrl(dto.getProfileUrl())
+                .figureType(dto.getFigureType())
+                .figureParty(dto.getFigureParty())
+                .education(safeListCopy(dto.getEducation()))
+                .careers(convertCareersDtosToEntities(dto.getCareers()))
+                .sites(safeListCopy(dto.getSites()))
+                .activities(safeListCopy(dto.getActivities()))
+                .viewCount(dto.getViewCount())
+                .build();
+
     }
 
-    private void updateComplexFields(Figure figure, FigureInfoDTO dto) {
-        figure.update(
-                dto.name(),
-                dto.englishName(),
-                dto.birth(),
-                dto.constituency(),
-                dto.profileUrl(),
-                FigureType.POLITICIAN,
-                dto.partyName(),
-                convertEducation(dto),
-                convertCareers(dto),
-                convertSites(dto),
-                convertActivities(dto),
-                "국회 Open API"
-        );
-    }
-
-    // ========== DTO 변환 관련 메서드 ==========
     public FigureDTO convertToFigureDTO(FigureInfoDTO dto) {
         if (dto == null) {
             log.warn("변환할 DTO가 null입니다");
@@ -193,6 +190,25 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
                 .sites(dto.getLinkUrl())
                 .activities(dto.getActivities())
                 .viewCount(0L)
+                .build();
+    }
+
+    private List<Career> convertCareersDtosToEntities(List<CareerDTO> careers) {
+        if (careers == null) {
+            return new ArrayList<>();
+        }
+
+        return careers.stream()
+                .map(this::convertCareersDtoToEntity)
+                .collect(Collectors.toList());
+    }
+
+    private Career convertCareersDtoToEntity(CareerDTO careerDTO) {
+        return Career.builder()
+                .title(careerDTO.getTitle())
+                .position(careerDTO.getPosition())
+                .organization(careerDTO.getOrganization())
+                .period(careerDTO.getPeriod())
                 .build();
     }
 
@@ -346,12 +362,6 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
         return new ArrayList<>(educationSet);
     }
 
-//    private void addNonEmptyEducation(List<String> education, String eduValue) {
-//        if (isNotEmpty(eduValue)) {
-//            education.add(eduValue.trim());
-//        }
-//    }
-
     // ========== 정당 변환 메서드 ==========
 
     private FigureParty convertToFigureParty(String partyName) {
@@ -464,5 +474,14 @@ public class FigureMapper implements ApiMapper<JsonNode, List<FigureInfoDTO>> {
 
         log.warn("이메일 형식이 올바르지 않음: {}", email);
         return email; // 원본 반환
+    }
+
+    /**
+     * 리스트의 방어적 복사 수행
+     * @param source 원본 리스트
+     * @return 복사된 리스트 (null인 경우 빈 리스트)
+     */
+    private <T> List<T> safeListCopy(List<T> source) {
+        return source != null ? new ArrayList<>(source) : new ArrayList<>();
     }
 }
