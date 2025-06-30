@@ -1,54 +1,52 @@
+GateStatus 프로젝트 포트폴리오
+📋 프로젝트 개요
+GateStatus는 대한민국 정치인들의 활동을 실시간으로 추적하고 분석하는 정치 정보 플랫폼입니다. 국회 공개 API와 AI 기술을 활용하여 정치인의 발언, 투표, 법안 발의 등을 종합 분석하고 시각화합니다.
+🎯 프로젝트 목표
+
+정치인의 활동을 투명하게 공개하여 정치적 책임성 강화
+AI 기반 팩트체크 시스템으로 정보의 신뢰성 확보
+복잡한 정치 정보를 일반 국민이 쉽게 이해할 수 있도록 시각화
 
 
-IssueController의 searchIssues && getIssueBySlug에 대한 내용입니다.
-조금 더 유저 친화적인 RestAPI 설계에 대한 내용 
-/**
-* 🎉 범용적인 이유:
-* 1. API 엔드포인트 개수 감소: 3개 → 1개
-* 2. 프론트엔드에서 검색 방식을 자유롭게 선택 가능
-* 3. 하나의 검색창으로 다양한 검색 지원
-* 4. URL이 일관성 있고 이해하기 쉬움
-     */
+🛠 기술 스택
+Backend
 
-// ============================================
-// 🏷️ Slug란 무엇인가? (SEO 친화적 URL)
-// ============================================
+Framework: Spring Boot 3.2.3 (Java 17)
+Database: PostgreSQL (메인), MongoDB (발언 데이터)
+Cache: Redis (세션, 캐시)
+Message Queue: RabbitMQ, Apache Kafka
+API: Spring WebFlux (비동기 처리)
+Security: Spring Security
+AI: OpenAI GPT-4 API
 
-/**
-* Slug = URL에 안전하고 읽기 좋은 형태의 문자열
-*
-* 원본 이슈명 → Slug 변환 예시:
-* "부동산 정책" → "budongsan-jeongchaek"
-* "코로나19 대응책" → "corona19-daeeungchaek"
-* "경제정책 & 투자가이드" → "gyeongje-jeongchaek-tooja-guide"
-  */
+Infrastructure & DevOps
 
-/**
-* 🤔 왜 Slug를 사용하는가?
-  */
-
-// ❌ 사용자 친화적이지 않은 URL들
-GET /v1/issues/507f1f77bcf86cd799439011  // ID - 의미 없음
-GET /v1/issues/by-name/부동산%20정책      // 인코딩 - 복잡함
-
-// ✅ Slug 사용한 깔끔한 URL
-GET /v1/issues/budongsan-jeongchaek      // 의미 있고 깔끔!
-
-/**
-* Slug의 장점:
-* 1. SEO 친화적 - 검색엔진이 URL 내용을 이해 가능
-* 2. 사용자 친화적 - URL만 봐도 내용 예상 가능
-* 3. 공유하기 좋음 - 인코딩 문제 없음
-* 4. 브랜딩 효과 - 전문적으로 보임
-     */
+Container: Docker, Kubernetes
+CI/CD: Google Jib
+Monitoring: Spring Actuator
+External API: 국회 공개 API, 네이버 뉴스 API
 
 
-    @GetMapping("/by-slug/{slug}")
-    public ResponseEntity<IssueResponse> getIssueBySlug(@PathVariable String slug) {
-        // 슬러그는 영문/숫자/하이픈만 사용하므로 인코딩 문제 없음
-        log.info("슬러그로 검색: {}", slug);
+🏗 시스템 아키텍처
+도메인 구조
+GateStatus/
+├── domain/
+│   ├── figure/          # 정치인 관리
+│   ├── statement/       # 발언 관리 (MongoDB)
+│   ├── vote/            # 투표 정보
+│   ├── proposedBill/    # 법안 발의
+│   ├── issue/           # 이슈 관리
+│   ├── comparison/      # 정치인 비교 분석
+│   ├── dashboard/       # 대시보드 통계
+│   ├── category/        # 카테고리 분류
+│   ├── tag/             # 태그 시스템
+│   └── timeline/        # 타임라인 이벤트
+└── global/
+├── config/          # 설정 (Security, Redis, Kafka 등)
+├── openAi/          # AI 기능
+└── kubernetes/      # 쿠버네티스 설정
+멀티 데이터베이스 전략
 
-        IssueResponse response = issueService.getIssueBySlug(slug);
-        return ResponseEntity.ok(response);
-    }
-해당 내용은 현 시점에선 오버엔지니어링으로 인하여 추후 사용을 할 예정
+PostgreSQL: 정형 데이터 (정치인, 투표, 법안)
+MongoDB: 비정형 데이터 (발언, 텍스트 분석)
+Redis: 캐싱 및 세션 관리
