@@ -37,6 +37,9 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                                // ✅ Swagger UI 접근 허용 추가
+                                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                                .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/v1/figures/sync/all").permitAll()
                         .requestMatchers("/v1/figures/sync/**").permitAll()
                         .requestMatchers("/v1/figures/test/**").permitAll()
@@ -92,6 +95,8 @@ public class SecurityConfig {
                             }
                         })
                 )
+                .headers(headers -> headers
+                        .frameOptions(frameOptions -> frameOptions.deny()))
                 .httpBasic(Customizer.withDefaults());
         return http.build();
     }
