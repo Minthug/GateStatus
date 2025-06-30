@@ -76,7 +76,7 @@ public class ComparisonDataService {
         List<StatementDocument> allStatements;
 
         if (context.hasTargetIssue()) {
-            allStatements = statementRepository.findByFigureIdInAndIssueIdsContainingAndStatementDateBetween(
+            allStatements = statementRepository.findByFiguresIdInAndIssueIdsContainingAndStatementDateBetween(
                     figureIds,
                     context.getIssueId(),
                     dateRange.getStartDate(),

@@ -47,7 +47,7 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
 
     // 여러 정치인용 (배치 처리)
     @Query("{'figureId': {$in: ?0}, 'issueIds': ?1, 'statementDate': {$gte: ?2, $lte: ?3}}")
-    List<StatementDocument> findByFigureIdInAndIssueIdsContainingAndStatementDateBetween(
+    List<StatementDocument> findByFiguresIdInAndIssueIdsContainingAndStatementDateBetween(
             List<Long> figureIds, String issueId, LocalDate startDate, LocalDate endDate);
 
     // 여러 정치인용 + 페이징 (전체 조회용)

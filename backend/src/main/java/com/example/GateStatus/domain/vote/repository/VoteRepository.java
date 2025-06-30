@@ -18,7 +18,7 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
     /**
      * 특정 정치인의 모든 투표 내역 조회
      */
-    List<Vote> findByFigureId(Long figureId);
+    List<Vote> findAllByFigureId(Long figureId);
 
     /**
      * 특정 정치인의 투표 내역 페이징 조회

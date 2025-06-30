@@ -75,7 +75,7 @@ public interface NewsRepository extends MongoRepository<NewsDocument, String> {
 
     Page<NewsDocument> findByCategoryOrderByPubDateDesc(String category, Pageable pageable);
 
-    Page<NewsDocument> findByPubDateBetween(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
+    Page<NewsDocument> findAllByPubDateBetween(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
 
     List<NewsDocument> findByPubDateBetween(LocalDateTime startDate, LocalDateTime endDate);
 
@@ -100,7 +100,6 @@ public interface NewsRepository extends MongoRepository<NewsDocument, String> {
                 .distinct()
                 .toList();
     }
-
 
     /**
      * 전체 뉴스 개수 확인

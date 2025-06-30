@@ -83,7 +83,7 @@ public class NewsService {
         if (startDate.isAfter(endDate)) {
             throw new IllegalArgumentException("시작일이 종료일보다 늦을 수 없습니다.");
         }
-        return newsRepository.findByPubDateBetween(startDate, endDate, pageable);
+        return newsRepository.findAllByPubDateBetween(startDate, endDate, pageable);
     }
 
     @Transactional
