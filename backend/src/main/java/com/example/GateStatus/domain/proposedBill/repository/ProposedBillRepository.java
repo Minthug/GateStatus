@@ -19,7 +19,7 @@ public interface ProposedBillRepository extends JpaRepository<ProposedBill, Long
 
     Optional<ProposedBill> findByBillNo(String BillNo);
 
-    List<ProposedBill> findByProposer(Figure proposer);
+    List<ProposedBill> findAllByProposer(Figure proposer);
 
     Page<ProposedBill> findByProposer(Figure proposer, Pageable pageable);
 

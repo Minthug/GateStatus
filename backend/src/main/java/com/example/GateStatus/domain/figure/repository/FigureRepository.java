@@ -30,14 +30,14 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
 
     Page<Figure> findByNameContaining(String name, Pageable pageable);
 
-    List<Figure> findOneByNameContaining(String name);
+//    List<Figure> findOneByNameContaining(String name);
 
     Page<Figure> findByConstituencyContaining(String place, Pageable pageable);
 
     List<Figure> findByFigureType(FigureType figureType);
 
     Page<Figure> findByFigureParty(FigureParty figureParty, Pageable pageable);
-    List<Figure> findByFigureParty(FigureParty figureParty);
+    List<Figure> findAllByFigureParty(FigureParty figureParty);
 
     List<Figure> findByNameContainingAndFigureParty(String name, FigureParty figureParty);
 
@@ -85,5 +85,5 @@ public interface FigureRepository extends JpaRepository<Figure, Long> {
     void incrementViewCount(String figureId);
 
     Page<Figure> findByNameContainingOrConstituencyContaining(String keyword, String keyword2, Pageable pageable);
-    List<Figure> findByNameContainingOrConstituencyContaining(String keyword, String keyword2);
+    List<Figure> findAllByNameContainingOrConstituencyContaining(String keyword, String keyword2);
 }

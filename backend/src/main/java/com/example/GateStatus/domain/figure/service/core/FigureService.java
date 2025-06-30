@@ -110,7 +110,7 @@ public class FigureService {
     @Transactional(readOnly = true)
     public List<FigureDTO> searchFigures(String keyword) {
         return cacheService.getOrComputeSearchResults(keyword, () -> {
-            List<Figure> figures = figureRepository.findByNameContainingOrConstituencyContaining(keyword, keyword);
+            List<Figure> figures = figureRepository.findAllByNameContainingOrConstituencyContaining(keyword, keyword);
             return figures.stream()
                     .map(FigureDTO::from)
                     .collect(Collectors.toList());

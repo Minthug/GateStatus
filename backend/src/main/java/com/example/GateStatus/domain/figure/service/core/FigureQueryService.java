@@ -66,7 +66,7 @@ public class FigureQueryService {
     }
 
     public List<Figure> findByParty(FigureParty party) {
-        return figureRepository.findByFigureParty(party);
+        return figureRepository.findAllByFigureParty(party);
     }
 
     public List<Figure> findPopularFigures(int limit) {

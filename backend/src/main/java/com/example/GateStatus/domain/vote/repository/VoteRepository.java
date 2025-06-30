@@ -40,10 +40,10 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
      */
     boolean existsByFigureIdAndBillBillNo(Long figureId, String billNo);
 
-    /**
-     * 특정 정치인의 특정 투표 결과만 조회
-     */
-    List<Vote> findByFigureIdAndVoteResult(Long figureId, VoteResultType voteResult);
+//    /**
+//     * 특정 정치인의 특정 투표 결과만 조회
+//     */
+//    List<Vote> findByFigureIdAndVoteResult(Long figureId, VoteResultType voteResult);
 
     /**
      * 특정 날짜 이후의 투표 내역 조회
@@ -88,7 +88,7 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
      * 법안명 키워드로 투표 내역 검색
      */
     @Query("SELECT v FROM Vote v JOIN v.bill b WHERE LOWER(b.billName) LIKE LOWER(CONCAT('%', :keyword, '%'))")
-    List<Vote> findByBillNameContaining(@Param("keyword") String keyword);
+    List<Vote> findOneByBillNameContaining(@Param("keyword") String keyword);
 
     /**
      * 법안명 키워드로 투표 내역 검색 (페이징)
@@ -114,10 +114,10 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
             "GROUP BY v.voteResult")
     List<Object[]> countVotesByResult(@Param("figureId") Long figureId);
 
-    /**
-     * 특정 법안에 대한 모든 정치인의 투표 내역 조회 (페이징)
-     */
-    Page<Vote> findByBillBillNo(String billNo, Pageable pageable);
+//    /**
+//     * 특정 법안에 대한 모든 정치인의 투표 내역 조회 (페이징)
+//     */
+//    Page<Vote> findByBillBillNo(String billNo, Pageable pageable);
 
     /**
      * 특정 정치인의 특정 투표 결과만 페이징 조회

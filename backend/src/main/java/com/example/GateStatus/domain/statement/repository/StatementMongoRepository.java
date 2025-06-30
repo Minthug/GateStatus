@@ -37,8 +37,8 @@ public interface StatementMongoRepository extends MongoRepository<StatementDocum
     @Query("{'figureId': ?0, 'statementDate': {$gte: ?1, $lte: ?2}}")
     List<StatementDocument> findByFigureIdAndStatementDateBetween(Long figureId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
-    // 특정 정치인의 특정 기간 내 모든 발언 조회(페이징없음)
-    List<StatementDocument> findByFigureIdAndStatementDateBetween(Long figureId, LocalDate startDate, LocalDate endDate);
+//    // 특정 정치인의 특정 기간 내 모든 발언 조회(페이징없음)
+//    List<StatementDocument> findByFigureIdAndStatementDateBetween(Long figureId, LocalDate startDate, LocalDate endDate);
 
     // 특정 정치인의 특정 이슈에 관한 특정 기간 내 발언 조회 (단일 정치인용)
     @Query("{'figureId': ?0, 'issueIds': ?1, 'statementDate': {$gte: ?2, $lte: ?3}}")
